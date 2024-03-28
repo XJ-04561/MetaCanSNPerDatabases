@@ -7,7 +7,10 @@ from typing import Generator, Callable, Iterable, Self, overload, final, Literal
 LOGGER = logging.Logger("MetaCanSNPerDatabases")
 LOGGER.addHandler(logging.FileHandler("MetaCanSNPerDatabases.log"))
 
-DATABASE_VERSIONS : dict[str,int] = {}
+DATABASE_VERSIONS : dict[str,int] = {
+    "7630f33662e27489b7bb7b3b121ca4ff" : 0,
+    "a" : 1
+}
 CURRENT_VERSION : str = ""
 STRICT : bool = False
 

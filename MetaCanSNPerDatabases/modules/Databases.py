@@ -197,13 +197,16 @@ class DatabaseWriter(Database):
 			case -2: # Table is new
 				for table in self.Tables:
 					table.create()
-				self._connection.execute('PRAGMA user_version = ?;', [self.__version__])
+				self._connection.execute("PRAGMA user_version = ? ;", [self.__version__])
 			case -3: # Transfer data from old tables into new tables
 				for table in self.Tables:
 					table.recreate()
 				for (table,) in self._connection.execute("SELECT name FROM sqlite_master WHERE type='table';"):
 					if table not in TABLES:
 						self._connection.execute(f"DROP TABLE {table};")
+				self._connection.execute("PRAGMA user_version = ? ;", [self.__version__])
+			case -4:
+				self._connection.execute("PRAGMA user_version = ? ;", [self.__version__])
 
 	def addSNP(self, nodeID, position, ancestral, derived, reference, date, genomeID):
 		self._connection.execute(f"INSERT (?,?,?,?,?,?,?) INTO {TABLE_NAME_SNP_ANNOTATION};", [nodeID, position, ancestral, derived, reference, date, genomeID])
