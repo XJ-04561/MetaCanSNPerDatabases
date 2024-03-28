@@ -242,6 +242,9 @@ def openDatabase(database : str, mode : Mode) -> DatabaseReader | DatabaseWriter
 		case "r":
 			if not os.path.exists(database):
 				raise FileNotFoundError(f"Database file {database} not found on the system.")
+			elif not os.path.isabs(database):
+				database = os.path.realpath(os.path.expanduser(database))
+					
 			# Convert to URI acceptable filename
 			cDatabase = "/".join(filter(lambda s : s != "", database.replace('?', '%3f').replace('#', '%23').split(os.path.sep)))
 			if not cDatabase.startswith("/"): # Path has to be absolute already, and windows paths need a prepended '/'

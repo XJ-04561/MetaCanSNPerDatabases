@@ -24,7 +24,7 @@ class Table:
 		self._mode = mode
 
 	def __len__(self):
-		self._conn.execute(f"SELECT COUNT(*) FROM {self._tableName};").fetchone()[0]
+		return self._conn.execute(f"SELECT COUNT(*) FROM {self._tableName};").fetchone()[0]
 	
 	def __repr__(self):
 		return object.__repr__(self)[:-1] + f" rows={len(self)} columns={self._columns}>"
