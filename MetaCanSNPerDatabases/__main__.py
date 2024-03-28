@@ -6,7 +6,7 @@ def main():
 
 	parser = argparse.ArgumentParser(prog="MetaCanSNPerDatabases")
 
-	parser.add_argument("filepath", required=True)
+	parser.add_argument("filepath")
 
 	modeGroup = parser.add_mutually_exclusive_group("Mode")
 	modeGroup.add_argument("-r", "--read",		metavar="read",		action="store_true")
