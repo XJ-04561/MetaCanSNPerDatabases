@@ -26,7 +26,7 @@ class Database:
 		self.RankTable = RankTable(self._connection, self._mode)
 		self.GenomesTable = GenomesTable(self._connection, self._mode)
 
-		if set(TABLES).isdisjoint([table for (table,) in self._connection.execute("SELECT tableName FROM sqlite_master WHERE type='table';")]):
+		if set(TABLES).isdisjoint([table for (table,) in self._connection.execute("SELECT name FROM sqlite_master WHERE type='table';")]):
 			# Table is new
 			self.SNPTable.create()
 			self.ReferenceTable.create()
