@@ -13,6 +13,59 @@ def private(func):
 
 whitespacePattern = re.compile(r"\s+")
 
+def updateFromLegacy(filename):
+	from MetaCanSNPerDatabases import DatabaseWriter
+	
+	shutil.move(filename, filename+".backup")
+	
+	conn1 = sqlite3.connect(filename+".backup")
+	conn2 = sqlite3.connect(filename)
+
+	db = DatabaseWriter(conn2)
+
+	# References
+	for (genomeID, genome, strain, genbank, refseq, assembly) in conn1.execute("SELECT * FROM snp_references;"):
+		db.addReference(genomeID, genome, strain, reference, date, genbank, refseq, assembly)
+
+	# Chromosomes
+	for (i, assembly) in conn1.execute("SELECT id, assembly FROM snp_references;"):
+		try:
+			# Try to get chromosome name from the .fna in the MetaCanSNPer directory.
+			chrom = open(os.path.join(os.path.splitroot(filename)[0], "..", "References", f"{assembly}.fna")).readline()[1:].split()[0]
+		except:
+			try:
+				# If not found, attempt same directory as the database.
+				chrom = open(os.path.join(os.path.splitroot(filename)[0], f"{assembly}.fna")).readline()[1:].split()[0]
+			except:
+				# And as a last case just set to NA
+				chrom = "NA"
+		db.addChromosome(i, chrom, i)
+	
+	# SNPs
+	i = 0
+	for (nodeID, snpID, pos, anc, der, reference, date, genomeID) in conn1.execute("SELECT * FROM snp_annotation;"):
+		# genomeID is the same as chromosomeID
+		db.addSNP((i := i+1), nodeID, pos, anc, der, reference, date, genomeID)
+	
+	# Nodes
+	i = 1
+	roots = 0
+	for (name,) in conn1.execute("SELECT name FROM snp_references ORDER BY id ASC;"):
+		if name != "root":
+			db.addNode(i, name)
+			i += 1
+		else:
+			roots += 1
+	
+	# Tree
+	for (parentID, childID) in conn1.execute("SELECT name FROM snp_references ORDER BY id ASC;"):
+		if name != "root":
+			db.addBranch(parentID-roots, childID-roots)
+	
+	db.commit()
+	db.close()
+
+
 def downloadDatabase(databaseName : str, dst : str) -> str:
 	from urllib.request import urlretrieve
 	

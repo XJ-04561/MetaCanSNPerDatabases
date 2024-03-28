@@ -22,4 +22,6 @@ class Branch:
 	@property
 	def children(self) -> Generator[Self,None,None]:
 		for (childID,) in self._connection.execute(f"SELECT {TREE_COLUMN_CHILD} FROM {TABLE_NAME_TREE} WHERE {TREE_COLUMN_PARENT} = ?", [self.nodeID]):
+			if childID == self.nodeID:
+				continue
 			yield Branch(self._connection, childID)

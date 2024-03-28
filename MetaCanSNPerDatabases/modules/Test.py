@@ -12,7 +12,7 @@ def runTest():
 
 			print(database.SNPTable)
 			print(database.ReferenceTable)
-			print(database.NodeTable)
+			print(database.NodesTable)
 			print(database.TreeTable)
 			print(database.RankTable)
 			print(database.GenomesTable)
@@ -21,7 +21,7 @@ def runTest():
 
 			print(database.SNPTable)
 			print(database.ReferenceTable)
-			print(database.NodeTable)
+			print(database.NodesTable)
 			print(database.TreeTable)
 			print(database.RankTable)
 			print(database.GenomesTable)

@@ -6,7 +6,7 @@ install_import_hook("MetaCanSNPerDatabases.modules.Globals")
 import MetaCanSNPerDatabases.modules.Globals as Globals
 
 install_import_hook("MetaCanSNPerDatabases.modules.Databases")
-from MetaCanSNPerDatabases.modules.Databases import openDatabase, DatabaseReader, DatabaseWriter
+from MetaCanSNPerDatabases.modules.Databases import openDatabase, DatabaseReader, DatabaseWriter, IsLegacyCanSNPer2, OutdatedCanSNPerDatabase
 
 install_import_hook("MetaCanSNPerDatabases.modules.Columns")
 from MetaCanSNPerDatabases.modules.Columns import ColumnFlag
@@ -16,7 +16,7 @@ install_import_hook("MetaCanSNPerDatabases.modules.Functions")
 from MetaCanSNPerDatabases.modules.Functions import downloadDatabase
 
 install_import_hook("MetaCanSNPerDatabases.modules.Tables")
-from MetaCanSNPerDatabases.modules.Tables import SNPTable, ReferenceTable, NodeTable, TreeTable
+from MetaCanSNPerDatabases.modules.Tables import SNPTable, ReferenceTable, NodesTable, TreeTable
 
 install_import_hook("MetaCanSNPerDatabases.modules.Tree")
 from MetaCanSNPerDatabases.modules.Tree import Branch

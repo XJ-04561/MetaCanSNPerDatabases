@@ -53,8 +53,11 @@ class Table:
 			pass
 
 	@overload
-	def get(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Literal["DESC","ASC"]]|list[tuple[ColumnFlag,Literal["DESC","ASC"]]]=[], nodeID : int=None, snpID : str=None, genomeID : int=None, position : int=None, ancestral : Literal["A","T","C","G"]=None, derived : Literal["A","T","C","G"]=None, snpReference : str=None, date : str=None, genome : str=None, strain : str=None, genbankID : str=None, refseqID : str=None, assembly : str=None, chromosome : str=None) -> Generator[tuple[Any],None,None]:
+	def get(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Literal["DESC","ASC"]]|list[tuple[ColumnFlag,Literal["DESC","ASC"]]]=[], TreeParent : int=None, TreeChild : int=None, NodeID : int=None, Genotype : str=None, SNPID : str=None, Position : int=None, Ancestral : Literal["A","T","C","G"]=None, Derived : Literal["A","T","C","G"]=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> Generator[tuple[Any],None,None]:
 		pass
+		"""
+		, TreeParent : int=None, TreeChild : int=None, NodeID : int=None, Genotype : str=None, SNPID : str=None, Position : int=None, Ancestral : Literal["A","T","C","G"]=None, Derived : Literal["A","T","C","G"]=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None
+		"""
 	
 	@final
 	def get(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Literal["DESC","ASC"]]|list[tuple[ColumnFlag,Literal["DESC","ASC"]]]=[], **where : Any) -> Generator[tuple[Any],None,None]:
@@ -62,7 +65,7 @@ class Table:
 			yield row
 
 	@overload
-	def first(self, *columnsToGet : ColumnFlag, nodeID : int=None, snpID : str=None, genomeID : int=None, position : int=None, ancestral : Literal["A","T","C","G"]=None, derived : Literal["A","T","C","G"]=None, snpReference : str=None, date : str=None, genome : str=None, strain : str=None, genbankID : str=None, refseqID : str=None, assembly : str=None, chromosome : str=None) -> tuple[Any]:
+	def first(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Literal["DESC","ASC"]]|list[tuple[ColumnFlag,Literal["DESC","ASC"]]]=[], TreeParent : int=None, TreeChild : int=None, NodeID : int=None, Genotype : str=None, SNPID : str=None, Position : int=None, Ancestral : Literal["A","T","C","G"]=None, Derived : Literal["A","T","C","G"]=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> tuple[Any]:
 		pass
 	
 	@final
@@ -71,7 +74,7 @@ class Table:
 			return row
 	
 	@overload
-	def all(self, *columnsToGet : ColumnFlag, nodeID : int=None, snpID : str=None, genomeID : int=None, position : int=None, ancestral : Literal["A","T","C","G"]=None, derived : Literal["A","T","C","G"]=None, snpReference : str=None, date : str=None, genome : str=None, strain : str=None, genbankID : str=None, refseqID : str=None, assembly : str=None, chromosome : str=None) -> list[tuple[Any]]:
+	def all(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Literal["DESC","ASC"]]|list[tuple[ColumnFlag,Literal["DESC","ASC"]]]=[], TreeParent : int=None, TreeChild : int=None, NodeID : int=None, Genotype : str=None, SNPID : str=None, Position : int=None, Ancestral : Literal["A","T","C","G"]=None, Derived : Literal["A","T","C","G"]=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> list[tuple[Any]]:
 		pass
 	
 	@final
@@ -84,28 +87,26 @@ class SNPTable(Table):
 
 	_tableName = TABLE_NAME_SNP_ANNOTATION
 	_columns = [
-		SNP_COLUMN_NODE_ID,
 		SNP_COLUMN_SNP_ID,
+		SNP_COLUMN_NODE_ID,
 		SNP_COLUMN_POSITION,
 		SNP_COLUMN_ANCESTRAL,
 		SNP_COLUMN_DERIVED,
 		SNP_COLUMN_REFERENCE,
 		SNP_COLUMN_DATE,
-		SNP_COLUMN_GENOME_ID
+		SNP_COLUMN_CHROMOSOMES_ID
 	]
 	_types = [
-		SNP_COLUMN_NODE_ID_TYPE,
 		SNP_COLUMN_SNP_ID_TYPE,
+		SNP_COLUMN_NODE_ID_TYPE,
 		SNP_COLUMN_POSITION_TYPE,
 		SNP_COLUMN_ANCESTRAL_TYPE,
 		SNP_COLUMN_DERIVED_TYPE,
 		SNP_COLUMN_REFERENCE_TYPE,
 		SNP_COLUMN_DATE_TYPE,
-		SNP_COLUMN_GENOME_ID_TYPE
+		SNP_COLUMN_CHROMOSOMES_ID_TYPE
 	]
-	_appendRows = [
-		f"FOREIGN KEY ({SNP_COLUMN_GENOME_ID}) REFERENCES {TABLE_NAME_REFERENCES} ({REFERENCE_COLUMN_GENOME_ID})"
-	]
+	_appendRows = SNP_APPEND
 
 class ReferenceTable(Table):
 
@@ -126,9 +127,9 @@ class ReferenceTable(Table):
 		REFERENCE_COLUMN_REFSEQ_TYPE,
 		REFERENCE_COLUMN_ASSEMBLY_TYPE
 	]
-	_appendRows = []
+	_appendRows = REFERENCE_APPEND
 
-class NodeTable(Table):
+class NodesTable(Table):
 
 	_tableName = TABLE_NAME_NODES
 	_columns = [
@@ -139,52 +140,32 @@ class NodeTable(Table):
 		NODE_COLUMN_ID_TYPE,
 		NODE_COLUMN_NAME_TYPE
 	]
-	_appendRows = []
+	_appendRows = NODES_APPEND
 
 class TreeTable(Table):
 
 	_tableName = TABLE_NAME_TREE
 	_columns = [
 		TREE_COLUMN_PARENT,
-		TREE_COLUMN_CHILD,
-		TREE_COLUMN_RANK,
+		TREE_COLUMN_CHILD
 	]
 	_types = [
 		TREE_COLUMN_PARENT_TYPE,
-		TREE_COLUMN_CHILD_TYPE,
-		TREE_COLUMN_RANK_TYPE
+		TREE_COLUMN_CHILD_TYPE
 	]
-	_appendRows = [
-		f"FOREIGN KEY ({TREE_COLUMN_PARENT}) REFERENCES {TABLE_NAME_NODES} ({NODE_COLUMN_ID})"
-		f"FOREIGN KEY ({TREE_COLUMN_CHILD}) REFERENCES {TABLE_NAME_NODES} ({NODE_COLUMN_ID})"
-		f"FOREIGN KEY ({TREE_COLUMN_RANK}) REFERENCES {TABLE_NAME_RANKS} ({RANKS_COLUMN_ID})"
-		f"unique ({TREE_COLUMN_PARENT}, {TREE_COLUMN_CHILD})"
-	]
+	_appendRows = TREE_APPEND
 
-class RankTable(Table):
+class ChromosomesTable(Table):
 	
-	_tableName = TABLE_NAME_RANKS
-	_columns = [
-		RANKS_COLUMN_ID,
-		RANKS_COLUMN_RANK
-	]
-	_types = [
-		RANKS_COLUMN_ID_TYPE,
-		RANKS_COLUMN_RANK_TYPE
-	]
-	_appendRows = []
-
-class GenomesTable(Table):
-	
-	_tableName = TABLE_NAME_RANKS
+	_tableName = TABLE_NAME_CHROMOSOMES
 	_columns = [		
-		GENOMES_COLUMN_ID,
-		GENOMES_COLUMN_NAME
+		CHROMOSOMES_COLUMN_ID,
+		CHROMOSOMES_COLUMN_NAME,
+		CHROMOSOMES_COLUMN_GENOME_ID
 	]
 	_types = [
-		GENOMES_COLUMN_ID_TYPE,
-		GENOMES_COLUMN_NAME_TYPE
+		CHROMOSOMES_COLUMN_ID_TYPE,
+		CHROMOSOMES_COLUMN_NAME_TYPE,
+		CHROMOSOMES_COLUMN_GENOME_ID_TYPE
 	]
-	_appendRows = [
-		f"FOREIGN KEY ({GENOMES_COLUMN_ID}) REFERENCES {TABLE_NAME_NODES} ({NODE_COLUMN_ID})"
-	]
+	_appendRows = CHROMOSOMES_APPEND

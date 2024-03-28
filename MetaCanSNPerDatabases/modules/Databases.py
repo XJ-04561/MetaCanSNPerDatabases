@@ -5,9 +5,12 @@ import MetaCanSNPerDatabases.modules.Columns as Columns
 from MetaCanSNPerDatabases.modules.Columns import ColumnFlag
 from MetaCanSNPerDatabases.modules._Constants import *
 
-from MetaCanSNPerDatabases.modules.Tables import Table, SNPTable, ReferenceTable, NodeTable, TreeTable, RankTable, GenomesTable
+from MetaCanSNPerDatabases.modules.Tables import Table, SNPTable, ReferenceTable, NodesTable, TreeTable, ChromosomesTable
 from MetaCanSNPerDatabases.modules.Tree import Branch
-from MetaCanSNPerDatabases.modules.Functions import generateQuery, whitespacePattern
+from MetaCanSNPerDatabases.modules.Functions import generateQuery, whitespacePattern, updateFromLegacy
+
+class IsLegacyCanSNPer2(sqlite3.Error): pass
+class OutdatedCanSNPerDatabase(sqlite3.Error): pass
 
 class Database:
 
@@ -21,17 +24,16 @@ class Database:
 
 		self.SNPTable = SNPTable(self._connection, self._mode)
 		self.ReferenceTable = ReferenceTable(self._connection, self._mode)
-		self.NodeTable = NodeTable(self._connection, self._mode)
+		self.NodesTable = NodesTable(self._connection, self._mode)
 		self.TreeTable = TreeTable(self._connection, self._mode)
-		self.RankTable = RankTable(self._connection, self._mode)
-		self.GenomesTable = GenomesTable(self._connection, self._mode)
+		self.ChromosomesTable = ChromosomesTable(self._connection, self._mode)
 	
 	def __enter__(self):
 		return self
 	
 	def __exit__(self):
 		try:
-			self.commit()
+			self._connection.commit()
 		except:
 			pass
 		del self
@@ -50,24 +52,26 @@ class Database:
 		return object.__repr__(self)[:-1] + f" version={self.__version__} schemaHash={self.schemaHash!r} tables={list(zip(TABLES,map(len, TABLES)))}>"
 	
 	@property
-	def Tables(self) -> list[Table]:
-		return [self.__getattribute__(name) for name in sorted(filter(lambda s : s.endswith("Table"), self.__dict__))]
+	def Tables(self) -> dict[str,Table]:
+		return {name:self.__getattribute__(name) for name in sorted(filter(lambda s : s.endswith("Table"), self.__dict__))}
 
 	def validateDatabase(self) -> int:
 		if len(self._connection.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()) == 0:
 			# Table is empty
 			return -2
+		elif self.__version__ == LEGACY_VERSION:
+			return -3
 		elif self.__version__ != CURRENT_VERSION:
 			LOGGER.warning(f"Database version (v.{self.__version__}) does not match the currently set version (v.{CURRENT_VERSION}).")
 			if Globals.STRICT:
 				raise sqlite3.DatabaseError(f"Database version (v.{self.__version__}) does not match the currently set version (v.{CURRENT_VERSION}).")
 			else:
 				# Table does not have the right schema version
-				return -3
+				return -4
 		elif CURRENT_VERSION != self._connection.execute('PRAGMA user_version;').fetchone()[0]:
 			# Table does not have the right `user_version` set.
 			LOGGER.warning(f"Table does not have the right `user_version` set. (Determined version is v.{self.__version__} but user_version is v.{self._connection.execute('PRAGMA user_version;').fetchone()[0]})")
-			return -4
+			return -5
 		else:
 			LOGGER.info(f"Database version is up to date! (v. {self.__version__})")
 			return 0
@@ -76,7 +80,7 @@ class Database:
 		raise NotImplementedError("Not implemented in the base class.")
 
 	@overload
-	def get(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Literal["DESC","ASC"]]|list[tuple[ColumnFlag,Literal["DESC","ASC"]]]=[], nodeID : int=None, snpID : str=None, genomeID : int=None, position : int=None, ancestral : Literal["A","T","C","G"]=None, derived : Literal["A","T","C","G"]=None, snpReference : str=None, date : str=None, genome : str=None, strain : str=None, genbankID : str=None, refseqID : str=None, assembly : str=None, chromosome : str=None) -> Generator[tuple[Any],None,None]:
+	def get(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Literal["DESC","ASC"]]|list[tuple[ColumnFlag,Literal["DESC","ASC"]]]=[], TreeParent : int=None, TreeChild : int=None, NodeID : int=None, Genotype : str=None, SNPID : str=None, Position : int=None, Ancestral : Literal["A","T","C","G"]=None, Derived : Literal["A","T","C","G"]=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> Generator[tuple[Any],None,None]:
 		pass
 
 	@final
@@ -94,12 +98,16 @@ class Database:
 
 	@property
 	def nodes(self) -> Generator[tuple[int,str],None,None]:
-		return self.NodeTable.get(Columns.ALL)
+		return self.NodesTable.get(Columns.ALL)
+	
+	@property
+	def chromosomes(self) -> Generator[tuple[int,str],None,None]:
+		return self.ChromosomesTable.get(Columns.ALL)
 
 	@cached_property
 	def tree(self) -> Branch:
 		"""{nodeID:[child1, child2, ...]}"""
-		for (nodeID,) in self._connection.execute(f"SELECT {TREE_COLUMN_CHILD} FROM {TABLE_NAME_TREE} WHERE {TREE_COLUMN_PARENT} = ?;", [2]):
+		for (nodeID,) in self.TreeTable:
 			if nodeID != 2:
 				return Branch(self._connection, nodeID)
 
@@ -126,31 +134,15 @@ class DatabaseReader(Database):
 		code = self.validateDatabase()
 
 		match code:
-			case -2:
-				print("Database is empty.")
-			case -3:
-				print(f"Database out of date/has wrong schema. Current version is v.{CURRENT_VERSION}, but this database has version v.{self.__version__} (schemaHash={self.schemaHash!r}).")
-			case -4:
-				print(f"Table does not have the right `user_version` set. (Determined version is v.{self.__version__} but user_version is v.{self._connection.execute('PRAGMA user_version;').fetchone()[0]})")
-			case 0:
-				print(f"Database is up to date! (v.{self.__version__})")
-			case _:
-				print(f"Unkown Database error. Current Database version is v.{CURRENT_VERSION}, and this database has version v.{self.__version__} (schemaHash={self.schemaHash!r}).")
-				print("Exiting.")
-				exit(1)
-		
-		if Globals.STRICT:
-			self.rectifyDatabase(code)
-	
-	def rectifyDatabase(self, code : int):
-		match code:
 			case 0: # We're good
 				pass
 			case -2: # Table is new
 				raise sqlite3.DatabaseError("Database is empty.")
-			case -3: # Transfer data from old tables into new tables
-				raise sqlite3.DatabaseError(f"Database version ({self.__version__}) does not match the currently set version. (user_version={self._connection.execute('PRAGMA user_version;').fetchone()[0]}, schemaHash={self.schemaHash!r})")
-			case -4: # Version number missmatch
+			case -3:
+				raise IsLegacyCanSNPer2("Database is a legacy CanSNPer database. If opened in '--write' mode it can be converted.")
+			case -4: # Transfer data from old tables into new tables
+				raise OutdatedCanSNPerDatabase(f"Database version ({self.__version__}) does not match the currently set version. (user_version={self._connection.execute('PRAGMA user_version;').fetchone()[0]}, schemaHash={self.schemaHash!r})")
+			case -5: # Version number missmatch
 				raise sqlite3.DatabaseError(f"Table does not have the right `user_version` set. (Determined version is v.{self.__version__} but user_version is v.{self._connection.execute('PRAGMA user_version;').fetchone()[0]})")
 			case _:
 				raise sqlite3.DatabaseError(f"Unkown Database error. Current Database version is v.{CURRENT_VERSION}, and this database has version v.{self.__version__} (schemaHash={self.schemaHash!r}).")
@@ -167,8 +159,10 @@ class DatabaseWriter(Database):
 			case -2:
 				print("Database is empty.")
 			case -3:
-				print(f"Database out of date/has wrong schema. Current version is v.{CURRENT_VERSION}, but this database has version v.{self.__version__} (schemaHash={self.schemaHash!r}).")
+				print("Database is a legacy CanSNPer database.")
 			case -4:
+				print(f"Database out of date/has wrong schema. Current version is v.{CURRENT_VERSION}, but this database has version v.{self.__version__} (schemaHash={self.schemaHash!r}).")
+			case -5:
 				print(f"Table does not have the right `user_version` set. (Determined version is v.{self.__version__} but user_version is v.{self._connection.execute('PRAGMA user_version;').fetchone()[0]})")
 			case 0:
 				print(f"Database is up to date! (v.{self.__version__})")
@@ -177,39 +171,33 @@ class DatabaseWriter(Database):
 				print("Exiting.")
 				exit(1)
 		
-		if code not in [0, -2]:
-			while (userString := input("Rectify database? (Recommended to make a backup prior) [Y/N]: ").strip().lower()) not in ["y", "n"]:
-				pass
-			match userString:
-				case "y":
-					self.rectifyDatabase(code)
-				case "n":
-					pass
-		elif code == -2:
-			self.rectifyDatabase(-2)
-		else:
-			pass
+		print("Making a '.backup' & rectifying database... ")
+		self.rectifyDatabase(code)
+		print("Done!")
 
 	def rectifyDatabase(self, code : int):
+		shutil.copy(self.filename, self.filename+".backup")
 		match code:
 			case 0: # We're good
 				pass
 			case -2: # Table is new
-				for table in self.Tables:
+				for table in self.Tables.values():
 					table.create()
 				self._connection.execute(f"PRAGMA user_version = {self.__version__:d};")
-			case -3: # Transfer data from old tables into new tables
-				for table in self.Tables:
+			case -3: # Legacy CanSNPer table
+				updateFromLegacy(self.filename)
+			case -4: # Transfer data from old tables into new tables
+				for table in self.Tables.values():
 					table.recreate()
 				for (table,) in self._connection.execute("SELECT name FROM sqlite_master WHERE type='table';"):
 					if table not in TABLES:
 						self._connection.execute(f"DROP TABLE {table};")
 				self._connection.execute(f"PRAGMA user_version = {self.__version__:d};")
-			case -4:
+			case -5:
 				self._connection.execute(f"PRAGMA user_version = {self.__version__:d};")
 
-	def addSNP(self, nodeID, position, ancestral, derived, reference, date, genomeID):
-		self._connection.execute(f"INSERT (?,?,?,?,?,?,?) INTO {TABLE_NAME_SNP_ANNOTATION};", [nodeID, position, ancestral, derived, reference, date, genomeID])
+	def addSNP(self, nodeID, snpID, position, ancestral, derived, reference, date, chromosomeID):
+		self._connection.execute(f"INSERT (?,?,?,?,?,?,?,?) INTO {TABLE_NAME_SNP_ANNOTATION};", [nodeID, snpID, position, ancestral, derived, reference, date, chromosomeID])
 	
 	def addReference(self, genomeID, genome, strain, genbank, refseq, assemblyName):
 		self._connection.execute(f"INSERT (?,?,?,?,?,?) INTO {TABLE_NAME_REFERENCES};", [genomeID, genome, strain, genbank, refseq, assemblyName])
@@ -217,14 +205,11 @@ class DatabaseWriter(Database):
 	def addNode(self, nodeID, genoType):
 		self._connection.execute(f"INSERT (?,?) INTO {TABLE_NAME_NODES};", [nodeID, genoType])
 
-	def addBranch(self, parentID, childID, rank):
-		self._connection.execute(f"INSERT (?,?,?) INTO {TABLE_NAME_TREE};", [parentID, childID, rank])
-
-	def addRank(self, rankID, rankName):
-		self._connection.execute(f"INSERT (?,?) INTO {TABLE_NAME_RANKS};", [rankID, rankName])
-
-	def addGenome(self, genomeID, genomeName):
-		self._connection.execute(f"INSERT (?,?) INTO {TABLE_NAME_GENOMES};", [genomeID, genomeName])
+	def addBranch(self, parentID, childID):
+		self._connection.execute(f"INSERT (?,?) INTO {TABLE_NAME_TREE};", [parentID, childID])
+	
+	def addChromosome(self, chromosomeID, chromosomeName, genomeID):
+		self._connection.execute(f"INSERT (?,?,?) INTO {TABLE_NAME_CHROMOSOMES};", [chromosomeID, chromosomeName, genomeID])
 	
 	def commit(self):
 		self._connection.commit()
