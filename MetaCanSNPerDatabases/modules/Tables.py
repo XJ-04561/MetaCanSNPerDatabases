@@ -7,6 +7,8 @@ from MetaCanSNPerDatabases.modules._Constants import *
 
 from MetaCanSNPerDatabases.modules.Functions import generateTableQuery
 
+type Mode = Literal["r","w"]
+
 class TableDefinitionMissmatch(Exception): pass
 
 class Table:
@@ -17,7 +19,7 @@ class Table:
 	_types : list[tuple[str]]
 	_appendRows : list[str]
 
-	def __init__(self, conn : sqlite3.Connection, mode : Literal["r","w","a"]):
+	def __init__(self, conn : sqlite3.Connection, mode : Mode):
 		self._conn = conn
 		self._mode = mode
 

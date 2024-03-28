@@ -5,7 +5,7 @@ import MetaCanSNPerDatabases.modules.Columns as Columns
 from MetaCanSNPerDatabases.modules.Columns import ColumnFlag
 from MetaCanSNPerDatabases.modules._Constants import *
 
-from MetaCanSNPerDatabases.modules.Tables import SNPTable, ReferenceTable, NodeTable, TreeTable, RankTable, GenomesTable
+from MetaCanSNPerDatabases.modules.Tables import Table, SNPTable, ReferenceTable, NodeTable, TreeTable, RankTable, GenomesTable
 from MetaCanSNPerDatabases.modules.Tree import Branch
 from MetaCanSNPerDatabases.modules.Functions import generateQuery, whitespacePattern
 
@@ -25,27 +25,6 @@ class Database:
 		self.TreeTable = TreeTable(self._connection, self._mode)
 		self.RankTable = RankTable(self._connection, self._mode)
 		self.GenomesTable = GenomesTable(self._connection, self._mode)
-
-		if set(TABLES).isdisjoint([table for (table,) in self._connection.execute("SELECT name FROM sqlite_master WHERE type='table';")]):
-			# Table is new
-			self.SNPTable.create()
-			self.ReferenceTable.create()
-			self.NodeTable.create()
-			self.TreeTable.create()
-			self.RankTable.create()
-			self.GenomesTable.create()
-		elif self.schemaHash != Globals.DATABASE_VERSION_HASH:
-			LOGGER.warning(f"Database version does not match the currently set version. (user_version={database.execute('PRAGMA user_version;').fetchone()[0]})")
-			if Globals.STRICT:
-				raise sqlite3.DatabaseError(f"Database version does not match the currently set version. (user_version={database.execute('PRAGMA user_version;').fetchone()[0]})")
-			elif self._mode == "w":
-				# Transfer data from old tables into new tables
-				self.SNPTable.recreate()
-				self.ReferenceTable.recreate()
-				self.NodeTable.recreate()
-				self.TreeTable.recreate()
-				self.RankTable.recreate()
-				self.GenomesTable.recreate()
 	
 	def __enter__(self):
 		return self
@@ -70,6 +49,32 @@ class Database:
 	def __repr__(self):
 		return object.__repr__(self)[:-1] + f" version={self.__version__} schemaHash={self.schemaHash} tables={list(zip(TABLES,map(len, TABLES)))}>"
 	
+	@property
+	def Tables(self) -> list[Table]:
+		return [self.__getattribute__(name) for name in sorted(filter(lambda s : s.endswith("Table"), self.__dict__))]
+
+	def validateDatabase(self) -> int:
+		if len(self._connection.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()) == 0:
+			# Table is empty
+			return -2
+		elif self.__version__ != CURRENT_VERSION:
+			LOGGER.warning(f"Database version (v.{self.__version__}) does not match the currently set version (v.{CURRENT_VERSION}).")
+			if Globals.STRICT:
+				raise sqlite3.DatabaseError(f"Database version (v.{self.__version__}) does not match the currently set version (v.{CURRENT_VERSION}).")
+			else:
+				# Table does not have the right schema version
+				return -3
+		elif CURRENT_VERSION != self._connection.execute('PRAGMA user_version;').fetchone()[0]:
+			# Table does not have the right `user_version` set.
+			LOGGER.warning(f"Table does not have the right `user_version` set. (Determined version is v.{self.__version__} but user_version is v.{self._connection.execute('PRAGMA user_version;').fetchone()[0]})")
+			return -4
+		else:
+			LOGGER.info(f"Database version is up to date! (v. {self.__version__})")
+			return 0
+	
+	def rectifyDatabase(self, code : int):
+		raise NotImplementedError("Not implemented in the base class.")
+
 	@overload
 	def get(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Literal["DESC","ASC"]]|list[tuple[ColumnFlag,Literal["DESC","ASC"]]]=[], nodeID : int=None, snpID : str=None, genomeID : int=None, position : int=None, ancestral : Literal["A","T","C","G"]=None, derived : Literal["A","T","C","G"]=None, snpReference : str=None, date : str=None, genome : str=None, strain : str=None, genbankID : str=None, refseqID : str=None, assembly : str=None, chromosome : str=None) -> Generator[tuple[Any],None,None]:
 		pass
@@ -105,7 +110,7 @@ class Database:
 				" ",
 				"; ".join([
 					x[0]
-					for x in self._connection.execute(f"SELECT sql FROM sqlite_schema;")
+					for x in self._connection.execute(f"SELECT sql FROM sqlite_schema ORDER BY sql DESC;")
 					if type(x) is tuple and x[0] is not None
 				])
 			).encode("utf-8")
@@ -114,10 +119,91 @@ class Database:
 class DatabaseReader(Database):
 	
 	_mode = "r"
+	
+	def __init__(self, database : sqlite3.Connection):
+		super().__init__(database)
+
+		code = self.validateDatabase()
+
+		match code:
+			case -2:
+				print("Database is empty.")
+			case -3:
+				print(f"Database out of date/has wrong schema. Current version is v.{CURRENT_VERSION}, but this database has version v.{self.__version__} (schemaHash={self.schemaHash!r}).")
+			case -4:
+				print(f"Table does not have the right `user_version` set. (Determined version is v.{self.__version__} but user_version is v.{self._connection.execute('PRAGMA user_version;').fetchone()[0]})")
+			case 0:
+				print(f"Database is up to date! (v.{self.__version__})")
+			case _:
+				print(f"Unkown Database error. Current Database version is v.{CURRENT_VERSION}, and this database has version v.{self.__version__} (schemaHash={self.schemaHash!r}).")
+				print("Exiting.")
+				exit(1)
+		
+		if Globals.STRICT:
+			self.rectifyDatabase(code)
+	
+	def rectifyDatabase(self, code : int):
+		match code:
+			case 0: # We're good
+				pass
+			case -2: # Table is new
+				raise sqlite3.DatabaseError("Database is empty.")
+			case -3: # Transfer data from old tables into new tables
+				raise sqlite3.DatabaseError(f"Database version ({self.__version__}) does not match the currently set version. (user_version={self._connection.execute('PRAGMA user_version;').fetchone()[0]}, schemaHash={self.schemaHash!r})")
+			case -4: # Version number missmatch
+				raise sqlite3.DatabaseError(f"Table does not have the right `user_version` set. (Determined version is v.{self.__version__} but user_version is v.{self._connection.execute('PRAGMA user_version;').fetchone()[0]})")
+			case _:
+				raise sqlite3.DatabaseError(f"Unkown Database error. Current Database version is v.{CURRENT_VERSION}, and this database has version v.{self.__version__} (schemaHash={self.schemaHash!r}).")
 
 class DatabaseWriter(Database):
 
 	_mode = "w"
+	
+	def __init__(self, database : sqlite3.Connection):
+		super().__init__(database)
+
+		code = self.validateDatabase()
+		match code:
+			case -2:
+				print("Database is empty.")
+			case -3:
+				print(f"Database out of date/has wrong schema. Current version is v.{CURRENT_VERSION}, but this database has version v.{self.__version__} (schemaHash={self.schemaHash!r}).")
+			case -4:
+				print(f"Table does not have the right `user_version` set. (Determined version is v.{self.__version__} but user_version is v.{self._connection.execute('PRAGMA user_version;').fetchone()[0]})")
+			case 0:
+				print(f"Database is up to date! (v.{self.__version__})")
+			case _:
+				print(f"Unkown Database error. Current Database version is v.{CURRENT_VERSION}, and this database has version v.{self.__version__} (schemaHash={self.schemaHash!r}).")
+				print("Exiting.")
+				exit(1)
+		
+		if code not in [0, -2]:
+			while (userString := input("Rectify database? (Recommended to make a backup prior) [Y/N]: ").strip().lower()) not in ["y", "n"]:
+				pass
+			match userString:
+				case "y":
+					self.rectifyDatabase(code)
+				case "n":
+					pass
+		elif code == -2:
+			self.rectifyDatabase(-2)
+		else:
+			pass
+
+	def rectifyDatabase(self, code : int):
+		match code:
+			case 0: # We're good
+				pass
+			case -2: # Table is new
+				for table in self.Tables:
+					table.create()
+				self._connection.execute('PRAGMA user_version = ?;', [self.__version__])
+			case -3: # Transfer data from old tables into new tables
+				for table in self.Tables:
+					table.recreate()
+				for (table,) in self._connection.execute("SELECT name FROM sqlite_master WHERE type='table';"):
+					if table not in TABLES:
+						self._connection.execute(f"DROP TABLE {table};")
 
 	def addSNP(self, nodeID, position, ancestral, derived, reference, date, genomeID):
 		self._connection.execute(f"INSERT (?,?,?,?,?,?,?) INTO {TABLE_NAME_SNP_ANNOTATION};", [nodeID, position, ancestral, derived, reference, date, genomeID])
