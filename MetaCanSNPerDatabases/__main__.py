@@ -32,3 +32,5 @@ def main():
 
 			database.commit()
 	print("Done!")
+
+main()
