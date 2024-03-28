@@ -5,7 +5,7 @@ import sqlite3, hashlib, re, os, logging
 from typing import Generator, Callable, Iterable, Self, overload, final, Literal, Any
 
 LOGGER = logging.Logger("MetaCanSNPerDatabases")
-LOGGER.addHandler(logging.FileHandler(os.devnull))
+LOGGER.addHandler(logging.FileHandler("MetaCanSNPerDatabases.log"))
 
 DATABASE_VERSIONS : dict[str,int] = {}
 CURRENT_VERSION : str = ""
