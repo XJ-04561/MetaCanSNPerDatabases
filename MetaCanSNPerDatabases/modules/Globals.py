@@ -8,7 +8,8 @@ LOGGER = logging.Logger("MetaCanSNPerDatabases")
 LOGGER.addHandler(logging.FileHandler("MetaCanSNPerDatabases.log"))
 
 DATABASE_VERSIONS : dict[str,int] = {
-    "7630f33662e27489b7bb7b3b121ca4ff" : 1 # Legacy CanSNPer
+    "7630f33662e27489b7bb7b3b121ca4ff" : 1, # Legacy CanSNPer
+    "e585ee1f5ed2fc1d00efeea7a146e1b1" : 2  # MetaCanSNPer Alpha version
 }
 CURRENT_VERSION = 1
 STRICT : bool = False

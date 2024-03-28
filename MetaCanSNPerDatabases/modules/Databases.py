@@ -47,7 +47,7 @@ class Database:
 			pass
 	
 	def __repr__(self):
-		return object.__repr__(self)[:-1] + f" version={self.__version__} schemaHash={self.schemaHash} tables={list(zip(TABLES,map(len, TABLES)))}>"
+		return object.__repr__(self)[:-1] + f" version={self.__version__} schemaHash={self.schemaHash!r} tables={list(zip(TABLES,map(len, TABLES)))}>"
 	
 	@property
 	def Tables(self) -> list[Table]:
@@ -197,16 +197,16 @@ class DatabaseWriter(Database):
 			case -2: # Table is new
 				for table in self.Tables:
 					table.create()
-				self._connection.execute("PRAGMA user_version = ? ;", [self.__version__])
+				self._connection.execute(f"PRAGMA user_version = {self.__version__:d};")
 			case -3: # Transfer data from old tables into new tables
 				for table in self.Tables:
 					table.recreate()
 				for (table,) in self._connection.execute("SELECT name FROM sqlite_master WHERE type='table';"):
 					if table not in TABLES:
 						self._connection.execute(f"DROP TABLE {table};")
-				self._connection.execute("PRAGMA user_version = ? ;", [self.__version__])
+				self._connection.execute(f"PRAGMA user_version = {self.__version__:d};")
 			case -4:
-				self._connection.execute("PRAGMA user_version = ? ;", [self.__version__])
+				self._connection.execute(f"PRAGMA user_version = {self.__version__:d};")
 
 	def addSNP(self, nodeID, position, ancestral, derived, reference, date, genomeID):
 		self._connection.execute(f"INSERT (?,?,?,?,?,?,?) INTO {TABLE_NAME_SNP_ANNOTATION};", [nodeID, position, ancestral, derived, reference, date, genomeID])
