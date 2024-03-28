@@ -145,8 +145,12 @@ class DatabaseWriter(Database):
 def openDatabase(database : str, mode : Literal["r"]) -> DatabaseReader:
 	pass
 
-@final
+@overload
 def openDatabase(database : str, mode : Literal["w"]) -> DatabaseWriter:
+	pass
+
+@final
+def openDatabase(database : str, mode : Literal["r","w"]) -> DatabaseReader | DatabaseWriter | None:
 	match mode:
 		case "r":
 			if not os.path.exists(database):
