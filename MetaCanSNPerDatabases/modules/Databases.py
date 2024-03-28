@@ -115,7 +115,6 @@ class DatabaseReader(Database):
 	
 	_mode = "r"
 
-
 class DatabaseWriter(Database):
 
 	_mode = "w"
@@ -141,6 +140,8 @@ class DatabaseWriter(Database):
 	def commit(self):
 		self._connection.commit()
 
+type Mode = Literal["r", "w"]
+
 @overload
 def openDatabase(database : str, mode : Literal["r"]) -> DatabaseReader:
 	pass
@@ -150,7 +151,7 @@ def openDatabase(database : str, mode : Literal["w"]) -> DatabaseWriter:
 	pass
 
 @final
-def openDatabase(database : str, mode : Literal["r","w"]) -> DatabaseReader | DatabaseWriter | None:
+def openDatabase(database : str, mode : Mode) -> DatabaseReader | DatabaseWriter | None:
 	match mode:
 		case "r":
 			if not os.path.exists(database):
