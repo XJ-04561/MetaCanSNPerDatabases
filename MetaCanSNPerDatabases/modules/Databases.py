@@ -38,7 +38,7 @@ class Database:
 	
 	@property
 	def __version__(self):
-		return DATABASE_VERSIONS.get(self.schemaHash, "Unknown")
+		return DATABASE_VERSIONS.get(self.schemaHash, 0)
 
 	def __del__(self):
 		try:

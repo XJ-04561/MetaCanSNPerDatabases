@@ -3,10 +3,11 @@ from MetaCanSNPerDatabases import *
 
 def main():
 	mode = input("Create or read from database? [w/r]: ").strip()
+	databaseName = input("Database path: ").strip()
 
 	match mode:
 		case "r":
-			database = openDatabase(input("Database path: ").strip(), "r")
+			database = openDatabase(databaseName, "r")
 
 			print(database.SNPTable)
 			print(database.ReferenceTable)
@@ -15,8 +16,12 @@ def main():
 			print(database.RankTable)
 			print(database.GenomesTable)
 		case "w":
-			database = openDatabase(input("Database path: ").strip(), "w")
-
+			try:
+				database = openDatabase(databaseName, "w")
+			except Exception as e:
+				e.add_note(repr(openDatabase(databaseName, "r")))
+				raise e
+			
 			print(database.SNPTable)
 			print(database.ReferenceTable)
 			print(database.NodeTable)
