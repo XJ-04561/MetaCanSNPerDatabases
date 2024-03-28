@@ -1,5 +1,5 @@
 
-from MetaCanSNPer.modules.Databases._Constants import *
+from MetaCanSNPerDatabases.modules._Constants import *
 
 
 class ColumnFlag(int): pass

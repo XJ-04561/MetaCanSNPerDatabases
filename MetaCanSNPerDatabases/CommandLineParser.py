@@ -1,9 +1,7 @@
 
+from MetaCanSNPerDatabases import *
 
-from MetaCanSNPer.modules.Databases import *
-
-
-def runTest():
+def main():
 	mode = input("Create or read from database? [w/r]: ").strip()
 
 	match mode:
@@ -26,5 +24,11 @@ def runTest():
 			print(database.RankTable)
 			print(database.GenomesTable)
 
+			genomesPath = input("Genomes-file path: ").strip()
+			referencesPath = input("References-file path: ").strip()
+			SNPAnnotationsPath = input("SNP-annotations-file path: ").strip()
+			NodesPath = input("Nodes-file path: ").strip()
+			TreeNodes = input("Tree-file path: ").strip()
+
 			database.commit()
-	print("Test complete!")
+	print("Done!")

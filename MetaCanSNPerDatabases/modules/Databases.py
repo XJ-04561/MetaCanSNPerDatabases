@@ -1,13 +1,13 @@
 
-from MetaCanSNPer.modules.Databases.Globals import *
-import MetaCanSNPer.modules.Databases.Globals as Globals
-import MetaCanSNPer.modules.Databases.Columns as Columns
-from MetaCanSNPer.modules.Databases.Columns import ColumnFlag
-from MetaCanSNPer.modules.Databases._Constants import *
+from MetaCanSNPerDatabases.modules.Globals import *
+import MetaCanSNPerDatabases.modules.Globals as Globals
+import MetaCanSNPerDatabases.modules.Columns as Columns
+from MetaCanSNPerDatabases.modules.Columns import ColumnFlag
+from MetaCanSNPerDatabases.modules._Constants import *
 
-from MetaCanSNPer.modules.Databases.Tables import SNPTable, ReferenceTable, NodeTable, TreeTable, RankTable, GenomesTable
-from MetaCanSNPer.modules.Databases.Tree import Branch
-from MetaCanSNPer.modules.Databases.Functions import generateQuery, whitespacePattern
+from MetaCanSNPerDatabases.modules.Tables import SNPTable, ReferenceTable, NodeTable, TreeTable, RankTable, GenomesTable
+from MetaCanSNPerDatabases.modules.Tree import Branch
+from MetaCanSNPerDatabases.modules.Functions import generateQuery, whitespacePattern
 
 class Database:
 
