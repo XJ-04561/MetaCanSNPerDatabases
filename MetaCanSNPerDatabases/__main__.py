@@ -79,29 +79,42 @@ def main():
 
 	modeGroup : argparse._SubParsersAction = parser.add_subparsers(title="Mode", description="Mode with which to open the database.", required=True)
 
-	readParser : argparse.ArgumentParser = modeGroup.add_parser("read",		metavar="read",		action="store_true")
+	readParser : argparse.ArgumentParser = modeGroup.add_parser("read")
 	parser.add_argument("--table",		nargs="+",		default=None)
 	readParser.set_defaults(func=read)
 
-	writeParser : argparse.ArgumentParser = modeGroup.add_parser("write",		metavar="write",	action="store_true")
+	writeParser : argparse.ArgumentParser = modeGroup.add_parser("write",	help="Create a database with or without data. Data for database is given through the appropriate File flags.")
 	filesGroup = parser.add_argument_group(title="Input Files")
 	
-	filesGroup.add_argument("--SNPFile")
-	filesGroup.add_argument("--referenceFile", required="--SNPFile" in sys.argv)
-	filesGroup.add_argument("--treeFile", required="--SNPFile" in sys.argv)
+	filesGroup.add_argument("--SNPFile", help="If used, make sure that the related references and tree nodes are present in the database or in the other flagged files.")
+	filesGroup.add_argument("--referenceFile")
+	filesGroup.add_argument("--treeFile")
+
+	filesGroup.add_argument("--refDir", help="Directory where the reference genomes are located. This is only required if your --referenceFile doesn't have a `chromosomes` column.")
 
 	optionalGroup = parser.add_argument_group(title="Optional Flags")
 	optionalGroup.add_argument("--rectify",	action="store_true", help="If used, will edit the database structure if it doesn't comply with the current set schema. If not used, will continue operations without rectifying, but the program might crash due to the difference in schema.")
 	
 	writeParser.set_defaults(func=write)
 
-	updateParser : argparse.ArgumentParser = modeGroup.add_parser("update",	metavar="update",	action="store_true")
-	parser.add_argument("--refDir",		default=None,	required=("-u" in sys.argv or "--update" in sys.argv))
+	updateParser : argparse.ArgumentParser = modeGroup.add_parser("update")
+	updateParser.add_argument("--refDir")
 	updateParser.set_defaults(func=update)
 
 	parser.add_argument("filepath")
 
+	parser.add_argument("--help", action="store_true")
+	parser.add_argument("--version", action="store_true")
+
+	if "--help" in sys.argv:
+		parser.print_help()
+		exit(0)
+	elif "--help" in sys.argv:
+		print(f"MetaCanSNPerDatabases v. {CURRENT_VERSION}")
+		exit(0)
+
 	args : argparse.Namespace = parser.parse_args(sys.argv)
+	
 	args.func(args)
 
 	print("Done!")
