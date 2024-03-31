@@ -5,9 +5,8 @@ import MetaCanSNPerDatabases.modules.Columns as Columns
 from MetaCanSNPerDatabases.modules.Columns import ColumnFlag
 from MetaCanSNPerDatabases.modules._Constants import *
 
-from MetaCanSNPerDatabases.modules.Tables import Table, SNPTable, ReferenceTable, NodesTable, TreeTable, ChromosomesTable
+
 from MetaCanSNPerDatabases.modules.Tree import Branch
-from MetaCanSNPerDatabases.modules.Functions import generateQuery, whitespacePattern, updateFromLegacy
 
 class IsLegacyCanSNPer2(sqlite3.Error): pass
 class OutdatedCanSNPerDatabase(sqlite3.Error): pass
@@ -19,6 +18,7 @@ class Database:
 	filename : str
 
 	def __init__(self, database : sqlite3.Connection):
+		from MetaCanSNPerDatabases.modules.Tables import SNPTable, ReferenceTable, TreeTable, ChromosomesTable
 		self.filename = database.execute("PRAGMA database_list;").fetchone()[2]
 		self._connection = database
 
@@ -51,7 +51,7 @@ class Database:
 		return object.__repr__(self)[:-1] + f" version={self.__version__} schemaHash={self.schemaHash!r} tables={list(zip(TABLES,map(len, TABLES)))}>"
 	
 	@property
-	def Tables(self) -> dict[str,Table]:
+	def Tables(self) -> dict:
 		return {name:self.__getattribute__(name) for name in sorted(filter(lambda s : s.endswith("Table"), self.__dict__))}
 
 	def checkDatabase(self) -> int:
