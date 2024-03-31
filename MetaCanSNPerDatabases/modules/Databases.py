@@ -24,7 +24,6 @@ class Database:
 
 		self.SNPTable = SNPTable(self._connection, self._mode)
 		self.ReferenceTable = ReferenceTable(self._connection, self._mode)
-		self.NodesTable = NodesTable(self._connection, self._mode)
 		self.TreeTable = TreeTable(self._connection, self._mode)
 		self.ChromosomesTable = ChromosomesTable(self._connection, self._mode)
 	
@@ -110,10 +109,6 @@ class Database:
 	@property
 	def references(self) -> Generator[tuple[int,str,str,str,str],None,None]:
 		return self.ReferenceTable.get(Columns.ALL)
-
-	@property
-	def nodes(self) -> Generator[tuple[int,str],None,None]:
-		return self.NodesTable.get(Columns.ALL)
 	
 	@property
 	def chromosomes(self) -> Generator[tuple[int,str],None,None]:
@@ -121,10 +116,8 @@ class Database:
 
 	@cached_property
 	def tree(self) -> Branch:
-		"""{nodeID:[child1, child2, ...]}"""
-		for (nodeID,) in self.TreeTable:
-			if nodeID != 2:
-				return Branch(self._connection, nodeID)
+		
+		return Branch(self._connection, *self.TreeTable.first(Columns.TreeChild, TreeParent=0))
 
 	@property
 	def schemaHash(self):

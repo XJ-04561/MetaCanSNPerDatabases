@@ -17,7 +17,6 @@ def read(args):
 	print(database)
 	if "table" not in args:
 		print(database.TreeTable)
-		print(database.NodesTable)
 		print(database.SNPTable)
 		print(database.ChromosomesTable)
 		print(database.ReferenceTable)
