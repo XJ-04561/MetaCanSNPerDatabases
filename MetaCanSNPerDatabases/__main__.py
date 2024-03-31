@@ -103,13 +103,9 @@ def main():
 
 	parser.add_argument("filepath")
 
-	parser.add_argument("--help", action="store_true")
 	parser.add_argument("--version", action="store_true")
 
-	if "--help" in sys.argv:
-		parser.print_help()
-		exit(0)
-	elif "--help" in sys.argv:
+	if "--version" in sys.argv:
 		print(f"MetaCanSNPerDatabases v. {CURRENT_VERSION}")
 		exit(0)
 
