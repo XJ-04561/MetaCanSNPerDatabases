@@ -40,10 +40,7 @@ class Table:
 			# Table doesn't exist
 			pass
 		
-		queryString = [f"{name} {' '.join(colType)}," for name, colType in zip(self._columns, self._types)]
-		queryString += self._appendRows
-
-		self._conn.execute(f"CREATE TABLE {self._tableName} (\n\t\t{',\n\t\t'.join(queryString)}\n);")
+		self.create()
 		
 		try:
 			self._conn.execute(f"INSERT INTO {self._tableName} SELECT * FROM {self._tableName}2;")
