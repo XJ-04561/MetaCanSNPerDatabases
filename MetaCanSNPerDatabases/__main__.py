@@ -77,7 +77,7 @@ def main():
 
 	parser = argparse.ArgumentParser(prog="MetaCanSNPerDatabases")
 
-	modeGroup : argparse._SubParsersAction = parser.add_subparsers(title="Mode", description="Mode with which to open the database.", required=True)
+	modeGroup : argparse._SubParsersAction = parser.add_subparsers(title="Mode", description="Mode with which to open the database.")
 
 	readParser : argparse.ArgumentParser = modeGroup.add_parser("read")
 	parser.add_argument("--table",		nargs="+",		default=None)
@@ -111,6 +111,10 @@ def main():
 	elif "--version" in sys.argv:
 		print(f"MetaCanSNPerDatabases v. {CURRENT_VERSION}")
 		exit(0)
+	elif sys.argv[0] not in ["read", "write", "update"]:
+		print("No mode chosen check usage to see which mode is appropriate for your intended use.", file=sys.stderr)
+		parser.print_help()
+		exit(1)
 
 	args : argparse.Namespace = parser.parse_args(sys.argv)
 	
