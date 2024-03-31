@@ -33,7 +33,7 @@ def write(args : argparse.Namespace):
 	database = openDatabase(args.filepath, "w")
 
 	# Creates with a "IF NOT EXISTS"-clause
-	for table in database.Tables:
+	for name, table in database.Tables:
 		table.create()
 
 	code = database.checkDatabase()
