@@ -7,8 +7,6 @@ from MetaCanSNPerDatabases.modules._Constants import *
 
 from MetaCanSNPerDatabases.modules.Functions import generateTableQuery
 
-type Mode = Literal["r","w"]
-
 class TableDefinitionMissmatch(Exception): pass
 
 class Table:
@@ -19,7 +17,7 @@ class Table:
 	_types : list[tuple[str]]
 	_appendRows : list[str]
 
-	def __init__(self, conn : sqlite3.Connection, mode : Mode):
+	def __init__(self, conn : sqlite3.Connection, mode : Literal["r","w"]):
 		self._conn = conn
 		self._mode = mode
 
@@ -87,7 +85,6 @@ class SNPTable(Table):
 
 	_tableName = TABLE_NAME_SNP_ANNOTATION
 	_columns = [
-		SNP_COLUMN_SNP_ID,
 		SNP_COLUMN_NODE_ID,
 		SNP_COLUMN_POSITION,
 		SNP_COLUMN_ANCESTRAL,
@@ -97,7 +94,6 @@ class SNPTable(Table):
 		SNP_COLUMN_CHROMOSOMES_ID
 	]
 	_types = [
-		SNP_COLUMN_SNP_ID_TYPE,
 		SNP_COLUMN_NODE_ID_TYPE,
 		SNP_COLUMN_POSITION_TYPE,
 		SNP_COLUMN_ANCESTRAL_TYPE,
@@ -128,19 +124,6 @@ class ReferenceTable(Table):
 		REFERENCE_COLUMN_ASSEMBLY_TYPE
 	]
 	_appendRows = REFERENCE_APPEND
-
-class NodesTable(Table):
-
-	_tableName = TABLE_NAME_NODES
-	_columns = [
-		NODE_COLUMN_ID,
-		NODE_COLUMN_NAME
-	]
-	_types = [
-		NODE_COLUMN_ID_TYPE,
-		NODE_COLUMN_NAME_TYPE
-	]
-	_appendRows = NODES_APPEND
 
 class TreeTable(Table):
 

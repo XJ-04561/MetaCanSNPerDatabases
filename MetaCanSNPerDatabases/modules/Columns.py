@@ -7,30 +7,28 @@ class ColumnFlag(int): pass
 ALL				= ColumnFlag(0)
 TreeParent		= ColumnFlag(1)
 TreeChild		= ColumnFlag(2)
-NodeID			= ColumnFlag(3)
-GenoType		= ColumnFlag(4)
-SnpID			= ColumnFlag(5)
-Position		= ColumnFlag(6)
-Ancestral		= ColumnFlag(7)
-Derived			= ColumnFlag(8)
-SNPReference	= ColumnFlag(9)
-Date			= ColumnFlag(10)
-ChromID			= ColumnFlag(11)
-Chromosome		= ColumnFlag(12)
-GenomeID		= ColumnFlag(13)
-Genome			= ColumnFlag(14)
-Strain			= ColumnFlag(15)
-GenbankID		= ColumnFlag(16)
-RefseqID		= ColumnFlag(17)
-Assembly		= ColumnFlag(18)
+GenoType		= ColumnFlag(3)
+NodeID			= ColumnFlag(4)
+Position		= ColumnFlag(5)
+Ancestral		= ColumnFlag(6)
+Derived			= ColumnFlag(7)
+SNPReference	= ColumnFlag(8)
+Date			= ColumnFlag(9)
+ChromID			= ColumnFlag(10)
+Chromosome		= ColumnFlag(11)
+GenomeID		= ColumnFlag(12)
+Genome			= ColumnFlag(13)
+Strain			= ColumnFlag(14)
+GenbankID		= ColumnFlag(15)
+RefseqID		= ColumnFlag(16)
+Assembly		= ColumnFlag(17)
 
 NAMES = [
 	ALL,
 	TreeParent,
 	TreeChild,
-	NodeID,
 	GenoType,
-	SnpID,
+	NodeID,
 	Position,
 	Ancestral,
 	Derived,
@@ -50,16 +48,12 @@ LOOKUP : dict[str,dict[ColumnFlag, str]] = {
     TABLE_NAME_TREE : {
         ALL			: "*",
         TreeParent	: TREE_COLUMN_PARENT,
-		TreeChild	: TREE_COLUMN_CHILD
-	},
-	TABLE_NAME_NODES : {
-        ALL			: "*",
-        NodeID		: NODE_COLUMN_ID,
-        GenoType	: NODE_COLUMN_NAME
+		TreeChild	: TREE_COLUMN_CHILD,
+        NodeID		: TREE_COLUMN_CHILD,
+        GenoType	: TREE_COLUMN_NAME
 	},
     TABLE_NAME_SNP_ANNOTATION : {
         ALL				: "*",
-		SnpID			: SNP_COLUMN_SNP_ID,
         NodeID			: SNP_COLUMN_NODE_ID,
 		Position		: SNP_COLUMN_POSITION,
 		Ancestral		: SNP_COLUMN_ANCESTRAL,
@@ -85,21 +79,19 @@ LOOKUP : dict[str,dict[ColumnFlag, str]] = {
 	}
 }
 
-UNIQUES = set(LOOKUP[TABLE_NAME_NODES]).difference(LOOKUP[TABLE_NAME_REFERENCES], LOOKUP[TABLE_NAME_SNP_ANNOTATION], LOOKUP[TABLE_NAME_TREE])
+UNIQUES = set(LOOKUP[TABLE_NAME_REFERENCES]).difference(LOOKUP[TABLE_NAME_CHROMOSOMES], LOOKUP[TABLE_NAME_SNP_ANNOTATION], LOOKUP[TABLE_NAME_TREE])
 UNIQUELOOKUP = {
     col : [table for table in LOOKUP if col in LOOKUP[table]][0] for col in UNIQUES
 }
-COMMONS = set(LOOKUP[TABLE_NAME_NODES]).intersection(LOOKUP[TABLE_NAME_REFERENCES], LOOKUP[TABLE_NAME_SNP_ANNOTATION], LOOKUP[TABLE_NAME_TREE])
+COMMONS = set(LOOKUP[TABLE_NAME_REFERENCES]).intersection(LOOKUP[TABLE_NAME_CHROMOSOMES], LOOKUP[TABLE_NAME_SNP_ANNOTATION], LOOKUP[TABLE_NAME_TREE])
 COMMONLOOKUP = {
     col : {table for table in LOOKUP if col in LOOKUP[table]} for col in COMMONS
 }
 
 RELATIONS : dict[tuple[str,str],ColumnFlag] = {
-	(TABLE_NAME_NODES, TABLE_NAME_TREE) : NodeID,
-    (TABLE_NAME_TREE, TABLE_NAME_NODES) : NodeID,
     
-    (TABLE_NAME_NODES, TABLE_NAME_SNP_ANNOTATION) : NodeID,
-    (TABLE_NAME_SNP_ANNOTATION, TABLE_NAME_NODES) : NodeID,
+    (TABLE_NAME_TREE, TABLE_NAME_SNP_ANNOTATION) : NodeID,
+    (TABLE_NAME_SNP_ANNOTATION, TABLE_NAME_TREE) : NodeID,
     
 	(TABLE_NAME_CHROMOSOMES, TABLE_NAME_SNP_ANNOTATION) : ChromID,
     (TABLE_NAME_SNP_ANNOTATION, TABLE_NAME_CHROMOSOMES) : ChromID,
@@ -112,30 +104,25 @@ RELATIONS : dict[tuple[str,str],ColumnFlag] = {
 }
 
 RELATIONSHIPS : dict[str,dict[ColumnFlag, str]]= {
-	TABLE_NAME_NODES : {
-		SnpID			: TABLE_NAME_SNP_ANNOTATION,
+	TABLE_NAME_TREE : {
 		Position		: TABLE_NAME_SNP_ANNOTATION,
 		Ancestral		: TABLE_NAME_SNP_ANNOTATION,
 		Derived			: TABLE_NAME_SNP_ANNOTATION,
 		SNPReference	: TABLE_NAME_SNP_ANNOTATION,
 		Date			: TABLE_NAME_SNP_ANNOTATION,
 		ChromID			: TABLE_NAME_SNP_ANNOTATION,
-        
-		TreeParent		: TABLE_NAME_TREE,
-		TreeChild		: TABLE_NAME_TREE
 	},
     TABLE_NAME_SNP_ANNOTATION : {
         Chromosome		: TABLE_NAME_CHROMOSOMES,
 		GenomeID		: TABLE_NAME_CHROMOSOMES,
         
-		GenoType		: TABLE_NAME_NODES,
+		GenoType		: TABLE_NAME_TREE,
         
 		TreeParent		: TABLE_NAME_TREE,
 		TreeChild		: TABLE_NAME_TREE
 	},
     TABLE_NAME_CHROMOSOMES : {
         NodeID			: TABLE_NAME_SNP_ANNOTATION,
-        SnpID			: TABLE_NAME_SNP_ANNOTATION,
 		Position		: TABLE_NAME_SNP_ANNOTATION,
 		Ancestral		: TABLE_NAME_SNP_ANNOTATION,
 		Derived			: TABLE_NAME_SNP_ANNOTATION,

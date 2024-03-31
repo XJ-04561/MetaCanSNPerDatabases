@@ -7,6 +7,7 @@ import MetaCanSNPerDatabases.modules.Globals as Globals
 
 install_import_hook("MetaCanSNPerDatabases.modules.Databases")
 from MetaCanSNPerDatabases.modules.Databases import openDatabase, DatabaseReader, DatabaseWriter, IsLegacyCanSNPer2, OutdatedCanSNPerDatabase
+from sqlite3 import DatabaseError
 
 install_import_hook("MetaCanSNPerDatabases.modules.Columns")
 from MetaCanSNPerDatabases.modules.Columns import ColumnFlag

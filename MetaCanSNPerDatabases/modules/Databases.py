@@ -55,7 +55,7 @@ class Database:
 	def Tables(self) -> dict[str,Table]:
 		return {name:self.__getattribute__(name) for name in sorted(filter(lambda s : s.endswith("Table"), self.__dict__))}
 
-	def validateDatabase(self) -> int:
+	def checkDatabase(self) -> int:
 		if len(self._connection.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()) == 0:
 			# Table is empty
 			return -2
@@ -76,6 +76,21 @@ class Database:
 			LOGGER.info(f"Database version is up to date! (v. {self.__version__})")
 			return 0
 	
+	def validateDatabase(self, code: int):
+		match code:
+			case 0: # We're good
+				pass
+			case -2: # Table is new
+				raise sqlite3.DatabaseError("Database is empty.")
+			case -3:
+				raise IsLegacyCanSNPer2("Database is a legacy CanSNPer database. If opened in '--write' mode it can be converted.")
+			case -4: # Transfer data from old tables into new tables
+				raise OutdatedCanSNPerDatabase(f"Database version ({self.__version__}) does not match the currently set version. (user_version={self._connection.execute('PRAGMA user_version;').fetchone()[0]}, schemaHash={self.schemaHash!r})")
+			case -5: # Version number missmatch
+				raise sqlite3.DatabaseError(f"Table does not have the right `user_version` set. (Determined version is v.{self.__version__} but user_version is v.{self._connection.execute('PRAGMA user_version;').fetchone()[0]})")
+			case _:
+				raise sqlite3.DatabaseError(f"Unkown Database error. Current Database version is v.{CURRENT_VERSION}, and this database has version v.{self.__version__} (schemaHash={self.schemaHash!r}).")
+
 	def rectifyDatabase(self, code : int):
 		raise NotImplementedError("Not implemented in the base class.")
 
@@ -127,56 +142,16 @@ class Database:
 class DatabaseReader(Database):
 	
 	_mode = "r"
+
+	def rectifyDatabase(self, code):
+		raise PermissionError("Can't rectify a database opened in read-only mode.")
 	
-	def __init__(self, database : sqlite3.Connection):
-		super().__init__(database)
-
-		code = self.validateDatabase()
-
-		match code:
-			case 0: # We're good
-				pass
-			case -2: # Table is new
-				raise sqlite3.DatabaseError("Database is empty.")
-			case -3:
-				raise IsLegacyCanSNPer2("Database is a legacy CanSNPer database. If opened in '--write' mode it can be converted.")
-			case -4: # Transfer data from old tables into new tables
-				raise OutdatedCanSNPerDatabase(f"Database version ({self.__version__}) does not match the currently set version. (user_version={self._connection.execute('PRAGMA user_version;').fetchone()[0]}, schemaHash={self.schemaHash!r})")
-			case -5: # Version number missmatch
-				raise sqlite3.DatabaseError(f"Table does not have the right `user_version` set. (Determined version is v.{self.__version__} but user_version is v.{self._connection.execute('PRAGMA user_version;').fetchone()[0]})")
-			case _:
-				raise sqlite3.DatabaseError(f"Unkown Database error. Current Database version is v.{CURRENT_VERSION}, and this database has version v.{self.__version__} (schemaHash={self.schemaHash!r}).")
-
 class DatabaseWriter(Database):
 
 	_mode = "w"
-	
-	def __init__(self, database : sqlite3.Connection):
-		super().__init__(database)
 
-		code = self.validateDatabase()
-		match code:
-			case -2:
-				print("Database is empty.")
-			case -3:
-				print("Database is a legacy CanSNPer database.")
-			case -4:
-				print(f"Database out of date/has wrong schema. Current version is v.{CURRENT_VERSION}, but this database has version v.{self.__version__} (schemaHash={self.schemaHash!r}).")
-			case -5:
-				print(f"Table does not have the right `user_version` set. (Determined version is v.{self.__version__} but user_version is v.{self._connection.execute('PRAGMA user_version;').fetchone()[0]})")
-			case 0:
-				print(f"Database is up to date! (v.{self.__version__})")
-			case _:
-				print(f"Unkown Database error. Current Database version is v.{CURRENT_VERSION}, and this database has version v.{self.__version__} (schemaHash={self.schemaHash!r}).")
-				print("Exiting.")
-				exit(1)
-		
-		print("Making a '.backup' & rectifying database... ")
-		self.rectifyDatabase(code)
-		print("Done!")
-
-	def rectifyDatabase(self, code : int):
-		shutil.copy(self.filename, self.filename+".backup")
+	def rectifyDatabase(self, code : int, copy : bool=True):
+		if copy: shutil.copy(self.filename, self.filename+".backup")
 		match code:
 			case 0: # We're good
 				pass
@@ -199,22 +174,23 @@ class DatabaseWriter(Database):
 	def addSNP(self, nodeID, snpID, position, ancestral, derived, reference, date, chromosomeID):
 		self._connection.execute(f"INSERT (?,?,?,?,?,?,?,?) INTO {TABLE_NAME_SNP_ANNOTATION};", [nodeID, snpID, position, ancestral, derived, reference, date, chromosomeID])
 	
-	def addReference(self, genomeID, genome, strain, genbank, refseq, assemblyName):
-		self._connection.execute(f"INSERT (?,?,?,?,?,?) INTO {TABLE_NAME_REFERENCES};", [genomeID, genome, strain, genbank, refseq, assemblyName])
-
-	def addNode(self, nodeID, genoType):
-		self._connection.execute(f"INSERT (?,?) INTO {TABLE_NAME_NODES};", [nodeID, genoType])
-
-	def addBranch(self, parentID, childID):
-		self._connection.execute(f"INSERT (?,?) INTO {TABLE_NAME_TREE};", [parentID, childID])
+	def addReference(self, genome, strain, genbank, refseq, assemblyName):
+		self._connection.execute(f"INSERT (null,?,?,?,?,?) INTO {TABLE_NAME_REFERENCES};", [genome, strain, genbank, refseq, assemblyName])
 	
-	def addChromosome(self, chromosomeID, chromosomeName, genomeID):
-		self._connection.execute(f"INSERT (?,?,?) INTO {TABLE_NAME_CHROMOSOMES};", [chromosomeID, chromosomeName, genomeID])
+	def addBranch(self, parent : int|str=None, name : str=None):
+		if type(parent) is int:
+			self._connection.execute(f"INSERT (?,null,?) INTO {TABLE_NAME_TREE};", [parent, name])
+		else:
+			self._connection.execute(f"INSERT ({TABLE_NAME_TREE}.child,null,?) INTO {TABLE_NAME_TREE} FROM {TABLE_NAME_TREE} WHERE {TABLE_NAME_TREE}.name = ?;", [name, parent])
+	
+	def addChromosome(self, chromosomeName : str=None, genomeID : int=None, genomeName : str=None):
+		if genomeID is not None:
+			self._connection.execute(f"INSERT (null,?,?) INTO {TABLE_NAME_CHROMOSOMES};", [chromosomeName, genomeID])
+		elif genomeName is not None:
+			self._connection.execute(f"INSERT (null,?,{TABLE_NAME_CHROMOSOMES}.id) INTO {TABLE_NAME_CHROMOSOMES} FROM {TABLE_NAME_CHROMOSOMES} WHERE {TABLE_NAME_CHROMOSOMES}.genome = ?;", [chromosomeName, genomeName])
 	
 	def commit(self):
 		self._connection.commit()
-
-type Mode = Literal["r", "w"]
 
 @overload
 def openDatabase(database : str, mode : Literal["r"]) -> DatabaseReader:
@@ -225,7 +201,7 @@ def openDatabase(database : str, mode : Literal["w"]) -> DatabaseWriter:
 	pass
 
 @final
-def openDatabase(database : str, mode : Mode) -> DatabaseReader | DatabaseWriter | None:
+def openDatabase(database : str, mode : Literal["r", "w"]) -> DatabaseReader | DatabaseWriter | None:
 	match mode:
 		case "r":
 			if not os.path.exists(database):

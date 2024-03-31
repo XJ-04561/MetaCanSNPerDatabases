@@ -4,67 +4,108 @@ import MetaCanSNPerDatabases.modules.Globals as Globals
 import MetaCanSNPerDatabases.modules.Columns as Columns
 from MetaCanSNPerDatabases.modules.Columns import ColumnFlag
 from MetaCanSNPerDatabases.modules._Constants import *
+try:
+	from MetaCanSNPerDatabases.modules.Databases import DatabaseWriter
+except:
+	pass
 
 import inspect
+
+class MissingReferenceFile(Exception): pass
 
 def private(func):
 	print("\n".join(map(repr, inspect.stack()[0])))
 	return func
 
 whitespacePattern = re.compile(r"\s+")
+sqlite3TypePattern = re.compile(r"(?P<integer>INTEGER)|(?P<varchar>VARCHAR[(](?P<number>[0-9]*)[)])|(?P<date>DATE)|(?P<text>TEXT)")
 
-def updateFromLegacy(filename):
-	from MetaCanSNPerDatabases import DatabaseWriter
-	
-	shutil.move(filename, filename+".backup")
-	
-	conn1 = sqlite3.connect(filename+".backup")
-	conn2 = sqlite3.connect(filename)
+def formatType(tps):
 
-	db = DatabaseWriter(conn2)
+	d = {"unknown" : True}
+	d.setdefault(False)
+	for tp in tps:
+		d |= sqlite3TypePattern.fullmatch(tp).groupdict()
+		
+		match next(filter(d.get, ["integer", "varchar", "date", "text", "unknown"])):
+			case "integer":
+				yield "{:>9d}"
+			case "varchar":
+				yield "{:>" + str(int(d.get("number"))+2) + "s}"
+			case "date":
+				yield "{:>12s}"
+			case "text":
+				yield "{:>20s}"
+			case "unknown":
+				yield "{:>20}"
+
+def loadFromReferenceFile(database : DatabaseWriter, file : TextIO, refDir : str="."):
+	file.seek(0)
+	if "genome	strain	genbank_id	refseq_id	assembly_name" == file.readline():
+		for row in file:
+			genome, strain, genbank_id, refseq_id, assembly_name = row.strip().split("\t")
+			database.addReference(genome, strain, genbank_id, refseq_id, assembly_name)
+			try:
+				chrom = open(os.path.join(refDir, f"{assembly_name}.fna"), "r").readline()[1:].split()[0]
+				database.addChromosome(chromosomeName=chrom, genomeName=genome)
+			except FileNotFoundError as e:
+				raise MissingReferenceFile(f"Could not find reference file {os.path.join(refDir, f'{assembly_name}.fna')!r}. The file {file.__name__!r} does not specify chromosomes, and so the reference fasta file is required. To set the directory in which to look for .fna references, use the flag '--refDir'")
+
+	elif "chromosomes	genome	strain	genbank_id	refseq_id	assembly_name" == file.readline():
+		for row in file:
+			chromosomes, genome, strain, genbank_id, refseq_id, assembly_name = row.strip().split("\t")
+			database.addReference(genome, strain, genbank_id, refseq_id, assembly_name)
+			for chrom in chromosomes.split(";"):
+				database.addChromosome(chromosomeName=chrom, genomeName=genome)
+	else:
+		ValueError("File is not of accepted format.")
+
+def loadFromTreeFile(database : DatabaseWriter, file : TextIO):
+	file.seek(0)
+	database.addBranch(parent=0, name=file.readline().strip())
+	for row in file:
+		*_, parent, child = row.rstrip(file.newlines).rsplit("\t", 2)
+		database.addBranch(parent=parent, name=child)
+		
+
+def loadFromSNPFile(database : DatabaseWriter, file : TextIO):
+	file.seek(0)
+	if "snp_id	strain	reference	genome	position	derived_base	ancestral_base" == file.readline().strip():
+		for row in file:
+			nodeName, strain, reference, genome, position, ancestral, derived = row.rstrip(file.newlines).split("\t")
+			database.addSNP(nodeName=nodeName, strain=strain, reference=reference, genome=genome, position=int(position), ancestral=ancestral, derived=derived)
+	else:
+		ValueError("File is not of accepted format.")
+
+def updateFromLegacy(database : DatabaseWriter):
+	"""Update from CanSNPer2 to MetaCanSNPer v.1 format."""
 
 	# References
-	for (genomeID, genome, strain, genbank, refseq, assembly) in conn1.execute("SELECT * FROM snp_references;"):
-		db.addReference(genomeID, genome, strain, reference, date, genbank, refseq, assembly)
+	pass # Nothing as of this version
 
 	# Chromosomes
-	for (i, assembly) in conn1.execute("SELECT id, assembly FROM snp_references;"):
-		try:
-			# Try to get chromosome name from the .fna in the MetaCanSNPer directory.
-			chrom = open(os.path.join(os.path.splitroot(filename)[0], "..", "References", f"{assembly}.fna")).readline()[1:].split()[0]
-		except:
-			try:
-				# If not found, attempt same directory as the database.
-				chrom = open(os.path.join(os.path.splitroot(filename)[0], f"{assembly}.fna")).readline()[1:].split()[0]
-			except:
-				# And as a last case just set to NA
-				chrom = "NA"
-		db.addChromosome(i, chrom, i)
+	database.ChromosomesTable.create()
+	for i, assembly in database.ReferenceTable.get(Columns.GenomeID, Columns.Assembly):
+		database._connection.execute(f"INSERT (?, ?, ?) INTO {TABLE_NAME_CHROMOSOMES};", [
+			i,
+			open(f"{assembly}.fna").readline()[1:].split()[0],
+			i
+		])
 	
 	# SNPs
-	i = 0
-	for (nodeID, snpID, pos, anc, der, reference, date, genomeID) in conn1.execute("SELECT * FROM snp_annotation;"):
-		# genomeID is the same as chromosomeID
-		db.addSNP((i := i+1), nodeID, pos, anc, der, reference, date, genomeID)
-	
-	# Nodes
-	i = 1
-	roots = 0
-	for (name,) in conn1.execute("SELECT name FROM snp_references ORDER BY id ASC;"):
-		if name != "root":
-			db.addNode(i, name)
-			i += 1
-		else:
-			roots += 1
+	database._connection.execute("ALTER TABLE snp_annotation RENAME TO snp_annotation_old;")
+	database.SNPTable.create()
+	database._connection.execute(f"INSERT INTO {TABLE_NAME_SNP_ANNOTATION} (null, node_id-1, position, ancestral_base, derived_base, reference, date, genome_i) FROM snp_annotation_old;")
+	database._connection.execute("DROP TABLE snp_annotation_old;")
 	
 	# Tree
-	for (parentID, childID) in conn1.execute("SELECT name FROM snp_references ORDER BY id ASC;"):
-		if name != "root":
-			db.addBranch(parentID-roots, childID-roots)
-	
-	db.commit()
-	db.close()
-
+	database._connection.execute("ALTER TABLE tree RENAME TO tree_old;")
+	database.TreeTable.create()
+	database._connection.execute(f"INSERT INTO {TABLE_NAME_TREE} (tree_old.parent-1, null, nodes.name) FROM tree_old, nodes WHERE tree_old.parent = nodes.id;")
+	database._connection.execute(f"DELETE FROM {TABLE_NAME_TREE} WHERE parent = 0 OR child = 0;")
+	database._connection.execute(f"UPDATE TABLE {TABLE_NAME_TREE} SET parent=0 WHERE child = 1;")
+	database._connection.execute("DROP TABLE nodes;")
+	database._connection.execute("DROP TABLE tree_old;")
 
 def downloadDatabase(databaseName : str, dst : str) -> str:
 	from urllib.request import urlretrieve
