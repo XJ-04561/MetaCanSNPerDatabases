@@ -116,7 +116,7 @@ def main():
 		parser.print_help()
 		exit(1)
 
-	args : argparse.Namespace = parser.parse_args(sys.argv)
+	args : argparse.Namespace = parser.parse_args(sys.argv[1:])
 	
 	args.func(args)
 
