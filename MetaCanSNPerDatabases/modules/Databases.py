@@ -20,7 +20,7 @@ class Database:
 
 	def __init__(self, database : sqlite3.Connection):
 		from MetaCanSNPerDatabases.modules.Tables import SNPTable, ReferenceTable, TreeTable, ChromosomesTable
-		self.filename = database.execute("PRAGMA database_list;").fetchone()[2]
+		self.filename = os.path.realpath(database.execute("PRAGMA database_list;").fetchone()[2])
 		self._connection = database
 
 		self.SNPTable = SNPTable(self._connection, self._mode)
@@ -161,7 +161,7 @@ class DatabaseWriter(Database):
 			case -2: # Table is new
 				for table in self.Tables.values():
 					table.create()
-				self._connection.execute(f"PRAGMA user_version = {self.__version__:d};")
+				self._connection.execute(f"PRAGMA user_version = {DATABASE_VERSIONS[self.schemaHash]:d};")
 			case -3: # Legacy CanSNPer table
 				updateFromLegacy(self.filename)
 			case -4: # Transfer data from old tables into new tables
@@ -170,9 +170,9 @@ class DatabaseWriter(Database):
 				for (table,) in self._connection.execute("SELECT name FROM sqlite_master WHERE type='table';"):
 					if table not in TABLES:
 						self._connection.execute(f"DROP TABLE {table};")
-				self._connection.execute(f"PRAGMA user_version = {self.__version__:d};")
+				self._connection.execute(f"PRAGMA user_version = {DATABASE_VERSIONS[self.schemaHash]:d};")
 			case -5:
-				self._connection.execute(f"PRAGMA user_version = {self.__version__:d};")
+				self._connection.execute(f"PRAGMA user_version = {DATABASE_VERSIONS[self.schemaHash]:d};")
 
 	def addSNP(self, nodeID, snpID, position, ancestral, derived, reference, date, chromosomeID):
 		self._connection.execute(f"INSERT (?,?,?,?,?,?,?,?) INTO {TABLE_NAME_SNP_ANNOTATION};", [nodeID, snpID, position, ancestral, derived, reference, date, chromosomeID])
