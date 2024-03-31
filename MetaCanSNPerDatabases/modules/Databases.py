@@ -84,8 +84,8 @@ class Database:
 				LOGGER.exception(sqlite3.DatabaseError("Database is empty."))
 				if throwError: raise sqlite3.DatabaseError("Database is empty.")
 			case -3:
-				LOGGER.exception(IsLegacyCanSNPer2("Database is a legacy CanSNPer database. If opened in '--write' mode it can be converted."))
-				if throwError: raise IsLegacyCanSNPer2("Database is a legacy CanSNPer database. If opened in '--write' mode it can be converted.")
+				LOGGER.exception(IsLegacyCanSNPer2("Database is a legacy CanSNPer database. If opened in '--update' mode it can be converted."))
+				if throwError: raise IsLegacyCanSNPer2("Database is a legacy CanSNPer database. If opened in '--update' mode it can be converted.")
 			case -4: # Transfer data from old tables into new tables
 				LOGGER.exception(OutdatedCanSNPerDatabase(f"Database version ({self.__version__}) does not match the currently set version. (user_version={self._connection.execute('PRAGMA user_version;').fetchone()[0]}, schemaHash={self.schemaHash!r})"))
 				if throwError: raise OutdatedCanSNPerDatabase(f"Database version ({self.__version__}) does not match the currently set version. (user_version={self._connection.execute('PRAGMA user_version;').fetchone()[0]}, schemaHash={self.schemaHash!r})")

@@ -64,7 +64,7 @@ def update(args):
 
 	database = openDatabase(args.filepath, "w")
 	code = database.checkDatabase()
-	database.validateDatabase(code)
+	database.validateDatabase(code, throwError=False)
 
 	oldCwd = os.curdir
 	os.chdir(args.refDir)
