@@ -17,7 +17,7 @@ class Table:
 	_columns : list[str]
 	_types : list[tuple[str]]
 	_appendRows : list[str]
-	mode : Mode
+	_mode : Mode
 
 	def __init__(self, conn : sqlite3.Connection, mode : Mode):
 		self._conn = conn
