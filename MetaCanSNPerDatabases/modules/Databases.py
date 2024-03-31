@@ -99,6 +99,8 @@ class Database:
 
 	@final
 	def get(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Literal["DESC","ASC"]]|list[tuple[ColumnFlag,Literal["DESC","ASC"]]]=[], **where : Any) -> Generator[tuple[Any],None,None]:
+		
+		from MetaCanSNPerDatabases.modules.Functions import generateQuery
 		for row in self._connection.execute(*generateQuery(*select, orderBy=orderBy, **where)):
 			yield row
 	
@@ -121,6 +123,7 @@ class Database:
 
 	@property
 	def schemaHash(self):
+		from MetaCanSNPerDatabases.modules.Functions import whitespacePattern
 		return hashlib.md5(
 			whitespacePattern.sub(
 				" ",
@@ -144,6 +147,7 @@ class DatabaseWriter(Database):
 	_mode = "w"
 
 	def rectifyDatabase(self, code : int, copy : bool=True):
+		from MetaCanSNPerDatabases.modules.Functions import updateFromLegacy
 		if copy: shutil.copy(self.filename, self.filename+".backup")
 		match code:
 			case 0: # We're good

@@ -4,10 +4,7 @@ import MetaCanSNPerDatabases.modules.Globals as Globals
 import MetaCanSNPerDatabases.modules.Columns as Columns
 from MetaCanSNPerDatabases.modules.Columns import ColumnFlag
 from MetaCanSNPerDatabases.modules._Constants import *
-try:
-	from MetaCanSNPerDatabases.modules.Databases import DatabaseWriter
-except:
-	pass
+from MetaCanSNPerDatabases.modules.Databases import DatabaseWriter
 
 import inspect
 
