@@ -9,6 +9,7 @@ LOGGER = logging.Logger("MetaCanSNPerDatabases", level=logging.WARNING)
 type Mode = Literal["r", "w"]
 type ReadMode = Literal["r"]
 type WriteMode = Literal["w"]
+type Direction = Literal["DESC","ASC"]
 
 DATABASE_VERSIONS : dict[str,int] = {
     "7630f33662e27489b7bb7b3b121ca4ff" : 1, # Legacy CanSNPer

@@ -118,7 +118,7 @@ def downloadDatabase(databaseName : str, dst : str) -> str:
 	return None
 
 @cache
-def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Literal["DESC","ASC"]]|list[tuple[ColumnFlag,Literal["DESC","ASC"]]]=[], **where : Any) -> Generator[tuple[Any],None,None]:
+def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Direction]|list[tuple[ColumnFlag,Direction]]=[], **where : Any) -> Generator[tuple[Any],None,None]:
     """All positional arguments should be `ColumnFlag` objects and they are used to
     determine what information to be gathered from the database.
     
@@ -153,7 +153,7 @@ def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[Co
     return query, params
 
 @cache
-def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Literal["DESC","ASC"]]|list[tuple[ColumnFlag,Literal["DESC","ASC"]]]=[], **where : Any) -> tuple[str,list[Any]]:
+def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Direction]|list[tuple[ColumnFlag,Direction]]=[], **where : Any) -> tuple[str,list[Any]]:
 	"""All positional arguments should be `ColumnFlag` objects and they are used to
 	determine what information to be gathered from the database.
 	
