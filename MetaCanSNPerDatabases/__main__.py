@@ -79,7 +79,7 @@ def main():
 
 	modeGroup : argparse._SubParsersAction = parser.add_subparsers(title="Mode", dest="mode", description="Mode with which to open the database.", metavar="MODES")
 
-	readParser : argparse.ArgumentParser = modeGroup.add_parser("read")
+	readParser : argparse.ArgumentParser = modeGroup.add_parser("read", help="Print out data from tables in database.")
 	parser.add_argument("--table",		nargs="+",		default=None)
 	readParser.set_defaults(func=read)
 
@@ -97,7 +97,7 @@ def main():
 	
 	writeParser.set_defaults(func=write)
 
-	updateParser : argparse.ArgumentParser = modeGroup.add_parser("update")
+	updateParser : argparse.ArgumentParser = modeGroup.add_parser("update", help="Update an existing database to follow the current standard schema.")
 	updateParser.add_argument("--refDir")
 	updateParser.set_defaults(func=update)
 
