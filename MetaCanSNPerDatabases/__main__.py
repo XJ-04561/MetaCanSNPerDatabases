@@ -105,7 +105,10 @@ def main():
 
 	parser.add_argument("--version", action="store_true")
 
-	if "--version" in sys.argv:
+	if sys.argv == []:
+		parser.print_help()
+		exit(0)
+	elif "--version" in sys.argv:
 		print(f"MetaCanSNPerDatabases v. {CURRENT_VERSION}")
 		exit(0)
 
