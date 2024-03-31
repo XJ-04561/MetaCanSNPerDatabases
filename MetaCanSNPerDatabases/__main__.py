@@ -77,7 +77,7 @@ def main():
 
 	parser = argparse.ArgumentParser(prog="MetaCanSNPerDatabases")
 
-	modeGroup : argparse._SubParsersAction = parser.add_subparsers(title="Mode", description="Mode with which to open the database.")
+	modeGroup : argparse._SubParsersAction = parser.add_subparsers(title="Mode", dest="mode", description="Mode with which to open the database.", metavar="MODES")
 
 	readParser : argparse.ArgumentParser = modeGroup.add_parser("read")
 	parser.add_argument("--table",		nargs="+",		default=None)
