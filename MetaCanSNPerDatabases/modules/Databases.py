@@ -1,4 +1,5 @@
 
+from sqlite3 import Connection
 from MetaCanSNPerDatabases.modules.Globals import *
 import MetaCanSNPerDatabases.modules.Globals as Globals
 import MetaCanSNPerDatabases.modules.Columns as Columns
@@ -150,6 +151,16 @@ class DatabaseReader(Database):
 class DatabaseWriter(Database):
 
 	_mode = "w"
+
+	def __init__(self, database: Connection):
+		super().__init__(database)
+
+		self._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION};")
+
+		self.ReferenceTable.create()
+		self.ChromosomesTable.create()
+		self.TreeTable.create()
+		self.SNPTable.create()
 
 	def rectifyDatabase(self, code : int, copy : bool=True):
 		from MetaCanSNPerDatabases.modules.Functions import updateFromLegacy
