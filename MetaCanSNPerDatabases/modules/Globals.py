@@ -4,8 +4,11 @@ from functools import cached_property, cache
 import sqlite3, hashlib, re, os, logging, shutil, sys
 from typing import Generator, Callable, Iterable, Self, overload, final, Literal, LiteralString, Any, TextIO, BinaryIO
 
-LOGGER = logging.Logger("MetaCanSNPerDatabases")
-LOGGER.addHandler(logging.FileHandler("MetaCanSNPerDatabases.log"))
+LOGGER = logging.Logger("MetaCanSNPerDatabases", level=logging.WARNING)
+
+type Mode = Literal["r", "w"]
+type ReadMode = Literal["r"]
+type WriteMode = Literal["w"]
 
 DATABASE_VERSIONS : dict[str,int] = {
     "7630f33662e27489b7bb7b3b121ca4ff" : 1, # Legacy CanSNPer

@@ -75,20 +75,25 @@ class Database:
 			LOGGER.info(f"Database version is up to date! (v. {self.__version__})")
 			return 0
 	
-	def validateDatabase(self, code: int):
+	def validateDatabase(self, code: int, throwError : bool=True):
 		match code:
 			case 0: # We're good
 				pass
 			case -2: # Table is new
-				raise sqlite3.DatabaseError("Database is empty.")
+				LOGGER.exception(sqlite3.DatabaseError("Database is empty."))
+				if throwError: raise sqlite3.DatabaseError("Database is empty.")
 			case -3:
-				raise IsLegacyCanSNPer2("Database is a legacy CanSNPer database. If opened in '--write' mode it can be converted.")
+				LOGGER.exception(IsLegacyCanSNPer2("Database is a legacy CanSNPer database. If opened in '--write' mode it can be converted."))
+				if throwError: raise IsLegacyCanSNPer2("Database is a legacy CanSNPer database. If opened in '--write' mode it can be converted.")
 			case -4: # Transfer data from old tables into new tables
-				raise OutdatedCanSNPerDatabase(f"Database version ({self.__version__}) does not match the currently set version. (user_version={self._connection.execute('PRAGMA user_version;').fetchone()[0]}, schemaHash={self.schemaHash!r})")
+				LOGGER.exception(OutdatedCanSNPerDatabase(f"Database version ({self.__version__}) does not match the currently set version. (user_version={self._connection.execute('PRAGMA user_version;').fetchone()[0]}, schemaHash={self.schemaHash!r})"))
+				if throwError: raise OutdatedCanSNPerDatabase(f"Database version ({self.__version__}) does not match the currently set version. (user_version={self._connection.execute('PRAGMA user_version;').fetchone()[0]}, schemaHash={self.schemaHash!r})")
 			case -5: # Version number missmatch
-				raise sqlite3.DatabaseError(f"Table does not have the right `user_version` set. (Determined version is v.{self.__version__} but user_version is v.{self._connection.execute('PRAGMA user_version;').fetchone()[0]})")
+				LOGGER.exception(sqlite3.DatabaseError(f"Table does not have the right `user_version` set. (Determined version is v.{self.__version__} but user_version is v.{self._connection.execute('PRAGMA user_version;').fetchone()[0]})"))
+				if throwError: raise sqlite3.DatabaseError(f"Table does not have the right `user_version` set. (Determined version is v.{self.__version__} but user_version is v.{self._connection.execute('PRAGMA user_version;').fetchone()[0]})")
 			case _:
-				raise sqlite3.DatabaseError(f"Unkown Database error. Current Database version is v.{CURRENT_VERSION}, and this database has version v.{self.__version__} (schemaHash={self.schemaHash!r}).")
+				LOGGER.exception(sqlite3.DatabaseError(f"Unkown Database error. Current Database version is v.{CURRENT_VERSION}, and this database has version v.{self.__version__} (schemaHash={self.schemaHash!r})."))
+				if throwError: raise sqlite3.DatabaseError(f"Unkown Database error. Current Database version is v.{CURRENT_VERSION}, and this database has version v.{self.__version__} (schemaHash={self.schemaHash!r}).")
 
 	def rectifyDatabase(self, code : int):
 		raise NotImplementedError("Not implemented in the base class.")
@@ -188,10 +193,6 @@ class DatabaseWriter(Database):
 	
 	def commit(self):
 		self._connection.commit()
-
-type Mode = Literal["r", "w"]
-type ReadMode = Literal["r"]
-type WriteMode = Literal["w"]
 
 @overload
 def openDatabase(database : str, mode : ReadMode) -> DatabaseReader:
