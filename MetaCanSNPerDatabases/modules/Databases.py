@@ -40,7 +40,7 @@ class Database:
 	
 	@property
 	def __version__(self):
-		return DATABASE_VERSIONS.get(self.schemaHash, 0)
+		return self._connection.execute("PRAGMA user_version;").fetchone()[0]
 
 	def __del__(self):
 		try:
@@ -61,14 +61,14 @@ class Database:
 			return -2
 		elif self.__version__ == LEGACY_VERSION:
 			return -3
-		elif self.__version__ != CURRENT_VERSION:
-			LOGGER.warning(f"Database version (v.{self.__version__}) does not match the currently set version (v.{CURRENT_VERSION}).")
+		elif self.schemaHash != CURRENT_HASH:
+			LOGGER.warning(f"Database version (v.{self.__version__}, schemaHash={self.schemaHash!r}) does not match the current MetaCanSNPerDatabase version (v.{CURRENT_VERSION}, schemaHash={CURRENT_HASH!r}).")
 			if Globals.STRICT:
 				raise sqlite3.DatabaseError(f"Database version (v.{self.__version__}) does not match the currently set version (v.{CURRENT_VERSION}).")
 			else:
 				# Table does not have the right schema version
 				return -4
-		elif CURRENT_VERSION != self._connection.execute('PRAGMA user_version;').fetchone()[0]:
+		elif self.__version__ != CURRENT_VERSION:
 			# Table does not have the right `user_version` set.
 			LOGGER.warning(f"Table does not have the right `user_version` set. (Determined version is v.{self.__version__} but user_version is v.{self._connection.execute('PRAGMA user_version;').fetchone()[0]})")
 			return -5
@@ -145,22 +145,12 @@ class DatabaseReader(Database):
 	
 	_mode = "r"
 
-	def rectifyDatabase(self, code):
+	def rectifyDatabase(self, code : Never):
 		raise PermissionError("Can't rectify a database opened in read-only mode.")
 	
 class DatabaseWriter(Database):
 
 	_mode = "w"
-
-	def __init__(self, database: Connection):
-		super().__init__(database)
-
-		self._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION};")
-
-		self.ReferenceTable.create()
-		self.ChromosomesTable.create()
-		self.TreeTable.create()
-		self.SNPTable.create()
 
 	def rectifyDatabase(self, code : int, copy : bool=True):
 		from MetaCanSNPerDatabases.modules.Functions import updateFromLegacy
@@ -233,4 +223,16 @@ def openDatabase(database : str, mode : Mode) -> DatabaseReader | DatabaseWriter
 				raise e
 			
 		case "w":
-			return DatabaseWriter(sqlite3.connect(database))
+			if os.path.exists(database):
+				return DatabaseWriter(sqlite3.connect(database))
+			else:
+				conn = sqlite3.connect(database)
+				conn.execute(f"PRAGMA user_version = {CURRENT_VERSION};")
+				ret = DatabaseWriter(conn)
+
+				ret.ReferenceTable.create()
+				ret.ChromosomesTable.create()
+				ret.TreeTable.create()
+				ret.SNPTable.create()
+
+				return ret
