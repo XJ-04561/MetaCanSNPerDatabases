@@ -49,7 +49,7 @@ class Database:
 			pass
 	
 	def __repr__(self):
-		return object.__repr__(self)[:-1] + f" version={self.__version__} schemaHash={self.schemaHash!r} tables={[(name, len(TABLES[name])) for name in TABLES]}>"
+		return object.__repr__(self)[:-1] + f" version={self.__version__} schemaHash={self.schemaHash!r} tables={[(name, len(table)) for name, table in TABLES]}>"
 	
 	@property
 	def Tables(self) -> dict:
