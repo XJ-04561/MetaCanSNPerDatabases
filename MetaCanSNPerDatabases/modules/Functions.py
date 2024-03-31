@@ -118,7 +118,7 @@ def downloadDatabase(databaseName : str, dst : str) -> str:
 	return None
 
 @cache
-def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Direction]|tuple[tuple[ColumnFlag,Direction]]=tuple(), **where : Any) -> Generator[tuple[Any],None,None]:
+def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Direction]|tuple[tuple[ColumnFlag,Direction]]=None, **where : Any) -> Generator[tuple[Any],None,None]:
 	"""All positional arguments should be `ColumnFlag` objects and they are used to
 	determine what information to be gathered from the database.
 	
@@ -140,12 +140,14 @@ def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[Co
 		query += f" WHERE {' AND '.join(_tmp)}"
 		del _tmp
 	
-	if isinstance(orderBy, ColumnFlag):
+	if orderBy is None:
+		orderBy = tuple()
+	elif isinstance(orderBy, ColumnFlag):
 		orderBy = [(orderBy, "DESC")]
 	elif isinstance(orderBy, tuple) and not isinstance(orderBy[0], tuple):
 		orderBy = [orderBy]
 	
-	if orderBy != []:
+	if len(orderBy) > 0:
 		# Create an ordered list of all "ORDER BY X [DIRECTION]"-statements
 		orderBy = [tupe if type(tupe) is tuple else (tupe, "DESC") for tupe in orderBy]
 		query += f" ORDER BY {', '.join(map(' '.join, orderBy))}"
@@ -153,7 +155,7 @@ def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[Co
 	return query, params
 
 @cache
-def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Direction]|tuple[tuple[ColumnFlag,Direction]]=tuple(), **where : Any) -> tuple[str,list[Any]]:
+def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Direction]|tuple[tuple[ColumnFlag,Direction]]=None, **where : Any) -> tuple[str,list[Any]]:
 	"""All positional arguments should be `ColumnFlag` objects and they are used to
 	determine what information to be gathered from the database.
 	
@@ -203,10 +205,13 @@ def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Di
 	conditions = " AND ".join([f"{table}.{Columns.LOOKUP[table][col]} = ?" for table, col in zip(map(getTable, params), params)])
 
 	# Create an ordered list of all "ORDER BY X [DIRECTION]"-statements
-	if isinstance(orderBy, ColumnFlag):
+	if orderBy is None:
+		orderBy = tuple()
+	elif isinstance(orderBy, ColumnFlag):
 		orderBy = [(orderBy, "DESC")]
 	elif isinstance(orderBy, tuple) and not isinstance(orderBy[0], tuple):
 		orderBy = [orderBy]
+
 	if len(orderBy) > 0:
 		orderBy = [tupe if type(tupe) is tuple else (tupe, "DESC") for tupe in orderBy]
 		

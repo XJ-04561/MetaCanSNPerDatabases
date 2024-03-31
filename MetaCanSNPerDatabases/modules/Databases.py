@@ -100,11 +100,11 @@ class Database:
 		raise NotImplementedError("Not implemented in the base class.")
 
 	@overload
-	def get(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Direction]|tuple[tuple[ColumnFlag,Direction]]=tuple(), TreeParent : int=None, TreeChild : int=None, NodeID : int=None, Genotype : str=None, SNPID : str=None, Position : int=None, Ancestral : Literal["A","T","C","G"]=None, Derived : Literal["A","T","C","G"]=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> Generator[tuple[Any],None,None]:
+	def get(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Direction]|tuple[tuple[ColumnFlag,Direction]]=None, TreeParent : int=None, TreeChild : int=None, NodeID : int=None, Genotype : str=None, SNPID : str=None, Position : int=None, Ancestral : Literal["A","T","C","G"]=None, Derived : Literal["A","T","C","G"]=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> Generator[tuple[Any],None,None]:
 		pass
 
 	@final
-	def get(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Direction]|tuple[tuple[ColumnFlag,Direction]]=tuple(), **where : Any) -> Generator[tuple[Any],None,None]:
+	def get(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Direction]|tuple[tuple[ColumnFlag,Direction]]=None, **where : Any) -> Generator[tuple[Any],None,None]:
 		
 		from MetaCanSNPerDatabases.modules.Functions import generateQuery
 		for row in self._connection.execute(*generateQuery(*select, orderBy=orderBy, **where)):
