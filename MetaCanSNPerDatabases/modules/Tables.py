@@ -9,6 +9,7 @@ from MetaCanSNPerDatabases.modules.Functions import generateTableQuery
 
 class TableDefinitionMissmatch(Exception): pass
 
+
 class Table:
 
 	_conn : sqlite3.Connection
@@ -16,36 +17,45 @@ class Table:
 	_columns : list[str]
 	_types : list[tuple[str]]
 	_appendRows : list[str]
+	mode : Mode
 
 	def __init__(self, conn : sqlite3.Connection, mode : Mode):
 		self._conn = conn
 		self._mode = mode
 
-	def __len__(self):
+	def __len__(self) -> int:
 		return self._conn.execute(f"SELECT COUNT(*) FROM {self._tableName};").fetchone()[0]
 	
 	def __repr__(self):
 		return object.__repr__(self)[:-1] + f" rows={len(self)} columns={self._columns}>"
 
 	def create(self) -> bool:
-		queryString = [f"{name} {' '.join(colType)}" for name, colType in zip(self._columns, self._types)]
-		queryString += self._appendRows
+		try:
+			queryString = [f"{name} {' '.join(colType)}" for name, colType in zip(self._columns, self._types)]
+			queryString += self._appendRows
 
-		self._conn.execute(f"CREATE TABLE IF NOT EXISTS {self._tableName} (\n\t\t{',\n\t\t'.join(queryString)}\n);")
+			self._conn.execute(f"CREATE TABLE IF NOT EXISTS {self._tableName} (\n\t\t{',\n\t\t'.join(queryString)}\n);")
+			return True
+		except:
+			return False
 	
 	def recreate(self) -> bool:
 		try:
-			self._conn.execute(f"ALTER TABLE {self._tableName} RENAME TO {self._tableName}2;")
+			try:
+				self._conn.execute(f"ALTER TABLE {self._tableName} RENAME TO {self._tableName}2;")
+			except:
+				# Table doesn't exist
+				pass
+			
+			self.create()
+			
+			try:
+				self._conn.execute(f"INSERT INTO {self._tableName} SELECT * FROM {self._tableName}2;")
+			except:
+				pass
+			return True
 		except:
-			# Table doesn't exist
-			pass
-		
-		self.create()
-		
-		try:
-			self._conn.execute(f"INSERT INTO {self._tableName} SELECT * FROM {self._tableName}2;")
-		except:
-			pass
+			return False
 
 	@overload
 	def get(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Literal["DESC","ASC"]]|list[tuple[ColumnFlag,Literal["DESC","ASC"]]]=[], TreeParent : int=None, TreeChild : int=None, NodeID : int=None, Genotype : str=None, SNPID : str=None, Position : int=None, Ancestral : Literal["A","T","C","G"]=None, Derived : Literal["A","T","C","G"]=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> Generator[tuple[Any],None,None]:
