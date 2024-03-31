@@ -163,7 +163,7 @@ class DatabaseWriter(Database):
 					table.create()
 				self._connection.execute(f"PRAGMA user_version = {DATABASE_VERSIONS[self.schemaHash]:d};")
 			case -3: # Legacy CanSNPer table
-				updateFromLegacy(self.filename)
+				updateFromLegacy(self)
 			case -4: # Transfer data from old tables into new tables
 				for table in self.Tables.values():
 					table.recreate()
