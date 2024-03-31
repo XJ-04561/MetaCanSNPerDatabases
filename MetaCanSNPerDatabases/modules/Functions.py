@@ -118,42 +118,42 @@ def downloadDatabase(databaseName : str, dst : str) -> str:
 	return None
 
 @cache
-def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Direction]|list[tuple[ColumnFlag,Direction]]=[], **where : Any) -> Generator[tuple[Any],None,None]:
-    """All positional arguments should be `ColumnFlag` objects and they are used to
-    determine what information to be gathered from the database.
-    
-    All keyword arguments (except `orderBy`) are the conditions by which each row
-    is selected. For example, if you inted to get the row for a specific genbankID
-    then you would use the keyword argument as such: `genbankID="GCA_123123123.1"`.
-    
-    `orderBy` is used to sort the selected data according to `ColumnFlag` with or
-    without a direction string ("DESC" or "ASC"). Input can be a list to use many
-    columns for sorting, and any item of the list can be with or without a
-    direction specified."""
-    query = f"SELECT {', '.join(map(Columns.LOOKUP[self._tableName].__getitem__, select))} FROM {self._tableName}"
-    params = []
-    if where != {}:
-        _tmp = []
-        for col, val in where.items():
-            _tmp.append(f'{col} = ?')
-            params.append(val)
-        query += f" WHERE {' AND '.join(_tmp)}"
-        del _tmp
-    
-    if type(orderBy) is ColumnFlag:
-        orderBy = [(orderBy, "DESC")]
-    elif type(orderBy) is tuple:
-        orderBy = [orderBy]
-    
-    if orderBy != []:
-        # Create an ordered list of all "ORDER BY X [DIRECTION]"-statements
-        orderBy = [tupe if type(tupe) is tuple else (tupe, "DESC") for tupe in orderBy]
-        query += f" ORDER BY {', '.join(map(' '.join, orderBy))}"
+def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Direction]|tuple[tuple[ColumnFlag,Direction]]=[], **where : Any) -> Generator[tuple[Any],None,None]:
+	"""All positional arguments should be `ColumnFlag` objects and they are used to
+	determine what information to be gathered from the database.
 	
-    return query, params
+	All keyword arguments (except `orderBy`) are the conditions by which each row
+	is selected. For example, if you inted to get the row for a specific genbankID
+	then you would use the keyword argument as such: `genbankID="GCA_123123123.1"`.
+	
+	`orderBy` is used to sort the selected data according to `ColumnFlag` with or
+	without a direction string ("DESC" or "ASC"). Input can be a list to use many
+	columns for sorting, and any item of the list can be with or without a
+	direction specified."""
+	query = f"SELECT {', '.join(map(Columns.LOOKUP[self._tableName].__getitem__, select))} FROM {self._tableName}"
+	params = []
+	if where != {}:
+		_tmp = []
+		for col, val in where.items():
+			_tmp.append(f'{col} = ?')
+			params.append(val)
+		query += f" WHERE {' AND '.join(_tmp)}"
+		del _tmp
+	
+	if isinstance(orderBy, ColumnFlag):
+		orderBy = [(orderBy, "DESC")]
+	elif isinstance(orderBy, tuple) and not isinstance(orderBy[0], tuple):
+		orderBy = [orderBy]
+	
+	if orderBy != []:
+		# Create an ordered list of all "ORDER BY X [DIRECTION]"-statements
+		orderBy = [tupe if type(tupe) is tuple else (tupe, "DESC") for tupe in orderBy]
+		query += f" ORDER BY {', '.join(map(' '.join, orderBy))}"
+	
+	return query, params
 
 @cache
-def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Direction]|list[tuple[ColumnFlag,Direction]]=[], **where : Any) -> tuple[str,list[Any]]:
+def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Direction]|tuple[tuple[ColumnFlag,Direction]]=[], **where : Any) -> tuple[str,list[Any]]:
 	"""All positional arguments should be `ColumnFlag` objects and they are used to
 	determine what information to be gathered from the database.
 	
@@ -203,9 +203,9 @@ def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Di
 	conditions = " AND ".join([f"{table}.{Columns.LOOKUP[table][col]} = ?" for table, col in zip(map(getTable, params), params)])
 
 	# Create an ordered list of all "ORDER BY X [DIRECTION]"-statements
-	if type(orderBy) is ColumnFlag:
+	if isinstance(orderBy, ColumnFlag):
 		orderBy = [(orderBy, "DESC")]
-	elif type(orderBy) is tuple:
+	elif isinstance(orderBy, tuple) and not isinstance(orderBy[0], tuple):
 		orderBy = [orderBy]
 	if len(orderBy) > 0:
 		orderBy = [tupe if type(tupe) is tuple else (tupe, "DESC") for tupe in orderBy]
