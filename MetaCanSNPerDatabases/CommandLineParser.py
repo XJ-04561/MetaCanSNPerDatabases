@@ -157,11 +157,13 @@ def main():
 	if args.noLog:
 		LOGGER.disabled = True
 
+	LOGGER.debug(f"{args.database=}")
+
 	try:
 		args.func(args)
 	except Exception as e:
 		LOGGER.exception(e)
-		print(f"{type(e).__name__}: "+str(e), file=sys.stderr)
+		print(f"{type(e).__name__}:", e, file=sys.stderr)
 		exit(1)
 
 	print("Done!")
