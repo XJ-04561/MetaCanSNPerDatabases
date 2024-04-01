@@ -1,6 +1,6 @@
 
 from MetaCanSNPerDatabases import *
-from MetaCanSNPerDatabases.modules.Functions import formatType, loadFromReferenceFile, loadFromTreeFile, loadFromSNPFile
+from MetaCanSNPerDatabases.modules.Functions import formatType, loadFromReferenceFile, loadFromTreeFile, loadFromSNPFile, DownloadFailed
 from MetaCanSNPerDatabases.modules.Globals import *
 import argparse, sys
 
@@ -8,7 +8,7 @@ class MissingArgument(Exception): pass
 
 def read(args):
 
-	database = openDatabase(args.filepath, "r")
+	database = openDatabase(args.database, "r")
 
 	code = database.checkDatabase()
 
@@ -30,7 +30,7 @@ def read(args):
 
 def write(args : argparse.Namespace):
 
-	database = openDatabase(args.filepath, "w")
+	database = openDatabase(args.database, "w")
 
 	code = database.checkDatabase()
 	if args.rectify:
@@ -62,16 +62,20 @@ def update(args):
 
 	import os
 
-	database = openDatabase(args.filepath, "w")
+	database = openDatabase(args.database, "w")
 	code = database.checkDatabase()
 	database.validateDatabase(code, throwError=False)
 
 	oldCwd = os.curdir
 	os.chdir(args.refDir)
 
-	database.rectifyDatabase(code, copy=False)
+	database.rectifyDatabase(code, copy=True)
 
 	os.chdir(oldCwd)
+
+def download(args):
+	if downloadDatabase(args.database, os.path.join(args.outDir, args.database)) is None:
+		raise DownloadFailed(f"Failed to download {args.database} to {os.path.join(args.outDir, args.database)}.")
 
 def main():
 
@@ -84,7 +88,7 @@ def main():
 	readParser.set_defaults(func=read)
 
 	writeParser : argparse.ArgumentParser = modeGroup.add_parser("write",	help="Create a database with or without data. Data for database is given through the appropriate File flags.")
-	filesGroup = parser.add_argument_group(title="Input Files")
+	filesGroup = writeParser.add_argument_group(title="Input Files")
 	
 	filesGroup.add_argument("--SNPFile", help="If used, make sure that the related references and tree nodes are present in the database or in the other flagged files.")
 	filesGroup.add_argument("--referenceFile")
@@ -92,7 +96,7 @@ def main():
 
 	filesGroup.add_argument("--refDir", help="Directory where the reference genomes are located. This is only required if your --referenceFile doesn't have a `chromosomes` column.")
 
-	optionalGroup = parser.add_argument_group(title="Optional Flags")
+	optionalGroup = writeParser.add_argument_group(title="Optional Flags")
 	optionalGroup.add_argument("--rectify",	action="store_true", help="If used, will edit the database structure if it doesn't comply with the current set schema. If not used, will continue operations without rectifying, but the program might crash due to the difference in schema.")
 	
 	writeParser.set_defaults(func=write)
@@ -100,8 +104,12 @@ def main():
 	updateParser : argparse.ArgumentParser = modeGroup.add_parser("update", help="Update an existing database to follow the current standard schema.")
 	updateParser.add_argument("--refDir")
 	updateParser.set_defaults(func=update)
+	
+	downloadParser : argparse.ArgumentParser = modeGroup.add_parser("download", help="Download a database from one of the internally defined sources.")
+	downloadParser.add_argument("--outDir", default=".")
+	downloadParser.set_defaults(func=download)
 
-	parser.add_argument("filepath")
+	parser.add_argument("database")
 
 	parser.add_argument("--version", action="store_true")
 

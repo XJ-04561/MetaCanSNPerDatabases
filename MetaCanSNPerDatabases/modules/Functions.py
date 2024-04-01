@@ -100,7 +100,9 @@ def updateFromLegacy(database : DatabaseWriter):
 	database._connection.execute("DROP TABLE nodes;")
 	database._connection.execute("DROP TABLE tree_old;")
 
-def downloadDatabase(databaseName : str, dst : str) -> str:
+class DownloadFailed(Exception): pass
+
+def downloadDatabase(databaseName : str, dst : str) -> str|None:
 	from urllib.request import urlretrieve
 	
 	for source in SOURCES:
