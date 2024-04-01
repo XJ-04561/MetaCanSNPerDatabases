@@ -136,6 +136,8 @@ def main():
 
 	parser.add_argument("--version", action="store_true")
 	parser.add_argument("--debug", action="store_true")
+	parser.add_argument("--info", action="store_true")
+	parser.add_argument("--noLog", action="store_true")
 
 	if len(sys.argv) <= 1:
 		parser.print_help()
@@ -150,7 +152,12 @@ def main():
 
 	args : argparse.Namespace = parser.parse_args(sys.argv[1:])
 	
-	LOGGER.disabled = args.debug
+	if args.debug:
+		LOGGER.setLevel(logging.DEBUG)
+	elif args.info:
+		LOGGER.setLevel(logging.INFO)
+	if args.noLog:
+		LOGGER.disabled = True
 
 	try:
 		args.func(args)

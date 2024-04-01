@@ -85,6 +85,7 @@ def updateFromLegacy(database : DatabaseWriter, refDir=""):
 	"""Update from CanSNPer2 to MetaCanSNPer v.1 format."""
 
 	# References
+	LOGGER.info("Updating 'References'-table")
 	database._connection.execute("BEGIN TRANSACTION;")
 	database._connection.execute("ALTER TABLE snp_references RENAME TO snp_references_old;")
 	database.ReferenceTable.create()
@@ -93,6 +94,7 @@ def updateFromLegacy(database : DatabaseWriter, refDir=""):
 	database._connection.execute("COMMIT;")
 
 	# Chromosomes
+	LOGGER.info("Updating 'Chromosomes'-table")
 	database._connection.execute("BEGIN TRANSACTION;")
 	database.ChromosomesTable.create()
 	for i, assembly in database.ReferenceTable.get(Columns.GenomeID, Columns.Assembly):
@@ -100,6 +102,7 @@ def updateFromLegacy(database : DatabaseWriter, refDir=""):
 	database._connection.execute("COMMIT;")
 	
 	# SNPs
+	LOGGER.info("Updating 'SNP'-table")
 	database._connection.execute("BEGIN TRANSACTION;")
 	database._connection.execute("ALTER TABLE snp_annotation RENAME TO snp_annotation_old;")
 	database.SNPTable.create()
@@ -108,6 +111,7 @@ def updateFromLegacy(database : DatabaseWriter, refDir=""):
 	database._connection.execute("COMMIT;")
 	
 	# Tree
+	LOGGER.info("Updating 'Tree'-table")
 	database._connection.execute("BEGIN TRANSACTION;")
 	database._connection.execute("ALTER TABLE tree RENAME TO tree_old;")
 	database.TreeTable.create()
@@ -116,6 +120,8 @@ def updateFromLegacy(database : DatabaseWriter, refDir=""):
 	database._connection.execute(f"UPDATE {TABLE_NAME_TREE} SET parent=0 WHERE child = 1;")
 	database._connection.execute("DROP TABLE nodes;")
 	database._connection.execute("DROP TABLE tree_old;")
+
+	LOGGER.info("Dropping 'genomes'- and 'rank'-tables")
 
 	database._connection.execute("DROP TABLE genomes;")
 	database._connection.execute("DROP TABLE rank;")
