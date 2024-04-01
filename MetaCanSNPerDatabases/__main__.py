@@ -61,29 +61,43 @@ def write(args : argparse.Namespace):
 def update(args):
 
 	import os
-
 	for databaseName in args.database:
-		database = openDatabase(databaseName, "w")
-		code = database.checkDatabase()
-		database.validateDatabase(code, throwError=False)
-
-		oldCwd = os.curdir
-		print(databaseName)
-		os.chdir(args.refDir)
-		database.rectifyDatabase(code, copy=not args.noCopy)
-		os.chdir(oldCwd)
-
-		database.commit()
 		try:
-			database.close()
-		except:
-			pass
+			database = openDatabase(databaseName, "w")
+			code = database.checkDatabase()
+			database.validateDatabase(code, throwError=False)
+
+			oldCwd = os.curdir
+			print(databaseName)
+			os.chdir(args.refDir)
+			database.rectifyDatabase(code, copy=not args.noCopy)
+			os.chdir(oldCwd)
+
+			database.commit()
+			try:
+				database.close()
+			except:
+				pass
+			print(f"Finished updating {databaseName!r}")
+		except Exception as e:
+			try:
+				database.close()
+			except:
+				pass
+			LOGGER.exception(e)
+			print(f"Failed in updating {databaseName!r} due to:\n{type(e).__name__}: {e}")
+					
 	
 
 def download(args):
 	for databaseName in args.database:
-		if downloadDatabase(databaseName, os.path.join(args.outDir, databaseName)) is None:
-			raise DownloadFailed(f"Failed to download {databaseName} to {os.path.join(args.outDir, databaseName)}.")
+		try:
+			if downloadDatabase(databaseName, os.path.join(args.outDir, databaseName)) is None:
+				raise DownloadFailed(f"Failed to download {databaseName} to {os.path.join(args.outDir, databaseName)}.")
+				print(f"Finished downloading {databaseName!r}")
+		except Exception as e:
+			LOGGER.exception(e)
+			print(f"Failed in downloading {databaseName!r}")
 
 def main():
 
