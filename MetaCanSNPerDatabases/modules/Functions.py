@@ -85,23 +85,30 @@ def updateFromLegacy(database : DatabaseWriter, refDir=""):
 	"""Update from CanSNPer2 to MetaCanSNPer v.1 format."""
 
 	# References
+	database._connection.execute("BEGIN TRANSACTION;")
 	database._connection.execute("ALTER TABLE snp_references RENAME TO snp_references_old;")
 	database.ReferenceTable.create()
 	database._connection.execute(f"INSERT INTO {TABLE_NAME_REFERENCES} SELECT * FROM snp_references_old;")
 	database._connection.execute("DROP TABLE snp_references_old;")
+	database._connection.execute("COMMIT;")
 
 	# Chromosomes
+	database._connection.execute("BEGIN TRANSACTION;")
 	database.ChromosomesTable.create()
 	for i, assembly in database.ReferenceTable.get(Columns.GenomeID, Columns.Assembly):
 		database._connection.execute(f"INSERT INTO {TABLE_NAME_CHROMOSOMES} VALUES (?, ?, ?);", [i, open(os.path.join(refDir, f"{assembly}.fna"), "r").readline()[1:].split()[0], i])
+	database._connection.execute("COMMIT;")
 	
 	# SNPs
+	database._connection.execute("BEGIN TRANSACTION;")
 	database._connection.execute("ALTER TABLE snp_annotation RENAME TO snp_annotation_old;")
 	database.SNPTable.create()
 	database._connection.execute(f"INSERT INTO {TABLE_NAME_SNP_ANNOTATION} ({SNP_COLUMN_NODE_ID}, {SNP_COLUMN_POSITION}, {SNP_COLUMN_ANCESTRAL}, {SNP_COLUMN_DERIVED}, {SNP_COLUMN_REFERENCE}, {SNP_COLUMN_DATE}, {SNP_COLUMN_CHROMOSOMES_ID}) SELECT node_id-1, position, ancestral_base, derived_base, reference, date, genome_i FROM snp_annotation_old;")
 	database._connection.execute("DROP TABLE snp_annotation_old;")
+	database._connection.execute("COMMIT;")
 	
 	# Tree
+	database._connection.execute("BEGIN TRANSACTION;")
 	database._connection.execute("ALTER TABLE tree RENAME TO tree_old;")
 	database.TreeTable.create()
 	database._connection.execute(f"INSERT INTO {TABLE_NAME_TREE} ({TREE_COLUMN_PARENT}, {TREE_COLUMN_CHILD}, {TREE_COLUMN_NAME}) SELECT tree_old.parent-1, null, nodes.name FROM tree_old, nodes WHERE tree_old.parent = nodes.id;")
@@ -114,6 +121,7 @@ def updateFromLegacy(database : DatabaseWriter, refDir=""):
 	database._connection.execute("DROP TABLE rank;")
 
 	database._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION};")
+	database._connection.execute("COMMIT;")
 
 class DownloadFailed(Exception): pass
 

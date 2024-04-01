@@ -68,16 +68,12 @@ def update(args):
 			database.validateDatabase(code, throwError=False)
 
 			oldCwd = os.curdir
-			print(databaseName)
+			
 			os.chdir(args.refDir)
 			database.rectifyDatabase(code, copy=not args.noCopy)
 			os.chdir(oldCwd)
 
-			database.commit()
-			try:
-				database.close()
-			except:
-				pass
+			database.close()
 			print(f"Finished updating {databaseName!r}")
 		except Exception as e:
 			try:
@@ -94,7 +90,7 @@ def download(args):
 		try:
 			if downloadDatabase(databaseName, os.path.join(args.outDir, databaseName)) is None:
 				raise DownloadFailed(f"Failed to download {databaseName} to {os.path.join(args.outDir, databaseName)}.")
-				print(f"Finished downloading {databaseName!r}")
+			print(f"Finished downloading {databaseName!r}")
 		except Exception as e:
 			LOGGER.exception(e)
 			print(f"Failed in downloading {databaseName!r}")

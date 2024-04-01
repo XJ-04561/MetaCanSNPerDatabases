@@ -165,20 +165,26 @@ class DatabaseWriter(Database):
 			case 0: # We're good
 				pass
 			case -2: # Table is new
+				self._connection.execute("BEGIN TRANSACTION;")
 				for table in self.Tables.values():
 					table.create()
 				self._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION:d};")
+				self._connection.execute("COMMIT;")
 			case -3: # Legacy CanSNPer table
 				updateFromLegacy(self)
 			case -4: # Transfer data from old tables into new tables
+				self._connection.execute("BEGIN TRANSACTION;")
 				for table in self.Tables.values():
 					table.recreate()
 				for (table,) in self._connection.execute("SELECT name FROM sqlite_master WHERE type='table';"):
 					if table not in TABLES:
 						self._connection.execute(f"DROP TABLE {table};")
 				self._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION:d};")
+				self._connection.execute("COMMIT;")
 			case -5:
+				self._connection.execute("BEGIN TRANSACTION;")
 				self._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION:d};")
+				self._connection.execute("COMMIT;")
 
 	def addSNP(self, nodeID, snpID, position, ancestral, derived, reference, date, chromosomeID):
 		self._connection.execute(f"INSERT (?,?,?,?,?,?,?,?) INTO {TABLE_NAME_SNP_ANNOTATION};", [nodeID, snpID, position, ancestral, derived, reference, date, chromosomeID])
