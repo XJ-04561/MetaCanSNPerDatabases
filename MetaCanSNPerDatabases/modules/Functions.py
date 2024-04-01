@@ -10,6 +10,13 @@ import inspect
 
 class MissingReferenceFile(Exception): pass
 
+def interpretSQLtype(flag, val):
+	match Columns.TYPE_LOOKUP[flag]:
+		case "INTEGER":
+			return int(val)
+		case _:
+			return val
+
 def private(func):
 	print("\n".join(map(repr, inspect.stack()[0])))
 	return func

@@ -40,7 +40,7 @@ class Database:
 	
 	@property
 	def __version__(self):
-		return self._connection.execute("PRAGMA user_version;").fetchone()[0]
+		return int(self._connection.execute("PRAGMA user_version;").fetchone()[0])
 
 	def __del__(self):
 		try:
@@ -106,9 +106,9 @@ class Database:
 	@final
 	def get(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, **where : Any) -> Generator[tuple[Any],None,None]|None:
 		
-		from MetaCanSNPerDatabases.modules.Functions import generateQuery
+		from MetaCanSNPerDatabases.modules.Functions import generateQuery, interpretSQLtype
 		for row in self._connection.execute(*generateQuery(*select, orderBy=orderBy, **where)):
-			yield row
+			yield map(interpretSQLtype, row)
 	
 	@property
 	def SNPs(self) -> Generator[tuple[str,int,str,str],None,None]:
