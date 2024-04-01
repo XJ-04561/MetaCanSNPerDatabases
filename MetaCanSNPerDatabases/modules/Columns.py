@@ -44,6 +44,48 @@ NAMES = [
 	Assembly
 ]
 
+NAMES_STRING = [
+	"ALL",
+	"TreeParent",
+	"TreeChild",
+	"GenoType",
+	"NodeID",
+	"Position",
+	"Ancestral",
+	"Derived",
+	"SNPReference",
+	"Date",
+	"ChromID",
+	"Chromosome",
+	"GenomeID",
+	"Genome",
+	"Strain",
+	"GenbankID",
+	"RefseqID",
+	"Assembly"
+]
+
+NAMES_DICT = {
+	"ALL"			: ALL,
+	"TreeParent"	: TreeParent,
+	"TreeChild"		: TreeChild,
+	"GenoType"		: GenoType,
+	"NodeID"		: NodeID,
+	"Position"		: Position,
+	"Ancestral"		: Ancestral,
+	"Derived"		: Derived,
+	"SNPReference"	: SNPReference,
+	"Date"			: Date,
+	"ChromID"		: ChromID,
+	"Chromosome"	: Chromosome,
+	"GenomeID"		: GenomeID,
+	"Genome"		: Genome,
+	"Strain"		: Strain,
+	"GenbankID"		: GenbankID,
+	"RefseqID"		: RefseqID,
+	"Assembly"		: Assembly
+}
+
 TYPE_LOOKUP = {
     TreeParent		:TREE_COLUMN_PARENT_TYPE,
 	TreeChild		:TREE_COLUMN_CHILD_TYPE,
@@ -109,7 +151,7 @@ COMMONLOOKUP = {
 }
 
 RELATIONS : dict[tuple[str,str],ColumnFlag] = {
-    
+    #	FROM			->			TO
     (TABLE_NAME_TREE, TABLE_NAME_SNP_ANNOTATION) : NodeID,
     (TABLE_NAME_SNP_ANNOTATION, TABLE_NAME_TREE) : NodeID,
     
@@ -119,8 +161,8 @@ RELATIONS : dict[tuple[str,str],ColumnFlag] = {
 	(TABLE_NAME_REFERENCES, TABLE_NAME_CHROMOSOMES) : GenomeID,
     (TABLE_NAME_CHROMOSOMES, TABLE_NAME_REFERENCES) : GenomeID,
     
-	(TABLE_NAME_SNP_ANNOTATION, TABLE_NAME_TREE) : NodeID,
-    (TABLE_NAME_TREE, TABLE_NAME_SNP_ANNOTATION) : NodeID
+	(TABLE_NAME_REFERENCES, TABLE_NAME_SNP_ANNOTATION) : GenomeID,
+    (TABLE_NAME_SNP_ANNOTATION, TABLE_NAME_REFERENCES) : ChromID,
 }
 
 RELATIONSHIPS : dict[str,dict[ColumnFlag, str]]= {
@@ -131,15 +173,29 @@ RELATIONSHIPS : dict[str,dict[ColumnFlag, str]]= {
 		SNPReference	: TABLE_NAME_SNP_ANNOTATION,
 		Date			: TABLE_NAME_SNP_ANNOTATION,
 		ChromID			: TABLE_NAME_SNP_ANNOTATION,
+        
+        Chromosome		: TABLE_NAME_SNP_ANNOTATION,
+		GenomeID		: TABLE_NAME_SNP_ANNOTATION,
+
+			Genome		: TABLE_NAME_SNP_ANNOTATION,
+			Strain		: TABLE_NAME_SNP_ANNOTATION,
+			GenbankID	: TABLE_NAME_SNP_ANNOTATION,
+			RefseqID	: TABLE_NAME_SNP_ANNOTATION,
+			Assembly	: TABLE_NAME_SNP_ANNOTATION
 	},
     TABLE_NAME_SNP_ANNOTATION : {
+		GenoType		: TABLE_NAME_TREE,
+		TreeParent		: TABLE_NAME_TREE,
+		TreeChild		: TABLE_NAME_TREE,
+        
         Chromosome		: TABLE_NAME_CHROMOSOMES,
 		GenomeID		: TABLE_NAME_CHROMOSOMES,
         
-		GenoType		: TABLE_NAME_TREE,
-        
-		TreeParent		: TABLE_NAME_TREE,
-		TreeChild		: TABLE_NAME_TREE
+		Genome			: TABLE_NAME_CHROMOSOMES,
+		Strain			: TABLE_NAME_CHROMOSOMES,
+		GenbankID		: TABLE_NAME_CHROMOSOMES,
+		RefseqID		: TABLE_NAME_CHROMOSOMES,
+		Assembly		: TABLE_NAME_CHROMOSOMES,
 	},
     TABLE_NAME_CHROMOSOMES : {
         NodeID			: TABLE_NAME_SNP_ANNOTATION,
@@ -157,6 +213,16 @@ RELATIONSHIPS : dict[str,dict[ColumnFlag, str]]= {
 	},
     TABLE_NAME_REFERENCES : {
         ChromID			: TABLE_NAME_CHROMOSOMES,
-		Chromosome		: TABLE_NAME_CHROMOSOMES
+		Chromosome		: TABLE_NAME_CHROMOSOMES,
+        
+        NodeID			: TABLE_NAME_CHROMOSOMES,
+		Position		: TABLE_NAME_CHROMOSOMES,
+		Ancestral		: TABLE_NAME_CHROMOSOMES,
+		Derived			: TABLE_NAME_CHROMOSOMES,
+		SNPReference	: TABLE_NAME_CHROMOSOMES,
+		Date			: TABLE_NAME_CHROMOSOMES,
+		GenoType		: TABLE_NAME_CHROMOSOMES,
+		TreeParent		: TABLE_NAME_CHROMOSOMES,
+		TreeChild		: TABLE_NAME_CHROMOSOMES,
 	}
 }

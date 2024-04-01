@@ -131,7 +131,7 @@ def downloadDatabase(databaseName : str, dst : str) -> str|None:
 	return None
 
 @cache
-def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, **where : Any) -> tuple[str,list[Any]]:
+def generateTableQueryString(self, select : tuple[ColumnFlag], orderBy : tuple[ColumnFlag]|None=None, where : tuple[str,bool]=tuple()) -> tuple[str,tuple[str]]:
 	"""All positional arguments should be `ColumnFlag` objects and they are used to
 	determine what information to be gathered from the database.
 	
@@ -144,26 +144,54 @@ def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[Co
 	of "DESC" and negative flags indicate "ASC"."""
 	query = f"SELECT {', '.join(map(Columns.LOOKUP[self._tableName].__getitem__, select))} FROM {self._tableName}"
 	params = []
-	if where != {}:
+	if len(where) == 0 and any(where):
 		_tmp = []
-		for col, val in where.items():
-			_tmp.append(f'{col} = ?')
-			params.append(val)
+		for col, val in where:
+			if val is False:
+				_tmp.append(f"{Columns.LOOKUP[self._tableName][Columns.NAMES_DICT[col]]} = ?")
+				params.append(col)
+			elif val is True:
+				_tmp.append(f"{Columns.LOOKUP[self._tableName][Columns.NAMES_DICT[col]]} IN " + "({"+Columns.LOOKUP[self._tableName][Columns.NAMES_DICT[col]]+"})")
+				params.append(col)
 		query += f" WHERE {' AND '.join(_tmp)}"
-		del _tmp
-	
-	if isinstance(orderBy, ColumnFlag):
-		orderBy = (orderBy,)
 	
 	if orderBy is not None and len(orderBy) > 0:
 		# Create an ordered list of all "ORDER BY X [DIRECTION]"-statements
 		orderBy = [f"{Columns.LOOKUP[self._tableName][flag]} {'DESC' if flag > 0 else 'ASC'}" for flag in orderBy]
-		query += f" ORDER BY {', '.join(orderBy)}"
+		query += f" ORDER BY {', '.join(orderBy)};"
 	
 	return query, params
 
 @cache
-def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, **where : Any) -> tuple[str,list[Any]]:
+def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, **where : Any) -> tuple[str,list[Any]]:
+	"""All positional arguments should be `ColumnFlag` objects and they are used to
+	determine what information to be gathered from the database.
+	
+	All keyword arguments (except `orderBy`) are the conditions by which each row
+	is selected. For example, if you inted to get the row for a specific genbankID
+	then you would use the keyword argument as such: `genbankID="GCA_123123123.1"`.
+	
+	`orderBy` is used to sort the selected data according to `ColumnFlag`.
+	Direction is indicated by negating the the flag. A positive flag is the default
+	of "DESC" and negative flags indicate "ASC"."""
+	
+	if isinstance(orderBy, ColumnFlag):
+		orderBy = (orderBy,)
+
+	boolWhere = tuple(sorted(map(lambda k,v:(k,isinstance(v, Iterable)), filter(lambda k,v:v is not None, where.items()))))
+
+	query, params = generateTableQueryString(self, select, orderBy=orderBy, where=boolWhere)
+	params = list(params)
+	formatDict = {}
+	for i, (name, yn) in enumerate(filter(lambda x:x[1], boolWhere)):
+		params.pop(i)
+		for val in where[name]:
+			params.insert(i, val)
+		formatDict[Columns.LOOKUP[self._tableName][Columns.NAMES_DICT[name]]] = where[name]
+	query.format(**formatDict)
+
+@cache
+def generateQueryString(select : tuple[ColumnFlag], orderBy : tuple[ColumnFlag]|None=None, table:str|None=None, where : tuple[tuple[str,bool]]|None=None) -> tuple[str,tuple[Any]]:
 	"""All positional arguments should be `ColumnFlag` objects and they are used to
 	determine what information to be gathered from the database.
 	
@@ -175,50 +203,129 @@ def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|N
 	Direction is indicated by negating the the flag. A positive flag is the default
 	of "DESC" and negative flags indicate "ASC"."""
 
-	# Find out which tables are involved in this query. Also makes some necessary assertions for the rest of the function.
-	tables = {Columns.UNIQUELOOKUP[col] for col in Columns.UNIQUES.intersection(select, where, map(lambda x : x if type(x) is ColumnFlag else x[0], orderBy))}
-	for col in Columns.COMMONS.intersection(select, where, map(lambda x : x[0], orderBy)):
-		assert col in Columns.NAMES, f"No such column `{col}` in `Columns.NAMES`"
-		if tables.isdisjoint(Columns.COMMONLOOKUP[col]):
-			for table in Columns.COMMONLOOKUP[col]:
-				if not tables.isdisjoint(Columns.RELATIONSHIPS[table].values()):
-					tables.add(table)
-					break
-			assert table in tables, f"Not implemented to join two disjoint tables, {table=} could not be joined with any of {tables=}"
-
-	def getTable(col):
-		for table in tables:
-			if col in Columns.LOOKUP[table]:
-				return table
-
 	# If selecting all columns then change the selection string into "*", otherwise create a list of "WHERE" statements
 	if Columns.ALL in select:
 		selection = "*"
+		if table is None:
+			raise ValueError(f"To select all columns of a table, the table must be specified.")
+		source = table
 	else:
-		selection = [f"{table}.{Columns.LOOKUP[table][col]}" for table, col in zip(map(getTable, select), select)]
-
-	# Simply join all the tables into a comma(+space) separated list
-	source = ", ".join(tables)
+		for table in Columns.LOOKUP:
+			if all(col in Columns.LOOKUP[table] for col in select):
+				selection = ", ".join([{Columns.LOOKUP[table][col]} for col in select])
+				source = table
+				break
+		try:
+			selection
+		except:
+			raise ValueError(f"No tables satisfy 'SELECT ({', '.join(map(Columns.NAMES_STRING.__getitem__, select))})'")
 	
 	# Create "WHERE"-statements that are meant to show how the tables are connected, like: table1.colA = table2.colB
-	connections = []
-	for i, table in enumerate(tables):
-		for otherTable in tables.intersection(Columns.RELATIONSHIPS[table].values()):
-			col = Columns.RELATIONS[table,otherTable]
-			connections.append(f"{table}.{Columns.LOOKUP[table][col]} = {table}.{Columns.LOOKUP[otherTable][col]}")
-			break
+	conditions = []
+	params = []
+	for name, val in where:
+		if Columns.NAMES_DICT[name] in Columns.LOOKUP[source]:
+			if val is False:
+				conditions.append(f"{Columns.LOOKUP[source][Columns.NAMES_DICT[name]]} = ?")
+			elif val is True:
+				conditions.append(f"{Columns.LOOKUP[source][Columns.NAMES_DICT[name]]} = " + "({" + f"{name}" + "})")
+		else:
+			otherTable = Columns.RELATIONSHIPS[source][Columns.NAMES_DICT[name]]
+			commonColumn = Columns.RELATIONS[source, otherTable]
+			subQuery, subParams = generateQueryString(commonColumn, ((Columns.NAMES_STRING[name],val),))
+			conditions.append(f" IN ({subQuery.rstrip(';')})")
+		params.append(val)
 
-	params = list(where.values())
-	conditions = " AND ".join([f"{table}.{Columns.LOOKUP[table][col]} = ?" for table, col in zip(map(getTable, params), params)])
+	if orderBy is not None and len(orderBy) > 0:
+		keyColumn = ", ".join([f"{Columns.LOOKUP[source][col]} {'DESC' if col > 0 else 'ASC'}" for col in orderBy])
+	
+		return f"SELECT {selection} FROM {source} WHERE {conditions} ORDER BY {keyColumn};", tuple(params)
+	else:
+		return f"SELECT {selection} FROM {source} WHERE {conditions};", tuple(params)
+
+@cache
+def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, table:str|None=None, **where : Any) -> tuple[str,tuple[Any]]:
 
 	if isinstance(orderBy, ColumnFlag):
 		orderBy = (orderBy,)
 
-	if orderBy is not None and len(orderBy) > 0:
-		andTable = lambda flag : (getTable(col), flag, "DESC" if flag > 0 else "ASC")
+	boolWhere = tuple(sorted(map(lambda k,v:(k,isinstance(v, Iterable)), filter(lambda k,v:v is not None, where.items()))))
 
-		keyColumn = ", ".join([f"{table}.{Columns.LOOKUP[table][col]} {direction}" for table, col, direction in map(andTable, orderBy)])
+	if table is None:
+		for t in Columns.LOOKUP:
+			if all(col in Columns.LOOKUP[t] for col in select):
+				table = t
+				break
 	
-		return f"SELECT {selection} FROM {source} WHERE {conditions} ORDER BY {keyColumn};", params
-	else:
-		return f"SELECT {selection} FROM {source} WHERE {conditions};", params
+	query, params = generateTableQueryString(select, orderBy=orderBy, table=table, where=boolWhere)
+	params = list(params)
+	formatDict = {}
+	
+	for i, (name, yn) in enumerate(filter(lambda x:x[1], boolWhere)):
+		params.pop(i)
+		for val in where[name]:
+			params.insert(i, val)
+		formatDict[Columns.LOOKUP[table][Columns.NAMES_DICT[name]]] = where[name]
+	
+	return query.format(**formatDict), tuple(params)
+
+# @cache
+# def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, **where : Any) -> tuple[str,list[Any]]:
+# 	"""All positional arguments should be `ColumnFlag` objects and they are used to
+# 	determine what information to be gathered from the database.
+	
+# 	All keyword arguments (except `orderBy`) are the conditions by which each row
+# 	is selected. For example, if you inted to get the row for a specific genbankID
+# 	then you would use the keyword argument as such: `genbankID="GCA_123123123.1"`.
+	
+# 	`orderBy` is used to sort the selected data according to `ColumnFlag`.
+# 	Direction is indicated by negating the the flag. A positive flag is the default
+# 	of "DESC" and negative flags indicate "ASC"."""
+
+# 	# Find out which tables are involved in this query. Also makes some necessary assertions for the rest of the function.
+# 	tables = {Columns.UNIQUELOOKUP[col] for col in Columns.UNIQUES.intersection(select, where, map(lambda x : x if type(x) is ColumnFlag else x[0], orderBy))}
+# 	for col in Columns.COMMONS.intersection(select, where, map(lambda x : x[0], orderBy)):
+# 		assert col in Columns.NAMES, f"No such column `{col}` in `Columns.NAMES`"
+# 		if tables.isdisjoint(Columns.COMMONLOOKUP[col]):
+# 			for table in Columns.COMMONLOOKUP[col]:
+# 				if not tables.isdisjoint(Columns.RELATIONSHIPS[table].values()):
+# 					tables.add(table)
+# 					break
+# 			assert table in tables, f"Not implemented to join two disjoint tables, {table=} could not be joined with any of {tables=}"
+
+# 	def getTable(col):
+# 		for table in tables:
+# 			if col in Columns.LOOKUP[table]:
+# 				return table
+
+# 	# If selecting all columns then change the selection string into "*", otherwise create a list of "WHERE" statements
+# 	if Columns.ALL in select:
+# 		selection = "*"
+# 	else:
+# 		selection = [f"{table}.{Columns.LOOKUP[table][col]}" for table, col in zip(map(getTable, select), select)]
+
+# 	# Simply join all the tables into a comma(+space) separated list
+# 	source = ", ".join(tables)
+	
+# 	# Create "WHERE"-statements that are meant to show how the tables are connected, like: table1.colA = table2.colB
+# 	connections = []
+# 	for i, table in enumerate(tables):
+# 		for otherTable in tables.intersection(Columns.RELATIONSHIPS[table].values()):
+# 			col = Columns.RELATIONS[table,otherTable]
+# 			connections.append(f"{table}.{Columns.LOOKUP[table][col]} = {table}.{Columns.LOOKUP[otherTable][col]}")
+# 			break
+
+# 	params = list(where.values())
+# 	conditions = " AND ".join([f"{table}.{Columns.LOOKUP[table][col]} = ?" for table, col in zip(map(getTable, params), params)])
+
+# 	if isinstance(orderBy, ColumnFlag):
+# 		orderBy = (orderBy,)
+
+# 	if orderBy is not None and len(orderBy) > 0:
+# 		andTable = lambda flag : (getTable(col), flag, "DESC" if flag > 0 else "ASC")
+
+# 		keyColumn = ", ".join([f"{table}.{Columns.LOOKUP[table][col]} {direction}" for table, col, direction in map(andTable, orderBy)])
+	
+# 		return f"SELECT {selection} FROM {source} WHERE {conditions} ORDER BY {keyColumn};", params
+# 	else:
+# 		return f"SELECT {selection} FROM {source} WHERE {conditions};", params
