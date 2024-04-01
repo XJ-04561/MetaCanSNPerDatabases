@@ -176,6 +176,8 @@ class DatabaseWriter(Database):
 				self._connection.execute("BEGIN TRANSACTION;")
 				for table in self.Tables.values():
 					table.recreate()
+				self._connection.execute("COMMIT;")
+				self._connection.execute("BEGIN TRANSACTION;")
 				for (table,) in self._connection.execute("SELECT name FROM sqlite_master WHERE type='table';"):
 					if table not in TABLES:
 						self._connection.execute(f"DROP TABLE {table};")
