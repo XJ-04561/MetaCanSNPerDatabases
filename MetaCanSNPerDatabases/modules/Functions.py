@@ -100,6 +100,8 @@ def updateFromLegacy(database : DatabaseWriter):
 	database._connection.execute("DROP TABLE nodes;")
 	database._connection.execute("DROP TABLE tree_old;")
 
+	database._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION};")
+
 class DownloadFailed(Exception): pass
 
 def downloadDatabase(databaseName : str, dst : str) -> str|None:
