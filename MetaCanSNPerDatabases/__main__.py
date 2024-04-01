@@ -60,19 +60,15 @@ def write(args : argparse.Namespace):
 
 def update(args):
 
-	if len(args.database) != len(args.refDir):
-		raise ValueError("Require equal amounts of databases to refDirs")
 	import os
 
-	oldCwd = os.curdir
-
-	for databaseName, refDir in zip(args.database, args.refDir):
+	for databaseName in args.database:
 		database = openDatabase(databaseName, "w")
 		code = database.checkDatabase()
 		database.validateDatabase(code, throwError=False)
 
 		oldCwd = os.curdir
-		os.chdir(refDir)
+		os.chdir(args.refDir)
 		database.rectifyDatabase(code, copy=not args.noCopy)
 		os.chdir(oldCwd)
 
@@ -115,7 +111,7 @@ def main():
 	writeParser.set_defaults(func=write)
 
 	updateParser : argparse.ArgumentParser = modeGroup.add_parser("update", help="Update an existing database to follow the current standard schema.")
-	updateParser.add_argument("--refDir", nargs="+")
+	updateParser.add_argument("--refDir")
 	updateParser.add_argument("--noCopy", action="store_true")
 	updateParser.add_argument("database", nargs="+")
 	updateParser.set_defaults(func=update)
