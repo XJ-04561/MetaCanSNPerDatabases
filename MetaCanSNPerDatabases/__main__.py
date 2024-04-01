@@ -131,9 +131,13 @@ def main():
 
 	args : argparse.Namespace = parser.parse_args(sys.argv[1:])
 	
-	args.func(args)
+	try:
+		args.func(args)
+	except Exception as e:
+		LOGGER.exception(e)
+		print(f"{type(e).__name__}: "+str(e), file=sys.stderr)
 
 	print("Done!")
 
-	return 0
+	exit(0)
 
