@@ -84,6 +84,9 @@ def loadFromSNPFile(database : DatabaseWriter, file : TextIO):
 def updateFromLegacy(database : DatabaseWriter, refDir=""):
 	"""Update from CanSNPer2 to MetaCanSNPer v.1 format."""
 
+	import textwrap, gzip
+	from urllib import request as urlretrieve
+
 	# References
 	LOGGER.info("Updating 'References'-table")
 	database._connection.execute("BEGIN TRANSACTION;")
@@ -97,8 +100,20 @@ def updateFromLegacy(database : DatabaseWriter, refDir=""):
 	LOGGER.info("Updating 'Chromosomes'-table")
 	database._connection.execute("BEGIN TRANSACTION;")
 	database.ChromosomesTable.create()
-	for i, assembly in database.ReferenceTable.get(Columns.GenomeID, Columns.Assembly):
-		database._connection.execute(f"INSERT INTO {TABLE_NAME_CHROMOSOMES} VALUES (?, ?, ?);", [i, open(os.path.join(refDir, f"{assembly}.fna"), "r").readline()[1:].split()[0], i])
+	for i, genbankID, assembly in database.ReferenceTable.get(Columns.GenomeID, Columns.GenbankID, Columns.Assembly):
+		try:
+			database._connection.execute(f"INSERT INTO {TABLE_NAME_CHROMOSOMES} VALUES (?, ?, ?);", [i, open(os.path.join(refDir, f"{assembly}.fna"), "r").readline()[1:].split()[0], i])
+		except FileNotFoundError:
+			LOGGER.warning(f"Couldn't find genome with assembly name {assembly!r} in {os.path.realpath(os.curdir)!r}.")
+			print(f"Couldn't find assembly {assembly!r}, downloading from ncbi... ", end="", flush=True)
+			n1,n2,n3 = textwrap.wrap(genbankID.split("_")[-1].split(".")[0],3)  ## Get the three number parts
+			
+			link = NCBI_FTP_LINK.format(source=SOURCED["genbank"], n1=n1, n2=n2, n3=n3, genome_id=genbankID, assembly=assembly)
+			urlretrieve(link, f"{assembly}.fna.gz")
+			with open(f"{assembly}.fna", "rb") as outFile:
+				outFile.write(gzip.decompress(open(f"{assembly}.fna.gz", "rb").read()))
+			print("Done!", flush=True)
+			database._connection.execute(f"INSERT INTO {TABLE_NAME_CHROMOSOMES} VALUES (?, ?, ?);", [i, open(os.path.join(refDir, f"{assembly}.fna"), "r").readline()[1:].split()[0], i])
 	database._connection.execute("COMMIT;")
 	
 	# SNPs
