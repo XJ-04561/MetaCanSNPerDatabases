@@ -110,7 +110,7 @@ def updateFromLegacy(database : DatabaseWriter, refDir=""):
 			
 			link = NCBI_FTP_LINK.format(source=SOURCED["genbank"], n1=n1, n2=n2, n3=n3, genome_id=genbankID, assembly=assembly)
 			urlretrieve(link, f"{assembly}.fna.gz")
-			with open(f"{assembly}.fna", "rb") as outFile:
+			with open(f"{assembly}.fna", "wb") as outFile:
 				outFile.write(gzip.decompress(open(f"{assembly}.fna.gz", "rb").read()))
 			print("Done!", flush=True)
 			database._connection.execute(f"INSERT INTO {TABLE_NAME_CHROMOSOMES} VALUES (?, ?, ?);", [i, open(os.path.join(refDir, f"{assembly}.fna"), "r").readline()[1:].split()[0], i])
