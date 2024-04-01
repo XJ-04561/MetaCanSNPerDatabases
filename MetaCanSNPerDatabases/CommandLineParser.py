@@ -132,8 +132,6 @@ def main():
 	downloadParser.add_argument("database", nargs="+")
 	downloadParser.set_defaults(func=download)
 
-	
-
 	parser.add_argument("--version", action="store_true")
 	parser.add_argument("--debug", action="store_true")
 	parser.add_argument("--info", action="store_true")
@@ -145,7 +143,7 @@ def main():
 	elif "--version" in sys.argv:
 		print(f"MetaCanSNPerDatabases v. {CURRENT_VERSION}")
 		exit(0)
-	elif sys.argv[1] not in ["read", "write", "update", "download"]:
+	elif all(mode not in sys.argv for mode in ["read", "write", "update", "download"]):
 		print("No mode chosen check usage to see which mode is appropriate for your intended use.", file=sys.stderr)
 		parser.print_help()
 		exit(1)
