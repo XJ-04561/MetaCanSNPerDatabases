@@ -62,15 +62,10 @@ class Database:
 		elif self.__version__ == LEGACY_VERSION:
 			return -3
 		elif self.schemaHash != CURRENT_HASH:
-			LOGGER.warning(f"Database version (v.{self.__version__}, schemaHash={self.schemaHash!r}) does not match the current MetaCanSNPerDatabase version (v.{CURRENT_VERSION}, schemaHash={CURRENT_HASH!r}).")
-			if Globals.STRICT:
-				raise sqlite3.DatabaseError(f"Database version (v.{self.__version__}) does not match the currently set version (v.{CURRENT_VERSION}).")
-			else:
-				# Table does not have the right schema version
-				return -4
+			# Table does not have the right schema version
+			return -4
 		elif self.__version__ != CURRENT_VERSION:
 			# Table does not have the right `user_version` set.
-			LOGGER.warning(f"Table does not have the right `user_version` set. (Determined version is v.{self.__version__} but user_version is v.{self._connection.execute('PRAGMA user_version;').fetchone()[0]})")
 			return -5
 		else:
 			LOGGER.info(f"Database version is up to date! (v. {self.__version__})")
@@ -90,8 +85,8 @@ class Database:
 				LOGGER.exception(OutdatedCanSNPerDatabase(f"Database schema does not match the most up to date schema. (Database: {self.schemaHash!r}, Latest MetaCanSNPerDatabases: {CURRENT_HASH})"))
 				if throwError: raise OutdatedCanSNPerDatabase(f"Database schema does not match the most up to date schema. (Database: {self.schemaHash!r}, Latest MetaCanSNPerDatabases: {CURRENT_HASH})")
 			case -5: # Version number missmatch
-				LOGGER.exception(sqlite3.DatabaseError(f"Table does not have the right `user_version` set. (Determined version is v.{self.__version__} but user_version is v.{self._connection.execute('PRAGMA user_version;').fetchone()[0]})"))
-				if throwError: raise sqlite3.DatabaseError(f"Table does not have the right `user_version` set. (Determined version is v.{self.__version__} but user_version is v.{self._connection.execute('PRAGMA user_version;').fetchone()[0]})")
+				LOGGER.exception(sqlite3.DatabaseError(f"Table does not have the right `user_version` set. (Determined version is v.{DATABASE_VERSIONS[self.schemaHash]} but user_version is v.{self.__version__})"))
+				if throwError: raise sqlite3.DatabaseError(f"Table does not have the right `user_version` set. (Determined version is v.{DATABASE_VERSIONS[self.schemaHash]} but user_version is v.{self.__version__})")
 			case _:
 				LOGGER.exception(sqlite3.DatabaseError(f"Unkown Database error. Current Database version is v.{CURRENT_VERSION}, and this database has version v.{self.__version__} (schemaHash={self.schemaHash!r})."))
 				if throwError: raise sqlite3.DatabaseError(f"Unkown Database error. Current Database version is v.{CURRENT_VERSION}, and this database has version v.{self.__version__} (schemaHash={self.schemaHash!r}).")

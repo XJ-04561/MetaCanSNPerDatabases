@@ -64,6 +64,7 @@ def update(args):
 	for databaseName in args.database:
 		try:
 			database = openDatabase(databaseName, "w")
+			LOGGER.debug(f"Database {databaseName} is of version v.{database.__version__}")
 			code = database.checkDatabase()
 			database.validateDatabase(code, throwError=False)
 
