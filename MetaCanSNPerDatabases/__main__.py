@@ -119,7 +119,7 @@ def main():
 	elif "--version" in sys.argv:
 		print(f"MetaCanSNPerDatabases v. {CURRENT_VERSION}")
 		exit(0)
-	elif sys.argv[1] not in ["read", "write", "update"]:
+	elif sys.argv[1] not in ["read", "write", "update", "download"]:
 		print("No mode chosen check usage to see which mode is appropriate for your intended use.", file=sys.stderr)
 		parser.print_help()
 		exit(1)
