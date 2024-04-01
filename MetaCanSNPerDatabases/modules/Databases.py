@@ -173,7 +173,6 @@ class DatabaseWriter(Database):
 				self._connection.execute(f"PRAGMA user_version = {DATABASE_VERSIONS[self.schemaHash]:d};")
 			case -5:
 				self._connection.execute(f"PRAGMA user_version = {DATABASE_VERSIONS[self.schemaHash]:d};")
-		self._connection.commit()
 
 	def addSNP(self, nodeID, snpID, position, ancestral, derived, reference, date, chromosomeID):
 		self._connection.execute(f"INSERT (?,?,?,?,?,?,?,?) INTO {TABLE_NAME_SNP_ANNOTATION};", [nodeID, snpID, position, ancestral, derived, reference, date, chromosomeID])

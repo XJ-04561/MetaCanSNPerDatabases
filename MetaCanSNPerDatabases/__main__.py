@@ -73,6 +73,8 @@ def update(args):
 
 	os.chdir(oldCwd)
 
+	database.commit()
+
 def download(args):
 	if downloadDatabase(args.database, os.path.join(args.outDir, args.database)) is None:
 		raise DownloadFailed(f"Failed to download {args.database} to {os.path.join(args.outDir, args.database)}.")
