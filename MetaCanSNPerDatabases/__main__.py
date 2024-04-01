@@ -9,9 +9,7 @@ class MissingArgument(Exception): pass
 def read(args):
 
 	database = openDatabase(args.database, "r")
-	for row, *_ in database._connection.execute("SELECT sql FROM sqlite_schema ORDER BY sql DESC;"):
-		if row is not None:
-			print(row)
+	
 	code = database.checkDatabase()
 
 	database.validateDatabase(code)
@@ -78,8 +76,9 @@ def update(args):
 	database.commit()
 
 def download(args):
-	if downloadDatabase(args.database, os.path.join(args.outDir, args.database)) is None:
-		raise DownloadFailed(f"Failed to download {args.database} to {os.path.join(args.outDir, args.database)}.")
+	for databaseName in args.database:
+		if downloadDatabase(databaseName, os.path.join(args.outDir, databaseName)) is None:
+			raise DownloadFailed(f"Failed to download {databaseName} to {os.path.join(args.outDir, databaseName)}.")
 
 def main():
 
@@ -88,7 +87,8 @@ def main():
 	modeGroup : argparse._SubParsersAction = parser.add_subparsers(title="Mode", dest="mode", description="Mode with which to open the database.", metavar="MODES")
 
 	readParser : argparse.ArgumentParser = modeGroup.add_parser("read", help="Print out data from tables in database.")
-	parser.add_argument("--table",		nargs="+",		default=None)
+	readParser.add_argument("--table",		nargs="+",		default=None)
+	readParser.add_argument("database")
 	readParser.set_defaults(func=read)
 
 	writeParser : argparse.ArgumentParser = modeGroup.add_parser("write",	help="Create a database with or without data. Data for database is given through the appropriate File flags.")
@@ -102,19 +102,22 @@ def main():
 
 	optionalGroup = writeParser.add_argument_group(title="Optional Flags")
 	optionalGroup.add_argument("--rectify",	action="store_true", help="If used, will edit the database structure if it doesn't comply with the current set schema. If not used, will continue operations without rectifying, but the program might crash due to the difference in schema.")
-	
+
+	writeParser.add_argument("database")
 	writeParser.set_defaults(func=write)
 
 	updateParser : argparse.ArgumentParser = modeGroup.add_parser("update", help="Update an existing database to follow the current standard schema.")
 	updateParser.add_argument("--refDir")
 	updateParser.add_argument("--noCopy", action="store_true")
+	updateParser.add_argument("database")
 	updateParser.set_defaults(func=update)
 	
 	downloadParser : argparse.ArgumentParser = modeGroup.add_parser("download", help="Download a database from one of the internally defined sources.")
 	downloadParser.add_argument("--outDir", default=".")
+	downloadParser.add_argument("database", nargs="+")
 	downloadParser.set_defaults(func=download)
 
-	parser.add_argument("database")
+	
 
 	parser.add_argument("--version", action="store_true")
 
