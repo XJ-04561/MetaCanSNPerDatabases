@@ -88,13 +88,13 @@ def updateFromLegacy(database : DatabaseWriter):
 	# SNPs
 	database._connection.execute("ALTER TABLE snp_annotation RENAME TO snp_annotation_old;")
 	database.SNPTable.create()
-	database._connection.execute(f"INSERT INTO {TABLE_NAME_SNP_ANNOTATION} VALUES ({SNP_COLUMN_NODE_ID}, {SNP_COLUMN_POSITION}, {SNP_COLUMN_ANCESTRAL}, {SNP_COLUMN_DERIVED}, {SNP_COLUMN_REFERENCE}, {SNP_COLUMN_DATE}, {SNP_COLUMN_CHROMOSOMES_ID}) SELECT node_id-1, position, ancestral_base, derived_base, reference, date, genome_i FROM snp_annotation_old;")
+	database._connection.execute(f"INSERT INTO {TABLE_NAME_SNP_ANNOTATION} ({SNP_COLUMN_NODE_ID}, {SNP_COLUMN_POSITION}, {SNP_COLUMN_ANCESTRAL}, {SNP_COLUMN_DERIVED}, {SNP_COLUMN_REFERENCE}, {SNP_COLUMN_DATE}, {SNP_COLUMN_CHROMOSOMES_ID}) SELECT node_id-1, position, ancestral_base, derived_base, reference, date, genome_i FROM snp_annotation_old;")
 	database._connection.execute("DROP TABLE snp_annotation_old;")
 	
 	# Tree
 	database._connection.execute("ALTER TABLE tree RENAME TO tree_old;")
 	database.TreeTable.create()
-	database._connection.execute(f"INSERT INTO {TABLE_NAME_TREE} ({TREE_COLUMN_PARENT, TREE_COLUMN_CHILD, TREE_COLUMN_NAME}) SELECT tree_old.parent-1, null, nodes.name FROM tree_old, nodes WHERE tree_old.parent = nodes.id;")
+	database._connection.execute(f"INSERT INTO {TABLE_NAME_TREE} ({TREE_COLUMN_PARENT}, {TREE_COLUMN_CHILD}, {TREE_COLUMN_NAME}) SELECT tree_old.parent-1, null, nodes.name FROM tree_old, nodes WHERE tree_old.parent = nodes.id;")
 	database._connection.execute(f"DELETE FROM {TABLE_NAME_TREE} WHERE parent = 0 OR child = 0;")
 	database._connection.execute(f"UPDATE TABLE {TABLE_NAME_TREE} SET parent=0 WHERE child = 1;")
 	database._connection.execute("DROP TABLE nodes;")
