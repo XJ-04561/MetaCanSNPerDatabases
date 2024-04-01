@@ -14,7 +14,7 @@ from MetaCanSNPerDatabases.modules.Columns import ColumnFlag
 import MetaCanSNPerDatabases.modules.Columns as Columns
 
 install_import_hook("MetaCanSNPerDatabases.modules.Functions")
-from MetaCanSNPerDatabases.modules.Functions import downloadDatabase
+from MetaCanSNPerDatabases.modules.Functions import downloadDatabase, updateFromLegacy
 
 install_import_hook("MetaCanSNPerDatabases.modules.Tables")
 from MetaCanSNPerDatabases.modules.Tables import SNPTable, ReferenceTable, TreeTable
