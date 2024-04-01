@@ -69,7 +69,7 @@ def update(args):
 	oldCwd = os.curdir
 	os.chdir(args.refDir)
 
-	database.rectifyDatabase(code, copy=True)
+	database.rectifyDatabase(code, copy=not args.noCopy)
 
 	os.chdir(oldCwd)
 
@@ -103,6 +103,7 @@ def main():
 
 	updateParser : argparse.ArgumentParser = modeGroup.add_parser("update", help="Update an existing database to follow the current standard schema.")
 	updateParser.add_argument("--refDir")
+	updateParser.add_argument("--noCopy", action="store_true")
 	updateParser.set_defaults(func=update)
 	
 	downloadParser : argparse.ArgumentParser = modeGroup.add_parser("download", help="Download a database from one of the internally defined sources.")
