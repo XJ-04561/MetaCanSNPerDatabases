@@ -140,6 +140,12 @@ class Database:
 				])
 			).encode("utf-8")
 		).hexdigest()
+	
+	def close(self):
+		try:
+			self._connection.close()
+		except:
+			pass
 
 class DatabaseReader(Database):
 	
@@ -161,7 +167,7 @@ class DatabaseWriter(Database):
 			case -2: # Table is new
 				for table in self.Tables.values():
 					table.create()
-				self._connection.execute(f"PRAGMA user_version = {DATABASE_VERSIONS[self.schemaHash]:d};")
+				self._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION:d};")
 			case -3: # Legacy CanSNPer table
 				updateFromLegacy(self)
 			case -4: # Transfer data from old tables into new tables
@@ -170,9 +176,9 @@ class DatabaseWriter(Database):
 				for (table,) in self._connection.execute("SELECT name FROM sqlite_master WHERE type='table';"):
 					if table not in TABLES:
 						self._connection.execute(f"DROP TABLE {table};")
-				self._connection.execute(f"PRAGMA user_version = {DATABASE_VERSIONS[self.schemaHash]:d};")
+				self._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION:d};")
 			case -5:
-				self._connection.execute(f"PRAGMA user_version = {DATABASE_VERSIONS[self.schemaHash]:d};")
+				self._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION:d};")
 
 	def addSNP(self, nodeID, snpID, position, ancestral, derived, reference, date, chromosomeID):
 		self._connection.execute(f"INSERT (?,?,?,?,?,?,?,?) INTO {TABLE_NAME_SNP_ANNOTATION};", [nodeID, snpID, position, ancestral, derived, reference, date, chromosomeID])
