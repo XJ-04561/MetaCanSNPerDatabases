@@ -125,6 +125,7 @@ def main():
 	
 
 	parser.add_argument("--version", action="store_true")
+	parser.add_argument("--debug", action="store_true")
 
 	if len(sys.argv) <= 1:
 		parser.print_help()
@@ -139,6 +140,8 @@ def main():
 
 	args : argparse.Namespace = parser.parse_args(sys.argv[1:])
 	
+	LOGGER.disabled = args.debug
+
 	try:
 		args.func(args)
 	except Exception as e:
