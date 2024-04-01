@@ -5,8 +5,10 @@ import sqlite3, hashlib, re, os, logging, shutil, sys
 from typing import Generator, Callable, Iterable, Self, overload, final, Literal, LiteralString, Any, TextIO, BinaryIO, Never, Iterator
 
 LOGGER = logging.Logger("MetaCanSNPerDatabases", level=logging.WARNING)
-LOGGER.addHandler(logging.FileHandler("MetaCanSNPerDatabases.log"))
 
+LOGGER_FILEHANDLER = logging.FileHandler("MetaCanSNPerDatabases.log")
+LOGGER_FILEHANDLER.setFormatter(logging.Formatter("[%(name)s] %(asctime)s - %(levelname)s: %(message)s"))
+LOGGER.addHandler(LOGGER_FILEHANDLER)
 type Mode = Literal["r", "w"]
 type ReadMode = Literal["r"]
 type WriteMode = Literal["w"]
