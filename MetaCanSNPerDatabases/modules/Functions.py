@@ -81,7 +81,7 @@ def loadFromSNPFile(database : DatabaseWriter, file : TextIO):
 	else:
 		ValueError("File is not of accepted format.")
 
-def updateFromLegacy(database : DatabaseWriter):
+def updateFromLegacy(database : DatabaseWriter, refDir=""):
 	"""Update from CanSNPer2 to MetaCanSNPer v.1 format."""
 
 	# References
@@ -93,7 +93,7 @@ def updateFromLegacy(database : DatabaseWriter):
 	# Chromosomes
 	database.ChromosomesTable.create()
 	for i, assembly in database.ReferenceTable.get(Columns.GenomeID, Columns.Assembly):
-		database._connection.execute(f"INSERT INTO {TABLE_NAME_CHROMOSOMES} VALUES (?, ?, ?);", [i, open(f"{assembly}.fna", "r").readline()[1:].split()[0], i])
+		database._connection.execute(f"INSERT INTO {TABLE_NAME_CHROMOSOMES} VALUES (?, ?, ?);", [i, open(os.path.join(refDir, f"{assembly}.fna"), "r").readline()[1:].split()[0], i])
 	
 	# SNPs
 	database._connection.execute("ALTER TABLE snp_annotation RENAME TO snp_annotation_old;")
