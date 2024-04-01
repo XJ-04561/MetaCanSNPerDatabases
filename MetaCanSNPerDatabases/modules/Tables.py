@@ -66,7 +66,7 @@ class Table:
 	
 	@final
 	def get(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, **where : Any) -> Generator[tuple[Any],None,None]:
-		for row in self._conn.execute(*generateTableQuery(*select, orderBy=orderBy, **where)):
+		for row in self._conn.execute(*generateTableQuery(self, *select, orderBy=orderBy, **where)):
 			yield row
 
 	@overload
