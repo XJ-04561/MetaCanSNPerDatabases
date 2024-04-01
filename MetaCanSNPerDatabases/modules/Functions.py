@@ -83,11 +83,7 @@ def updateFromLegacy(database : DatabaseWriter):
 	# Chromosomes
 	database.ChromosomesTable.create()
 	for i, assembly in database.ReferenceTable.get(Columns.GenomeID, Columns.Assembly):
-		database._connection.execute(f"INSERT (?, ?, ?) INTO {TABLE_NAME_CHROMOSOMES};", [
-			i,
-			open(f"{assembly}.fna").readline()[1:].split()[0],
-			i
-		])
+		database._connection.execute(f"INSERT (?, ?, ?) INTO {TABLE_NAME_CHROMOSOMES};", [i, open(f"{assembly}.fna", "r").readline()[1:].split()[0], i])
 	
 	# SNPs
 	database._connection.execute("ALTER TABLE snp_annotation RENAME TO snp_annotation_old;")
