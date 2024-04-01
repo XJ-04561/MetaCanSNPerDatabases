@@ -68,6 +68,7 @@ def update(args):
 		database.validateDatabase(code, throwError=False)
 
 		oldCwd = os.curdir
+		print(databaseName)
 		os.chdir(args.refDir)
 		database.rectifyDatabase(code, copy=not args.noCopy)
 		os.chdir(oldCwd)
