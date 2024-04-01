@@ -139,12 +139,10 @@ def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[Co
 		query += f" WHERE {' AND '.join(_tmp)}"
 		del _tmp
 	
-	if orderBy is None:
-		orderBy = tuple()
-	elif isinstance(orderBy, ColumnFlag):
+	if isinstance(orderBy, ColumnFlag):
 		orderBy = (orderBy,)
 	
-	if len(orderBy) > 0:
+	if orderBy is not None and len(orderBy) > 0:
 		# Create an ordered list of all "ORDER BY X [DIRECTION]"-statements
 		orderBy = [f"{Columns.LOOKUP[self._tableName][flag]} {'DESC' if flag > 0 else 'ASC'}" for flag in orderBy]
 		query += f" ORDER BY {', '.join(orderBy)}"
@@ -200,13 +198,10 @@ def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|N
 	params = list(where.values())
 	conditions = " AND ".join([f"{table}.{Columns.LOOKUP[table][col]} = ?" for table, col in zip(map(getTable, params), params)])
 
-	# Create an ordered list of all "ORDER BY X [DIRECTION]"-statements
-	if orderBy is None:
-		orderBy = tuple()
-	elif isinstance(orderBy, ColumnFlag):
+	if isinstance(orderBy, ColumnFlag):
 		orderBy = (orderBy,)
 
-	if len(orderBy) > 0:
+	if orderBy is not None and len(orderBy) > 0:
 		andTable = lambda flag : (getTable(col), flag, "DESC" if flag > 0 else "ASC")
 
 		keyColumn = ", ".join([f"{table}.{Columns.LOOKUP[table][col]} {direction}" for table, col, direction in map(andTable, orderBy)])
