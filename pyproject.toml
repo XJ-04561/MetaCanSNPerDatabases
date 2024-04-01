@@ -32,9 +32,7 @@ classifiers = [
 
     "Operating System :: OS Independent"
 ]
-dependencies = [
-    "typeguard"
-]
+dependencies = []
 
 [project.urls]
 Repository = "https://github.com/XJ-04561/MetaCanSNPerDatabases.git"
