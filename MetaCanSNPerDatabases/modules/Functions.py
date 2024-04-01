@@ -111,7 +111,7 @@ def downloadDatabase(databaseName : str, dst : str) -> str|None:
 			return filename
 		except Exception as e:
 			LOGGER.info(f"Database {databaseName!r} not found/accessible on {source!r}.")
-			LOGGER.exception(e, stacklevel=logging.INFO)
+			LOGGER.info(e)
 	LOGGER.error(f"No database named {databaseName!r} found online. Sources tried: {SOURCES}")
 	return None
 
