@@ -85,7 +85,7 @@ def updateFromLegacy(database : DatabaseWriter, refDir=""):
 	"""Update from CanSNPer2 to MetaCanSNPer v.1 format."""
 
 	import textwrap, gzip
-	from urllib import request as urlretrieve
+	from urllib.request import urlretrieve
 
 	# References
 	LOGGER.info("Updating 'References'-table")
