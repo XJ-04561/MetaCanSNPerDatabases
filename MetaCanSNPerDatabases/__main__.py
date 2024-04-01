@@ -9,7 +9,9 @@ class MissingArgument(Exception): pass
 def read(args):
 
 	database = openDatabase(args.database, "r")
-
+	for row, *_ in database._connection.execute("SELECT sql FROM sqlite_schema ORDER BY sql DESC;"):
+		if row is not None:
+			print(row)
 	code = database.checkDatabase()
 
 	database.validateDatabase(code)
@@ -132,4 +134,6 @@ def main():
 	args.func(args)
 
 	print("Done!")
+
+	return 0
 
