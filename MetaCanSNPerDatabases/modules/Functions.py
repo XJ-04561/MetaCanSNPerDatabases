@@ -207,7 +207,7 @@ def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[Co
 	if isinstance(orderBy, ColumnFlag):
 		orderBy = (orderBy,)
 
-	boolWhere = tuple(sorted(map(lambda k,v:(k,isinstance(v, Iterable)), filter(lambda k,v:v is not None, where.items()))))
+	boolWhere = tuple(sorted(map(lambda kv:(kv[0],isinstance(kv[1], Iterable)), filter(lambda kv:kv[1] is not None, where.items()))))
 
 	query, params = generateTableQueryString(self, select, orderBy=orderBy, where=boolWhere)
 	params = list(params)
@@ -279,7 +279,7 @@ def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|N
 	if isinstance(orderBy, ColumnFlag):
 		orderBy = (orderBy,)
 
-	boolWhere = tuple(sorted(map(lambda k,v:(k,isinstance(v, Iterable)), filter(lambda k,v:v is not None, where.items()))))
+	boolWhere = tuple(sorted(map(lambda kv:(kv[0],isinstance(kv[1], Iterable)), filter(lambda kv:kv[1] is not None, where.items()))))
 
 	if table is None:
 		for t in Columns.LOOKUP:
