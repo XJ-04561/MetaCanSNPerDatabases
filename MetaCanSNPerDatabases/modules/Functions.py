@@ -87,7 +87,7 @@ def updateFromLegacy(database : DatabaseWriter):
 	# References
 	database._connection.execute("ALTER TABLE snp_references RENAME TO snp_references_old;")
 	database.ReferenceTable.create()
-	database._connection.execute(f"INSERT INTO {TABLE_NAME_REFERENCES} FROM snp_references_old;")
+	database._connection.execute(f"INSERT INTO {TABLE_NAME_REFERENCES} SELECT * FROM snp_references_old;")
 	database._connection.execute("DROP TABLE snp_reference_old;")
 
 	# Chromosomes
