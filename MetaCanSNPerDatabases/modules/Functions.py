@@ -11,7 +11,7 @@ import inspect
 class MissingReferenceFile(Exception): pass
 
 def interpretSQLtype(flag, val):
-	match Columns.TYPE_LOOKUP[flag]:
+	match Columns.TYPE_LOOKUP[flag][0]:
 		case "INTEGER":
 			return int(val)
 		case _:
