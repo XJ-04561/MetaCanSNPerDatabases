@@ -129,8 +129,8 @@ def main():
 	updateParser.set_defaults(func=update)
 	
 	downloadParser : argparse.ArgumentParser = modeGroup.add_parser("download", help="Download a database from one of the internally defined sources.")
-	downloadParser.add_argument("--outDir", default=".")
-	downloadParser.add_argument("database", nargs="+", type=os.path.realpath)
+	downloadParser.add_argument("--outDir", default=os.path.realpath("."))
+	downloadParser.add_argument("database", nargs="+")
 	downloadParser.set_defaults(func=download)
 
 	parser.add_argument("--version", action="store_true")
