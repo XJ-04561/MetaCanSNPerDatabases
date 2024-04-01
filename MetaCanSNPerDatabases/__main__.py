@@ -17,7 +17,7 @@ def read(args):
 	database.validateDatabase(code)
 
 	print(database)
-	if "table" not in args:
+	if args.table is None:
 		print(database.TreeTable)
 		print(database.SNPTable)
 		print(database.ChromosomesTable)
@@ -136,6 +136,7 @@ def main():
 	except Exception as e:
 		LOGGER.exception(e)
 		print(f"{type(e).__name__}: "+str(e), file=sys.stderr)
+		exit(1)
 
 	print("Done!")
 
