@@ -188,7 +188,8 @@ def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[Co
 		for val in where[name]:
 			params.insert(i, val)
 		formatDict[Columns.LOOKUP[self._tableName][Columns.NAMES_DICT[name]]] = where[name]
-	query.format(**formatDict)
+	
+	return query.format(**formatDict), tuple(params)
 
 @cache
 def generateQueryString(select : tuple[ColumnFlag], orderBy : tuple[ColumnFlag]|None=None, table:str|None=None, where : tuple[tuple[str,bool]]|None=None) -> tuple[str,tuple[Any]]:
