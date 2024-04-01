@@ -60,6 +60,8 @@ def write(args : argparse.Namespace):
 
 def update(args):
 
+	if len(args.database) != len(args.refDir):
+		raise ValueError("Require equal amounts of databases to refDirs")
 	import os
 
 	oldCwd = os.curdir
