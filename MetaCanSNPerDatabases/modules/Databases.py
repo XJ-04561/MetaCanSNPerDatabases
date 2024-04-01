@@ -87,7 +87,7 @@ class Database:
 				LOGGER.exception(IsLegacyCanSNPer2("Database is a legacy CanSNPer database. If opened in '--update' mode it can be converted."))
 				if throwError: raise IsLegacyCanSNPer2("Database is a legacy CanSNPer database. If opened in '--update' mode it can be converted.")
 			case -4: # Transfer data from old tables into new tables
-				LOGGER.exception(OutdatedCanSNPerDatabase(f"Database version ({self.__version__}) does not match the currently set version. (user_version={self._connection.execute('PRAGMA user_version;').fetchone()[0]}, schemaHash={self.schemaHash!r})"))
+				LOGGER.exception(OutdatedCanSNPerDatabase(f"Database schema does not match the most up to date schema. (Database: {self.schemaHash!r}, Latest MetaCanSNPerDatabases: {CURRENT_HASH})"))
 				if throwError: raise OutdatedCanSNPerDatabase(f"Database version ({self.__version__}) does not match the currently set version. (user_version={self._connection.execute('PRAGMA user_version;').fetchone()[0]}, schemaHash={self.schemaHash!r})")
 			case -5: # Version number missmatch
 				LOGGER.exception(sqlite3.DatabaseError(f"Table does not have the right `user_version` set. (Determined version is v.{self.__version__} but user_version is v.{self._connection.execute('PRAGMA user_version;').fetchone()[0]})"))
