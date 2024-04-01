@@ -62,18 +62,23 @@ def update(args):
 
 	import os
 
-	database = openDatabase(args.database, "w")
-	code = database.checkDatabase()
-	database.validateDatabase(code, throwError=False)
+	for databaseName in args.database:
+		database = openDatabase(databaseName, "w")
+		code = database.checkDatabase()
+		database.validateDatabase(code, throwError=False)
 
-	oldCwd = os.curdir
-	os.chdir(args.refDir)
+		oldCwd = os.curdir
+		os.chdir(args.refDir)
 
-	database.rectifyDatabase(code, copy=not args.noCopy)
+		database.rectifyDatabase(code, copy=not args.noCopy)
 
-	os.chdir(oldCwd)
+		os.chdir(oldCwd)
 
-	database.commit()
+		database.commit()
+		try:
+			database.close()
+		except:
+			pass
 
 def download(args):
 	for databaseName in args.database:
@@ -109,7 +114,7 @@ def main():
 	updateParser : argparse.ArgumentParser = modeGroup.add_parser("update", help="Update an existing database to follow the current standard schema.")
 	updateParser.add_argument("--refDir")
 	updateParser.add_argument("--noCopy", action="store_true")
-	updateParser.add_argument("database")
+	updateParser.add_argument("database", nargs="+")
 	updateParser.set_defaults(func=update)
 	
 	downloadParser : argparse.ArgumentParser = modeGroup.add_parser("download", help="Download a database from one of the internally defined sources.")
