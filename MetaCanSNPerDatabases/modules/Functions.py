@@ -118,7 +118,7 @@ def downloadDatabase(databaseName : str, dst : str) -> str:
 	return None
 
 @cache
-def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Direction]|tuple[tuple[ColumnFlag,Direction]]=None, **where : Any) -> Generator[tuple[Any],None,None]:
+def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, **where : Any) -> Generator[tuple[Any],None,None]:
 	"""All positional arguments should be `ColumnFlag` objects and they are used to
 	determine what information to be gathered from the database.
 	
@@ -126,10 +126,9 @@ def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[Co
 	is selected. For example, if you inted to get the row for a specific genbankID
 	then you would use the keyword argument as such: `genbankID="GCA_123123123.1"`.
 	
-	`orderBy` is used to sort the selected data according to `ColumnFlag` with or
-	without a direction string ("DESC" or "ASC"). Input can be a list to use many
-	columns for sorting, and any item of the list can be with or without a
-	direction specified."""
+	`orderBy` is used to sort the selected data according to `ColumnFlag`.
+	Direction is indicated by negating the the flag. A positive flag is the default
+	of "DESC" and negative flags indicate "ASC"."""
 	query = f"SELECT {', '.join(map(Columns.LOOKUP[self._tableName].__getitem__, select))} FROM {self._tableName}"
 	params = []
 	if where != {}:
@@ -143,19 +142,17 @@ def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[Co
 	if orderBy is None:
 		orderBy = tuple()
 	elif isinstance(orderBy, ColumnFlag):
-		orderBy = [(orderBy, "DESC")]
-	elif isinstance(orderBy, tuple) and not isinstance(orderBy[0], tuple):
-		orderBy = [orderBy]
+		orderBy = (orderBy,)
 	
 	if len(orderBy) > 0:
 		# Create an ordered list of all "ORDER BY X [DIRECTION]"-statements
-		orderBy = [tupe if type(tupe) is tuple else (tupe, "DESC") for tupe in orderBy]
-		query += f" ORDER BY {', '.join(map(' '.join, orderBy))}"
+		orderBy = [f"{Columns.LOOKUP[self._tableName][flag]} {'DESC' if flag > 0 else 'ASC'}" for flag in orderBy]
+		query += f" ORDER BY {', '.join(orderBy)}"
 	
 	return query, params
 
 @cache
-def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Direction]|tuple[tuple[ColumnFlag,Direction]]=None, **where : Any) -> tuple[str,list[Any]]:
+def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, **where : Any) -> tuple[str,list[Any]]:
 	"""All positional arguments should be `ColumnFlag` objects and they are used to
 	determine what information to be gathered from the database.
 	
@@ -163,10 +160,9 @@ def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Di
 	is selected. For example, if you inted to get the row for a specific genbankID
 	then you would use the keyword argument as such: `genbankID="GCA_123123123.1"`.
 	
-	`orderBy` is used to sort the selected data according to `ColumnFlag` with or
-	without a direction string ("DESC" or "ASC"). Input can be a list to use many
-	columns for sorting, and any item of the list can be with or without a
-	direction specified."""
+	`orderBy` is used to sort the selected data according to `ColumnFlag`.
+	Direction is indicated by negating the the flag. A positive flag is the default
+	of "DESC" and negative flags indicate "ASC"."""
 
 	# Find out which tables are involved in this query. Also makes some necessary assertions for the rest of the function.
 	tables = {Columns.UNIQUELOOKUP[col] for col in Columns.UNIQUES.intersection(select, where, map(lambda x : x if type(x) is ColumnFlag else x[0], orderBy))}
@@ -208,14 +204,10 @@ def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag,Di
 	if orderBy is None:
 		orderBy = tuple()
 	elif isinstance(orderBy, ColumnFlag):
-		orderBy = [(orderBy, "DESC")]
-	elif isinstance(orderBy, tuple) and not isinstance(orderBy[0], tuple):
-		orderBy = [orderBy]
+		orderBy = (orderBy,)
 
 	if len(orderBy) > 0:
-		orderBy = [tupe if type(tupe) is tuple else (tupe, "DESC") for tupe in orderBy]
-		
-		andTable = lambda col, direction : (getTable(col), col, direction)
+		andTable = lambda flag : (getTable(col), flag, "DESC" if flag > 0 else "ASC")
 
 		keyColumn = ", ".join([f"{table}.{Columns.LOOKUP[table][col]} {direction}" for table, col, direction in map(andTable, orderBy)])
 	
