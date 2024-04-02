@@ -170,7 +170,7 @@ class DatabaseWriter(Database):
 
 	_mode = "w"
 
-	def rectifyDatabase(self, code : int, copy : bool=True):
+	def rectifyDatabase(self, code : int, copy : bool=True, refDir : str=""):
 		from MetaCanSNPerDatabases.modules.Functions import updateFromLegacy
 		if copy: shutil.copy(self.filename, self.filename+".backup")
 		match code:
@@ -183,7 +183,7 @@ class DatabaseWriter(Database):
 				self._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION:d};")
 				self._connection.execute("COMMIT;")
 			case -3: # Legacy CanSNPer table
-				updateFromLegacy(self)
+				updateFromLegacy(self, refDir=refDir)
 			case -4: # Transfer data from old tables into new tables
 				self._connection.execute("BEGIN TRANSACTION;")
 				for table in self.Tables.values():
