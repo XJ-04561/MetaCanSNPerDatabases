@@ -295,7 +295,7 @@ def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|N
 				table = t
 				break
 	
-	query, params = generateTableQueryString(select, orderBy=orderBy, table=table, where=boolWhere)
+	query, params = generateQueryString(select, orderBy=orderBy, table=table, where=boolWhere)
 	params = list(params)
 	formatDict = {}
 	
