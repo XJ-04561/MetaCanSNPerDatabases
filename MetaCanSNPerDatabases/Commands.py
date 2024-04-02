@@ -143,7 +143,7 @@ def main():
 	modeGroup : argparse._SubParsersAction = parser.add_subparsers(title="Mode", dest="mode", description="Mode with which to open the database.", metavar="MODES")
 
 	readParser : argparse.ArgumentParser = modeGroup.add_parser("read", help="Print out data from tables in database.")
-	readParser.add_argument("database", type=os.path.realpath)
+	readParser.add_argument("--database",	type=os.path.realpath)
 	readParser.add_argument("--table",		nargs="+",		default=[],		choices=["TreeTable", "SNPTable", "ChromosomesTable", "ReferenceTable"])
 	readParser.set_defaults(func=read)
 
