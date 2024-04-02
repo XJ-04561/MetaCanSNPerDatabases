@@ -96,8 +96,42 @@ def download(args):
 			LOGGER.exception(e)
 			print(f"Failed in downloading {databaseName!r}")
 
-# def test(args):
+def test(args):
 
+	print("Testing Download:")
+	download(args)
+
+	print("Testing Update:")
+	update(args)
+
+	print("Testing Read:")
+	for databaseName in args.database:
+		print(f"\t{databaseName}")
+		LOGGER.debug(f"{databaseName}")
+
+		database = openDatabase(databaseName, "r")
+		LOGGER.debug(repr(database))
+
+		print(f"\t\tArbitrary `.get` from one table only.")
+		LOGGER.debug(f"Arbitrary `.get` from one table only.")
+		database.get(Columns.Position, Columns.Ancestral, Columns.Derived, ChromID=1)
+		LOGGER.debug("\n".join(database.get(Columns.Position, Columns.Ancestral, Columns.Derived, ChromID=1)))
+
+		print(f"\t\tGet one entry from a table.")
+		LOGGER.debug(f"Get one entry from a table.")
+		chromID, chromosome, genomeID = database.ChromosomesTable.first()
+		LOGGER.debug(f"{chromID=}, {chromosome=}, {genomeID=}")
+
+		genomeID, genome, *rest = database.ChromosomesTable.first()
+		LOGGER.debug(f"{genomeID=}, {genome=}, {rest=}")
+
+		print(f"\t\tArbitrary `.get` from one table referencing adjacent table.")
+		LOGGER.debug(f"Arbitrary `.get` from one table referencing adjacent table.")
+		LOGGER.debug("\n".join(database.get(Columns.Position, Columns.Ancestral, Columns.Derived, Chromosome=chromosome)))
+
+		print(f"\t\tArbitrary `.get` from one table referencing across more than one chained table.")
+		LOGGER.debug(f"Arbitrary `.get` from one table referencing across more than one chained table.")
+		LOGGER.debug("\n".join(database.get(Columns.Position, Columns.Ancestral, Columns.Derived, Genome=genome)))
 
 def main():
 
@@ -136,6 +170,13 @@ def main():
 	downloadParser.add_argument("database", nargs="+")
 	downloadParser.set_defaults(func=download)
 
+	testParser : argparse.ArgumentParser = modeGroup.add_parser("test", help="Test out the features of MetaCanSNPerDatabases to see if your environment is suitable for using it.")
+	testParser.add_argument("--refDir")
+	testParser.add_argument("--noCopy", action="store_true")
+	testParser.add_argument("--outDir", default=os.path.realpath("."))
+	testParser.add_argument("database", nargs="+", type=os.path.realpath)
+	testParser.set_defaults(func=test)
+
 	parser.add_argument("--version", action="store_true")
 	parser.add_argument("--debug", action="store_true")
 	parser.add_argument("--info", action="store_true")
@@ -147,7 +188,7 @@ def main():
 	elif "--version" in sys.argv:
 		print(f"MetaCanSNPerDatabases v. {CURRENT_VERSION}")
 		exit(0)
-	elif all(mode not in sys.argv for mode in ["read", "write", "update", "download"]):
+	elif all(mode not in sys.argv for mode in ["read", "write", "update", "download", "test"]):
 		print("No mode chosen check usage to see which mode is appropriate for your intended use.", file=sys.stderr)
 		parser.print_help()
 		exit(1)

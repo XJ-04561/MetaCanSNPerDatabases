@@ -176,7 +176,10 @@ def generateTableQueryString(self, select : tuple[ColumnFlag], orderBy : tuple[C
 	`orderBy` is used to sort the selected data according to `ColumnFlag`.
 	Direction is indicated by negating the the flag. A positive flag is the default
 	of "DESC" and negative flags indicate "ASC"."""
-	query = f"SELECT {', '.join(map(Columns.LOOKUP[self._tableName].__getitem__, select))} FROM {self._tableName}"
+	if len(select) > 0:
+		query = f"SELECT {', '.join(map(Columns.LOOKUP[self._tableName].__getitem__, select))} FROM {self._tableName}"
+	else:
+		query = f"SELECT * FROM {self._tableName}"
 	params = []
 	if len(where) == 0 and any(where):
 		_tmp = []
@@ -239,7 +242,7 @@ def generateQueryString(select : tuple[ColumnFlag], orderBy : tuple[ColumnFlag]|
 	of "DESC" and negative flags indicate "ASC"."""
 
 	# If selecting all columns then change the selection string into "*", otherwise create a list of "WHERE" statements
-	if Columns.ALL in select:
+	if Columns.ALL in select or len(select) == 0:
 		selection = "*"
 		if table is None:
 			raise ValueError(f"To select all columns of a table, the table must be specified.")
