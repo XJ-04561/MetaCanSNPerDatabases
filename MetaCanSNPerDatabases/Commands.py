@@ -6,7 +6,7 @@ import argparse, sys
 
 class MissingArgument(Exception): pass
 
-def read(databasePath : str=None, table : str=None, tables : list[str]=None):
+def read(databasePath : str=None, table : str=None, tables : list[str]=None, **kwargs):
 
 	database = openDatabase(databasePath, "r")
 	
@@ -34,7 +34,7 @@ def read(databasePath : str=None, table : str=None, tables : list[str]=None):
 			for row in database.Tables[table]:
 				rowFormat.format(*row)
 
-def write(databasePath : str=None, rectify : bool=False, SNPFile : str=None, treeFile : str=None, referenceFile : str=None):
+def write(databasePath : str=None, rectify : bool=False, SNPFile : str=None, treeFile : str=None, referenceFile : str=None, **kwargs):
 
 	database : DatabaseWriter = openDatabase(databasePath, "w")
 
@@ -65,10 +65,10 @@ def write(databasePath : str=None, rectify : bool=False, SNPFile : str=None, tre
 	database.commit()
 	database.close()
 
-def update(databaseNames : list[str]=None, refDir : str=".", noCopy=False):
+def update(databasePaths : list[str]=None, refDir : str=".", noCopy=False, **kwargs):
 
 	import os
-	for databaseName in databaseNames:
+	for databaseName in databasePaths:
 		try:
 			database = openDatabase(databaseName, "w")
 			LOGGER.debug(f"Database {databaseName} is of version v.{database.__version__}")
@@ -88,11 +88,9 @@ def update(databaseNames : list[str]=None, refDir : str=".", noCopy=False):
 				pass
 			LOGGER.exception(e)
 			print(f"Failed in updating {databaseName!r} due to:\n{type(e).__name__}: {e}")
-					
-	
 
-def download(databaseNames : list[str]=[], outDir : str="."):
-	for databaseName in map(os.path.basename, databaseNames):
+def download(databaseNames : list[str]=[], outDir : str=".", **kwargs):
+	for databaseName in databaseNames:
 		try:
 			if downloadDatabase(databaseName, os.path.join(outDir, databaseName)) is None:
 				raise DownloadFailed(f"Failed to download {databaseName} to {os.path.join(outDir, databaseName)}.")
@@ -172,7 +170,7 @@ def main():
 	
 	downloadParser : argparse.ArgumentParser = modeGroup.add_parser("download", help="Download a database from one of the internally defined sources.")
 	downloadParser.add_argument("--outDir", default=os.path.realpath("."))
-	downloadParser.add_argument("database", nargs="+")
+	downloadParser.add_argument("database", nargs="+", type=os.path.basename)
 	downloadParser.set_defaults(func=download)
 
 	testParser : argparse.ArgumentParser = modeGroup.add_parser("test", help="Test out the features of MetaCanSNPerDatabases to see if your environment is suitable for using it.")

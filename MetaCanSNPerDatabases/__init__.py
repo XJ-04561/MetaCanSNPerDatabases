@@ -13,3 +13,4 @@ from MetaCanSNPerDatabases.modules.Functions import downloadDatabase, updateFrom
 from MetaCanSNPerDatabases.modules.Tables import SNPTable, ReferenceTable, TreeTable
 from MetaCanSNPerDatabases.modules.Tree import Branch
 import MetaCanSNPerDatabases.modules.Test as Test
+from MetaCanSNPerDatabases import Commands
