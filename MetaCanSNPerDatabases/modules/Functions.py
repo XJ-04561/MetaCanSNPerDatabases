@@ -81,11 +81,14 @@ def loadFromSNPFile(database : DatabaseWriter, file : TextIO):
 	else:
 		ValueError("File is not of accepted format.")
 
-def updateFromLegacy(database : DatabaseWriter, refDir=""):
+def updateFromLegacy(database : DatabaseWriter, refDir : Path|PathGroup=None):
 	"""Update from CanSNPer2 to MetaCanSNPer v.1 format."""
 
 	import textwrap, gzip
 	from urllib.request import urlretrieve
+
+	if refDir is None:
+		refDir = CommonGroups.shared / f"{SOFTWARE_NAME}-Data" / pName(database.filename)
 
 	# References
 	LOGGER.info("Updating 'References'-table")
@@ -102,7 +105,7 @@ def updateFromLegacy(database : DatabaseWriter, refDir=""):
 	database.ChromosomesTable.create()
 	for i, genbankID, assembly in database.ReferenceTable.get(Columns.GenomeID, Columns.GenbankID, Columns.Assembly):
 		try:
-			database._connection.execute(f"INSERT INTO {TABLE_NAME_CHROMOSOMES} VALUES (?, ?, ?);", [i, open(os.path.join(refDir, f"{assembly}.fna"), "r").readline()[1:].split()[0], i])
+			database._connection.execute(f"INSERT INTO {TABLE_NAME_CHROMOSOMES} VALUES (?, ?, ?);", [i, open(refDir.find(f"{assembly}.fna"), "r").readline()[1:].split()[0], i])
 		except FileNotFoundError:
 			LOGGER.warning(f"Couldn't find genome with assembly name {assembly!r} in {os.path.realpath(os.curdir)!r}.")
 			print(f"Couldn't find assembly {assembly!r}, downloading from ncbi... ", end="", flush=True)
@@ -113,7 +116,7 @@ def updateFromLegacy(database : DatabaseWriter, refDir=""):
 			with open(f"{assembly}.fna", "wb") as outFile:
 				outFile.write(gzip.decompress(open(f"{assembly}.fna.gz", "rb").read()))
 			print("Done!", flush=True)
-			database._connection.execute(f"INSERT INTO {TABLE_NAME_CHROMOSOMES} VALUES (?, ?, ?);", [i, open(os.path.join(refDir, f"{assembly}.fna"), "r").readline()[1:].split()[0], i])
+			database._connection.execute(f"INSERT INTO {TABLE_NAME_CHROMOSOMES} VALUES (?, ?, ?);", [i, open(refDir.find(f"{assembly}.fna"), "r").readline()[1:].split()[0], i])
 	database._connection.execute("COMMIT;")
 	
 	# SNPs

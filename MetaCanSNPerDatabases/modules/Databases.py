@@ -163,16 +163,18 @@ class DatabaseReader(Database):
 	
 	_mode = "r"
 
-	def rectifyDatabase(self, code : Never):
+	def rectifyDatabase(self, code : int) -> Never:
 		raise PermissionError("Can't rectify a database opened in read-only mode.")
 	
 class DatabaseWriter(Database):
 
 	_mode = "w"
 
-	def rectifyDatabase(self, code : int, copy : bool=True, refDir : str=""):
+	def rectifyDatabase(self, code : int, copy : bool=True, refDir : Path|PathGroup=None):
 		from MetaCanSNPerDatabases.modules.Functions import updateFromLegacy
 		if copy: shutil.copy(self.filename, self.filename+".backup")
+		if refDir is None:
+			refDir = CommonGroups.shared / f"{SOFTWARE_NAME}-Data" / pName(self.filename)
 		match code:
 			case 0: # We're good
 				pass

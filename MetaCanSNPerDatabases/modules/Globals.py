@@ -4,6 +4,10 @@ from functools import cached_property, cache
 import sqlite3, hashlib, re, os, logging, shutil, sys
 from typing import Generator, Callable, Iterable, Self, overload, final, Literal, LiteralString, Any, TextIO, BinaryIO, Never, Iterator
 
+from PseudoPathy import Path, DirectoryPath, FilePath, PathGroup, PathLibrary, PathList
+from PseudoPathy.Library import CommonGroups
+from PseudoPathy.PathShortHands import *
+
 class Mode: pass
 class ReadMode: pass
 class WriteMode: pass
@@ -32,6 +36,7 @@ LEGACY_VERSION = 0
 CURRENT_VERSION = 2
 CURRENT_HASH = "175c47f1ad61ec81a7d11d8a8e1887ff"
 STRICT : bool = False
+SOFTWARE_NAME = "MetaCanSNPer"
 
 SOURCES = [
     "https://github.com/XJ-04561/MetaCanSNPer-data/raw/master/database/{databaseName}", # MetaCanSNPer
