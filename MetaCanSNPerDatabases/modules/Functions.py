@@ -194,7 +194,7 @@ def generateTableQueryString(self, select : tuple[ColumnFlag], orderBy : tuple[C
 	
 	if orderBy is not None and len(orderBy) > 0:
 		# Create an ordered list of all "ORDER BY X [DIRECTION]"-statements
-		orderBy = [f"{Columns.LOOKUP[self._tableName][flag]} {'DESC' if flag > 0 else 'ASC'}" for flag in orderBy]
+		orderBy = [f"{Columns.LOOKUP[self._tableName][abs(flag)]} {'DESC' if flag > 0 else 'ASC'}" for flag in orderBy]
 		query += f" ORDER BY {', '.join(orderBy)};"
 	
 	return query, params
@@ -271,13 +271,13 @@ def generateQueryString(select : tuple[ColumnFlag], orderBy : tuple[ColumnFlag]|
 		else:
 			otherTable = Columns.RELATIONSHIPS[source][Columns.NAMES_DICT[name]]
 			commonColumn = Columns.RELATIONS[source, otherTable]
-			subQuery, subParams = generateQueryString((commonColumn,), ((Columns.NAMES_DICT[name],val),))
+			subQuery, subParams = generateQueryString((commonColumn,), where=((Columns.NAMES_DICT[name],val),))
 			conditions.append(f" IN ({subQuery.rstrip(';')})")
 		params.append(val)
 	conditions = " AND ".join(conditions)
 
 	if orderBy is not None and len(orderBy) > 0:
-		keyColumn = ", ".join([f"{Columns.LOOKUP[source][col]} {'DESC' if col > 0 else 'ASC'}" for col in orderBy])
+		keyColumn = ", ".join([f"{Columns.LOOKUP[source][abs(flag)]} {'DESC' if flag > 0 else 'ASC'}" for flag in orderBy])
 	
 		return f"SELECT {selection} FROM {source} WHERE {conditions} ORDER BY {keyColumn};", tuple(params)
 	else:
