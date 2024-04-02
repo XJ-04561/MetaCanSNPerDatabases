@@ -96,6 +96,9 @@ def download(args):
 			LOGGER.exception(e)
 			print(f"Failed in downloading {databaseName!r}")
 
+# def test(args):
+
+
 def main():
 
 	parser = argparse.ArgumentParser(prog="MetaCanSNPerDatabases")

@@ -205,15 +205,15 @@ class DatabaseWriter(Database):
 		self._connection.commit()
 
 @overload
-def openDatabase(database : str, mode : ReadMode) -> DatabaseReader:
+def openDatabase(database : str, mode : str) -> DatabaseReader:
 	pass
 
 @overload
-def openDatabase(database : str, mode : WriteMode) -> DatabaseWriter:
+def openDatabase(database : str, mode : str) -> DatabaseWriter:
 	pass
 
 @final
-def openDatabase(database : str, mode : Mode) -> DatabaseReader | DatabaseWriter | None:
+def openDatabase(database : str, mode : str) -> DatabaseReader | DatabaseWriter | None:
 	match mode:
 		case "r":
 			if not os.path.exists(database):
