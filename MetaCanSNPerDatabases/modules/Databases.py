@@ -222,15 +222,15 @@ class DatabaseWriter(Database):
 		self._connection.commit()
 
 @overload
-def openDatabase(database : str, mode : str) -> DatabaseReader:
+def openDatabase(database : str, mode : ReadMode) -> DatabaseReader:
 	pass
 
 @overload
-def openDatabase(database : str, mode : str) -> DatabaseWriter:
+def openDatabase(database : str, mode : WriteMode) -> DatabaseWriter:
 	pass
 
 @final
-def openDatabase(database : str, mode : str) -> DatabaseReader | DatabaseWriter | None:
+def openDatabase(database : str, mode : Mode) -> DatabaseReader | DatabaseWriter | None:
 	match mode:
 		case "r":
 			if not os.path.exists(database):
@@ -262,3 +262,5 @@ def openDatabase(database : str, mode : str) -> DatabaseReader | DatabaseWriter 
 				ret.SNPTable.create()
 
 				return ret
+		case _:
+			raise ValueError(f"Improper mode in which to open database. Can only be {'r'!r} (read) or {'w'!r} (write), not {mode!r}")
