@@ -252,7 +252,7 @@ def generateQueryString(select : tuple[ColumnFlag], orderBy : tuple[ColumnFlag]|
 		candidates = []
 		for table in Columns.LOOKUP:
 			if all(col in Columns.LOOKUP[table] for col in select):
-				candidates.append(", ".join([Columns.LOOKUP[table][col] for col in select]), table)
+				candidates.append((", ".join([Columns.LOOKUP[table][col] for col in select]), table))
 		if len(candidates) == 0:
 			raise ValueError(f"No table for all of these selections: ({', '.join(map(Columns.NAMES_STRING, select))})")
 		for slct, table in candidates:
