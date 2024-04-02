@@ -230,7 +230,7 @@ def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[Co
 	return out
 
 @cache
-def generateQueryString(select : tuple[ColumnFlag], orderBy : tuple[ColumnFlag]|None=None, table:str|None=None, where : tuple[tuple[str,bool]]|None=None) -> tuple[str,tuple[Any]]:
+def generateQueryString(select : tuple[ColumnFlag], orderBy : tuple[ColumnFlag]|None=None, table:str|None=None, where : tuple[tuple[str,bool]]|None=tuple()) -> tuple[str,tuple[Any]]:
 	"""All positional arguments should be `ColumnFlag` objects and they are used to
 	determine what information to be gathered from the database.
 	
