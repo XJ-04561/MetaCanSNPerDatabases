@@ -4,6 +4,8 @@ from functools import cached_property, cache
 import sqlite3, hashlib, re, os, logging, shutil, sys
 from typing import Generator, Callable, Iterable, Self, overload, final, Literal, LiteralString, Any, TextIO, BinaryIO, Never, Iterator
 
+formatPattern = re.compile(r"[{](.*?)[}]")
+
 LOGGER = logging.Logger("MetaCanSNPerDatabases", level=logging.WARNING)
 
 LOGGER_FILEHANDLER = logging.FileHandler("MetaCanSNPerDatabases.log")

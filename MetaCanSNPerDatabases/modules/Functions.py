@@ -220,11 +220,12 @@ def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[Co
 	query, params = generateTableQueryString(self, select, orderBy=orderBy, where=boolWhere)
 	params = list(params)
 	formatDict = {}
-	for i, (name, yn) in enumerate(filter(lambda x:x[1], boolWhere)):
+	keys = formatPattern.findall(query)
+	for (i, (name, yn), key) in zip(enumerate(filter(lambda x:x[1], boolWhere)), keys):
 		params.pop(i)
-		for val in where[Columns.NAMES_STRING[name]]:
+		for val in where[name]:
 			params.insert(i, val)
-		formatDict[Columns.LOOKUP[self._tableName][name]] = ", ".join(["?"]*len(where[Columns.NAMES_STRING[name]]))
+		formatDict[key] = ", ".join(["?"]*len(where[name]))
 	
 	LOGGER.debug(out := (query.format(**formatDict), tuple(params)))
 	return out
@@ -300,12 +301,12 @@ def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|N
 	query, params = generateQueryString(select, orderBy=orderBy, table=table, where=boolWhere)
 	params = list(params)
 	formatDict = {}
-	
-	for i, (name, yn) in enumerate(filter(lambda x:x[1], boolWhere)):
+	keys = formatPattern.findall(query)
+	for (i, (name, yn), key) in zip(enumerate(filter(lambda x:x[1], boolWhere)), keys):
 		params.pop(i)
 		for val in where[name]:
 			params.insert(i, val)
-		formatDict[Columns.LOOKUP[table][Columns.NAMES_DICT[name]]] = ", ".join(["?"]*len(where[name]))
+		formatDict[key] = ", ".join(["?"]*len(where[name]))
 	
 	LOGGER.debug(out := (query.format(**formatDict), tuple(params)))
 	return out
