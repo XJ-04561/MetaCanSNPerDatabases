@@ -250,7 +250,7 @@ def generateQueryString(select : tuple[ColumnFlag], orderBy : tuple[ColumnFlag]|
 	else:
 		for table in Columns.LOOKUP:
 			if all(col in Columns.LOOKUP[table] for col in select):
-				selection = ", ".join([{Columns.LOOKUP[table][col]} for col in select])
+				selection = ", ".join([Columns.LOOKUP[table][col] for col in select])
 				source = table
 				break
 		try:
