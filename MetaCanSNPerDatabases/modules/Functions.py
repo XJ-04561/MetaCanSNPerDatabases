@@ -226,7 +226,7 @@ def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[Co
 			params.insert(i, val)
 		formatDict[Columns.LOOKUP[self._tableName][Columns.NAMES_DICT[name]]] = where[name]
 	
-	LOGGER.debug((out := query.format(**formatDict), tuple(params)))
+	LOGGER.debug(out := (query.format(**formatDict), tuple(params)))
 	return out
 
 @cache
@@ -306,7 +306,7 @@ def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|N
 			params.insert(i, val)
 		formatDict[Columns.LOOKUP[table][Columns.NAMES_DICT[name]]] = where[name]
 	
-	LOGGER.debug((out := query.format(**formatDict), tuple(params)))
+	LOGGER.debug(out := (query.format(**formatDict), tuple(params)))
 	return out
 
 # @cache
