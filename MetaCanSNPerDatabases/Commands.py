@@ -143,41 +143,41 @@ def main():
 	modeGroup : argparse._SubParsersAction = parser.add_subparsers(title="Mode", dest="mode", description="Mode with which to open the database.", metavar="MODES")
 
 	readParser : argparse.ArgumentParser = modeGroup.add_parser("read", help="Print out data from tables in database.")
-	readParser.add_argument("--table",		nargs="+",		default=None)
 	readParser.add_argument("database", type=os.path.realpath)
+	readParser.add_argument("--table",		nargs="+",		default=None)
 	readParser.set_defaults(func=read)
 
 	writeParser : argparse.ArgumentParser = modeGroup.add_parser("write",	help="Create a database with or without data. Data for database is given through the appropriate File flags.")
+	writeParser.add_argument("database", type=os.path.realpath)
 	filesGroup = writeParser.add_argument_group(title="Input Files")
 	
 	filesGroup.add_argument("--SNPFile", help="If used, make sure that the related references and tree nodes are present in the database or in the other flagged files.")
 	filesGroup.add_argument("--referenceFile")
 	filesGroup.add_argument("--treeFile")
 
-	filesGroup.add_argument("--refDir", help="Directory where the reference genomes are located. This is only required if your --referenceFile doesn't have a `chromosomes` column.")
+	writeParser.add_argument("--refDir", help="Directory where the reference genomes are located. This is only required if your --referenceFile doesn't have a `chromosomes` column.")
 
 	optionalGroup = writeParser.add_argument_group(title="Optional Flags")
 	optionalGroup.add_argument("--rectify",	action="store_true", help="If used, will edit the database structure if it doesn't comply with the current set schema. If not used, will continue operations without rectifying, but the program might crash due to the difference in schema.")
 
-	writeParser.add_argument("database", type=os.path.realpath)
 	writeParser.set_defaults(func=write)
 
 	updateParser : argparse.ArgumentParser = modeGroup.add_parser("update", help="Update an existing database to follow the current standard schema.")
+	updateParser.add_argument("database", nargs="+", type=os.path.realpath)
 	updateParser.add_argument("--refDir")
 	updateParser.add_argument("--noCopy", action="store_true")
-	updateParser.add_argument("database", nargs="+", type=os.path.realpath)
 	updateParser.set_defaults(func=update)
 	
 	downloadParser : argparse.ArgumentParser = modeGroup.add_parser("download", help="Download a database from one of the internally defined sources.")
-	downloadParser.add_argument("--outDir", default=os.path.realpath("."))
 	downloadParser.add_argument("database", nargs="+", type=os.path.basename)
+	downloadParser.add_argument("--outDir", default=os.path.realpath("."))
 	downloadParser.set_defaults(func=download)
 
 	testParser : argparse.ArgumentParser = modeGroup.add_parser("test", help="Test out the features of MetaCanSNPerDatabases to see if your environment is suitable for using it.")
+	testParser.add_argument("database", nargs="+", type=os.path.realpath)
 	testParser.add_argument("--refDir")
 	testParser.add_argument("--noCopy", action="store_true")
 	testParser.add_argument("--outDir", default=os.path.realpath("."))
-	testParser.add_argument("database", nargs="+", type=os.path.realpath)
 	testParser.set_defaults(func=test)
 
 	parser.add_argument("--version", action="store_true")
