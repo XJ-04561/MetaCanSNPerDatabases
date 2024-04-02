@@ -249,15 +249,17 @@ def generateQueryString(select : tuple[ColumnFlag], orderBy : tuple[ColumnFlag]|
 			raise ValueError(f"To select all columns of a table, the table must be specified.")
 		source = table
 	else:
+		candidates = []
 		for table in Columns.LOOKUP:
 			if all(col in Columns.LOOKUP[table] for col in select):
-				selection = ", ".join([Columns.LOOKUP[table][col] for col in select])
-				source = table
+				candidates.append(", ".join([Columns.LOOKUP[table][col] for col in select]), table)
+		if len(candidates) == 0:
+			raise ValueError(f"No table for all of these selections: ({', '.join(map(Columns.NAMES_STRING, select))})")
+		for slct, table in candidates:
+			if all(col in Columns.LOOKUP[table] for col,val in where):
 				break
-		try:
-			selection
-		except:
-			raise ValueError(f"No tables satisfy 'SELECT ({', '.join(map(Columns.NAMES_STRING.__getitem__, select))})'")
+		selection = slct
+		source = table
 	
 	# Create "WHERE"-statements that are meant to show how the tables are connected, like: table1.colA = table2.colB
 	conditions = []
