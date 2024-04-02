@@ -34,7 +34,7 @@ class Table:
 			queryString = [f"{name} {' '.join(colType)}" for name, colType in zip(self._columns, self._types)]
 			queryString += self._appendRows
 
-			self._conn.execute(f"CREATE TABLE IF NOT EXISTS {self._tableName} (\n\t\t{',\n\t\t'.join(queryString)}\n);")
+			self._conn.execute(f"CREATE TABLE IF NOT EXISTS {self._tableName} (\n\t\t" + ",\n\t\t".join(queryString) + "\n);")
 			return True
 		except:
 			return False
