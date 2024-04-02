@@ -87,7 +87,7 @@ def update(args):
 	
 
 def download(args):
-	for databaseName in args.database:
+	for databaseName in map(os.path.basename, args.database):
 		try:
 			if downloadDatabase(databaseName, os.path.join(args.outDir, databaseName)) is None:
 				raise DownloadFailed(f"Failed to download {databaseName} to {os.path.join(args.outDir, databaseName)}.")
