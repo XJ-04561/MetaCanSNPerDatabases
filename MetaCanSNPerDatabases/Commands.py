@@ -8,6 +8,7 @@ class MissingArgument(Exception): pass
 
 def read(databasePath : str=None, TreeTable : bool=False, SNPTable : bool=False, ChromosomesTable : bool=False, ReferenceTable : bool=False, **kwargs):
 
+	LOGGER.debug(f"{databasePath=}")
 	database : DatabaseReader = openDatabase(databasePath, "r")
 	
 	code = database.checkDatabase()
@@ -29,6 +30,7 @@ def read(databasePath : str=None, TreeTable : bool=False, SNPTable : bool=False,
 
 def write(databasePath : str=None, rectify : bool=False, SNPFile : str=None, treeFile : str=None, referenceFile : str=None, **kwargs):
 
+	LOGGER.debug(f"{databasePath=}")
 	database : DatabaseWriter = openDatabase(databasePath, "w")
 
 	code = database.checkDatabase()
@@ -60,6 +62,7 @@ def write(databasePath : str=None, rectify : bool=False, SNPFile : str=None, tre
 
 def update(databasePaths : list[str]=None, refDir : str=".", noCopy=False, **kwargs):
 
+	LOGGER.debug(f"{databasePaths=}")
 	import os
 	for databaseName in databasePaths:
 		try:
@@ -83,6 +86,8 @@ def update(databasePaths : list[str]=None, refDir : str=".", noCopy=False, **kwa
 			print(f"Failed in updating {databaseName!r} due to:\n{type(e).__name__}: {e}")
 
 def download(databaseNames : list[str]=[], outDir : str=".", **kwargs):
+
+	LOGGER.debug(f"{databaseNames=}")
 	for databaseName in databaseNames:
 		try:
 			if downloadDatabase(databaseName, os.path.join(outDir, databaseName)) is None:
@@ -94,6 +99,7 @@ def download(databaseNames : list[str]=[], outDir : str=".", **kwargs):
 
 def test(**kwargs):
 
+	LOGGER.debug(f"{kwargs.database=}")
 	print("Testing Download:")
 	download(kwargs)
 
@@ -147,9 +153,9 @@ def main():
 	writeParser.add_argument("databasePath", type=os.path.realpath)
 	filesGroup = writeParser.add_argument_group(title="Input Files")
 	
-	filesGroup.add_argument("--SNPFile", help="If used, make sure that the related references and tree nodes are present in the database or in the other flagged files.")
-	filesGroup.add_argument("--referenceFile")
-	filesGroup.add_argument("--treeFile")
+	filesGroup.add_argument("--SNPFile",		type=os.path.realpath,	help="If used, make sure that the related references and tree nodes are present in the database or in the other flagged files.")
+	filesGroup.add_argument("--referenceFile",	type=os.path.realpath)
+	filesGroup.add_argument("--treeFile",		type=os.path.realpath)
 
 	writeParser.add_argument("--refDir", help="Directory where the reference genomes are located. This is only required if your --referenceFile doesn't have a `chromosomes` column.")
 
@@ -159,7 +165,7 @@ def main():
 	writeParser.set_defaults(func=write)
 
 	updateParser : argparse.ArgumentParser = modeGroup.add_parser("update", help="Update an existing database to follow the current standard schema.")
-	updateParser.add_argument("databasePath", nargs="+", type=os.path.realpath)
+	updateParser.add_argument("databasePaths", nargs="+", type=os.path.realpath)
 	updateParser.add_argument("--refDir")
 	updateParser.add_argument("--noCopy", action="store_true")
 	updateParser.set_defaults(func=update)
@@ -200,8 +206,6 @@ def main():
 		LOGGER.setLevel(logging.INFO)
 	if args.noLog:
 		LOGGER.disabled = True
-
-	LOGGER.debug(f"{args.database=}")
 
 	try:
 		args.func(**dict(args._get_kwargs()))
