@@ -136,7 +136,7 @@ def main():
 	modeGroup : argparse._SubParsersAction = parser.add_subparsers(title="Mode", dest="mode", description="Mode with which to open the database.", metavar="MODES")
 
 	readParser : argparse.ArgumentParser = modeGroup.add_parser("read", help="Print out data from tables in database.")
-	readParser.add_argument("--database",	type=os.path.realpath)
+	readParser.add_argument("databasePath",	type=os.path.realpath)
 	readParser.add_argument("--TreeTable",			action="store_true")
 	readParser.add_argument("--SNPTable",			action="store_true")
 	readParser.add_argument("--ChromosomesTable",	action="store_true")
@@ -144,7 +144,7 @@ def main():
 	readParser.set_defaults(func=read)
 
 	writeParser : argparse.ArgumentParser = modeGroup.add_parser("write",	help="Create a database with or without data. Data for database is given through the appropriate File flags.")
-	writeParser.add_argument("database", type=os.path.realpath)
+	writeParser.add_argument("databasePath", type=os.path.realpath)
 	filesGroup = writeParser.add_argument_group(title="Input Files")
 	
 	filesGroup.add_argument("--SNPFile", help="If used, make sure that the related references and tree nodes are present in the database or in the other flagged files.")
@@ -159,13 +159,13 @@ def main():
 	writeParser.set_defaults(func=write)
 
 	updateParser : argparse.ArgumentParser = modeGroup.add_parser("update", help="Update an existing database to follow the current standard schema.")
-	updateParser.add_argument("database", nargs="+", type=os.path.realpath)
+	updateParser.add_argument("databasePath", nargs="+", type=os.path.realpath)
 	updateParser.add_argument("--refDir")
 	updateParser.add_argument("--noCopy", action="store_true")
 	updateParser.set_defaults(func=update)
 	
 	downloadParser : argparse.ArgumentParser = modeGroup.add_parser("download", help="Download a database from one of the internally defined sources.")
-	downloadParser.add_argument("database", nargs="+", type=os.path.basename)
+	downloadParser.add_argument("databaseNames", nargs="+", type=os.path.basename)
 	downloadParser.add_argument("--outDir", default=os.path.realpath("."))
 	downloadParser.set_defaults(func=download)
 
