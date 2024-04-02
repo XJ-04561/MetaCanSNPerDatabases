@@ -222,9 +222,9 @@ def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[Co
 	formatDict = {}
 	for i, (name, yn) in enumerate(filter(lambda x:x[1], boolWhere)):
 		params.pop(i)
-		for val in where[name]:
+		for val in where[Columns.NAMES_STRING[name]]:
 			params.insert(i, val)
-		formatDict[Columns.LOOKUP[self._tableName][Columns.NAMES_DICT[name]]] = where[name]
+		formatDict[Columns.LOOKUP[self._tableName][name]] = ", ".join(["?"]*len(where[Columns.NAMES_STRING[name]]))
 	
 	LOGGER.debug(out := (query.format(**formatDict), tuple(params)))
 	return out
@@ -249,17 +249,21 @@ def generateQueryString(select : tuple[ColumnFlag], orderBy : tuple[ColumnFlag]|
 			raise ValueError(f"To select all columns of a table, the table must be specified.")
 		source = table
 	else:
-		candidates = []
-		for table in Columns.LOOKUP:
-			if all(col in Columns.LOOKUP[table] for col in select):
-				candidates.append((", ".join([Columns.LOOKUP[table][col] for col in select]), table))
-		if len(candidates) == 0:
-			raise ValueError(f"No table for all of these selections: ({', '.join(map(Columns.NAMES_STRING, select))})")
-		for slct, table in candidates:
-			if all(col in Columns.LOOKUP[table] for col,val in where):
-				break
-		selection = slct
-		source = table
+		if table is None:
+			candidates = []
+			for table in Columns.LOOKUP:
+				if all(col in Columns.LOOKUP[table] for col in select):
+					candidates.append((", ".join([Columns.LOOKUP[table][col] for col in select]), table))
+			if len(candidates) == 0:
+				raise ValueError(f"No table for all of these selections: ({', '.join(map(Columns.NAMES_STRING, select))})")
+			for slct, table in candidates:
+				if all(col in Columns.LOOKUP[table] for col,val in where):
+					break
+			selection = slct
+			source = table
+		else:
+			selection = ", ".join([Columns.LOOKUP[table][col] for col in select])
+			source = table
 	
 	# Create "WHERE"-statements that are meant to show how the tables are connected, like: table1.colA = table2.colB
 	conditions = []
@@ -292,12 +296,6 @@ def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|N
 		orderBy = (orderBy,)
 
 	boolWhere = tuple(sorted(map(lambda kv:(kv[0],isinstance(kv[1], Iterable)), filter(lambda kv:kv[1] is not None, where.items()))))
-
-	if table is None:
-		for t in Columns.LOOKUP:
-			if all(col in Columns.LOOKUP[t] for col in select):
-				table = t
-				break
 	
 	query, params = generateQueryString(select, orderBy=orderBy, table=table, where=boolWhere)
 	params = list(params)
@@ -305,9 +303,9 @@ def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|N
 	
 	for i, (name, yn) in enumerate(filter(lambda x:x[1], boolWhere)):
 		params.pop(i)
-		for val in where[name]:
+		for val in where[Columns.NAMES_STRING[name]]:
 			params.insert(i, val)
-		formatDict[Columns.LOOKUP[table][Columns.NAMES_DICT[name]]] = where[name]
+		formatDict[Columns.LOOKUP[table][name]] = ", ".join(["?"]*len(where[Columns.NAMES_STRING[name]]))
 	
 	LOGGER.debug(out := (query.format(**formatDict), tuple(params)))
 	return out
