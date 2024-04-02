@@ -215,7 +215,7 @@ def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[Co
 	if isinstance(orderBy, ColumnFlag):
 		orderBy = (orderBy,)
 
-	boolWhere = tuple(sorted(map(lambda kv:(kv[0],isinstance(kv[1], Iterable)), filter(lambda kv:kv[1] is not None, where.items()))))
+	boolWhere = tuple(sorted(map(lambda kv:(kv[0],isinstance(kv[1], list|tuple|set)), filter(lambda kv:kv[1] is not None, where.items()))))
 
 	query, params = generateTableQueryString(self, select, orderBy=orderBy, where=boolWhere)
 	params = list(params)
@@ -274,12 +274,12 @@ def generateQueryString(select : tuple[ColumnFlag], orderBy : tuple[ColumnFlag]|
 			if val is False:
 				conditions.append(f"{Columns.LOOKUP[source][Columns.NAMES_DICT[name]]} = ?")
 			elif val is True:
-				conditions.append(f"{Columns.LOOKUP[source][Columns.NAMES_DICT[name]]} = " + "({" + f"{name}" + "})")
+				conditions.append(f"{Columns.LOOKUP[source][Columns.NAMES_DICT[name]]} IN " + "({" + f"{name}" + "})")
 		else:
 			otherTable = Columns.RELATIONSHIPS[source][Columns.NAMES_DICT[name]]
 			commonColumn = Columns.RELATIONS[source, otherTable]
 			subQuery, subParams = generateQueryString((commonColumn,), where=((name,val),))
-			conditions.append(f" IN ({subQuery.rstrip(';')})")
+			conditions.append(f"{Columns.LOOKUP[source][commonColumn]} IN ({subQuery.rstrip(';')})")
 		params.append(val)
 	conditions = " AND ".join(conditions)
 
@@ -296,7 +296,7 @@ def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|N
 	if isinstance(orderBy, ColumnFlag):
 		orderBy = (orderBy,)
 
-	boolWhere = tuple(sorted(map(lambda kv:(kv[0],isinstance(kv[1], Iterable)), filter(lambda kv:kv[1] is not None, where.items()))))
+	boolWhere = tuple(sorted(map(lambda kv:(kv[0],isinstance(kv[1], list|tuple|set)), filter(lambda kv:kv[1] is not None, where.items()))))
 	
 	query, params = generateQueryString(select, orderBy=orderBy, table=table, where=boolWhere)
 	params = list(params)
