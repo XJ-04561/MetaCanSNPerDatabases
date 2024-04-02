@@ -144,7 +144,7 @@ def main():
 
 	readParser : argparse.ArgumentParser = modeGroup.add_parser("read", help="Print out data from tables in database.")
 	readParser.add_argument("database", type=os.path.realpath)
-	readParser.add_argument("--table",		nargs="+",		default=None)
+	readParser.add_argument("--table",		nargs="+",		default=[],		choices=["TreeTable", "SNPTable", "ChromosomesTable", "ReferenceTable"])
 	readParser.set_defaults(func=read)
 
 	writeParser : argparse.ArgumentParser = modeGroup.add_parser("write",	help="Create a database with or without data. Data for database is given through the appropriate File flags.")
