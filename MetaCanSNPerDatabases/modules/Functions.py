@@ -271,7 +271,7 @@ def generateQueryString(select : tuple[ColumnFlag], orderBy : tuple[ColumnFlag]|
 		else:
 			otherTable = Columns.RELATIONSHIPS[source][Columns.NAMES_DICT[name]]
 			commonColumn = Columns.RELATIONS[source, otherTable]
-			subQuery, subParams = generateQueryString(commonColumn, ((Columns.NAMES_DICT[name],val),))
+			subQuery, subParams = generateQueryString((commonColumn,), ((Columns.NAMES_DICT[name],val),))
 			conditions.append(f" IN ({subQuery.rstrip(';')})")
 		params.append(val)
 	conditions = " AND ".join(conditions)
