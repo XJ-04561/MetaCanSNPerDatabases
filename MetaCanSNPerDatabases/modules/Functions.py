@@ -33,15 +33,15 @@ def formatType(tps):
 		
 		match next(filter(d.get, ["integer", "varchar", "date", "text", "unknown"])):
 			case "integer":
-				yield "{:>9d}"
+				yield "{:>7d}"
 			case "varchar":
 				yield "{:>" + str(int(d.get("number"))+2) + "s}"
 			case "date":
 				yield "{:>12s}"
 			case "text":
-				yield "{:>20s}"
+				yield "{:>12s}"
 			case "unknown":
-				yield "{:>20}"
+				yield "{:>12}"
 
 def loadFromReferenceFile(database : DatabaseWriter, file : TextIO, refDir : str="."):
 	file.seek(0)
