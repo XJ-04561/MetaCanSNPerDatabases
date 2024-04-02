@@ -303,9 +303,9 @@ def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|N
 	
 	for i, (name, yn) in enumerate(filter(lambda x:x[1], boolWhere)):
 		params.pop(i)
-		for val in where[Columns.NAMES_STRING[name]]:
+		for val in where[name]:
 			params.insert(i, val)
-		formatDict[Columns.LOOKUP[table][name]] = ", ".join(["?"]*len(where[Columns.NAMES_STRING[name]]))
+		formatDict[Columns.LOOKUP[table][Columns.NAMES_DICT[name]]] = ", ".join(["?"]*len(where[name]))
 	
 	LOGGER.debug(out := (query.format(**formatDict), tuple(params)))
 	return out
