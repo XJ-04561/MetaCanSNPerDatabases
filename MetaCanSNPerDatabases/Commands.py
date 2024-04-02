@@ -6,34 +6,40 @@ import argparse, sys
 
 class MissingArgument(Exception): pass
 
-def read(args):
+def read(databasePath : str=None, table : str=None, tables : list[str]=None):
 
-	database = openDatabase(args.database, "r")
+	database = openDatabase(databasePath, "r")
 	
 	code = database.checkDatabase()
 
 	database.validateDatabase(code)
 
 	print(database)
-	if args.table is None:
+	if tables is None and table is None:
 		print(database.TreeTable)
 		print(database.SNPTable)
 		print(database.ChromosomesTable)
 		print(database.ReferenceTable)
+	elif tables is None:
+		if table not in database.Tables:
+			raise NameError(f"The following table is not a valid table name: {table}\nCurrent existing table names are: {sorted(database.Tables.keys())}")
+		rowFormat = " | ".join(formatType([tp for tp, *_ in database.Tables[table]._types]))
+		for row in database.Tables[table]:
+			rowFormat.format(*row)
 	else:
-		if len(unidentifieds := [table for table in args.table if table not in database.Tables]) > 0:
+		if len(unidentifieds := [t for t in tables if t not in database.Tables]) > 0:
 			raise NameError(f"The following tables are not valid table names: {unidentifieds}\nCurrent existing table names are: {sorted(database.Tables.keys())}")
-		for table in args.table:
+		for table in tables:
 			rowFormat = " | ".join(formatType([tp for tp, *_ in database.Tables[table]._types]))
 			for row in database.Tables[table]:
 				rowFormat.format(*row)
 
-def write(args : argparse.Namespace):
+def write(databasePath : str=None, rectify : bool=False, SNPFile : str=None, treeFile : str=None, referenceFile : str=None):
 
-	database = openDatabase(args.database, "w")
+	database : DatabaseWriter = openDatabase(databasePath, "w")
 
 	code = database.checkDatabase()
-	if args.rectify:
+	if rectify:
 		n = 0
 		while code != 0 or n < 10:
 			database.rectifyDatabase(code)
@@ -49,19 +55,20 @@ def write(args : argparse.Namespace):
 	
 	print(database)
 	
-	if args.SNPFile:
-		loadFromReferenceFile(database, args.referenceFile)
-		loadFromTreeFile(database, args.treeFile)
-		loadFromSNPFile(database, args.SNPFile)
+	if SNPFile is not None:
+		loadFromReferenceFile(database, referenceFile)
+		loadFromTreeFile(database, treeFile)
+		loadFromSNPFile(database, SNPFile)
 	else:
 		LOGGER.warning("No files given to build database from. Created an empty database with the current MetaCanSNPer structure.")
 
 	database.commit()
+	database.close()
 
-def update(args):
+def update(databaseNames : list[str]=None, refDir : str=".", noCopy=False):
 
 	import os
-	for databaseName in args.database:
+	for databaseName in databaseNames:
 		try:
 			database = openDatabase(databaseName, "w")
 			LOGGER.debug(f"Database {databaseName} is of version v.{database.__version__}")
@@ -70,9 +77,7 @@ def update(args):
 
 			oldCwd = os.path.realpath(os.curdir)
 			
-			os.chdir(args.refDir)
-			database.rectifyDatabase(code, copy=not args.noCopy)
-			os.chdir(oldCwd)
+			database.rectifyDatabase(code, copy=not noCopy, refDir=refDir)
 
 			database.close()
 			print(f"Finished updating {databaseName!r}")
@@ -86,26 +91,26 @@ def update(args):
 					
 	
 
-def download(args):
-	for databaseName in map(os.path.basename, args.database):
+def download(databaseNames : list[str]=[], outDir : str="."):
+	for databaseName in map(os.path.basename, databaseNames):
 		try:
-			if downloadDatabase(databaseName, os.path.join(args.outDir, databaseName)) is None:
-				raise DownloadFailed(f"Failed to download {databaseName} to {os.path.join(args.outDir, databaseName)}.")
+			if downloadDatabase(databaseName, os.path.join(outDir, databaseName)) is None:
+				raise DownloadFailed(f"Failed to download {databaseName} to {os.path.join(outDir, databaseName)}.")
 			print(f"Finished downloading {databaseName!r}")
 		except Exception as e:
 			LOGGER.exception(e)
 			print(f"Failed in downloading {databaseName!r}")
 
-def test(args):
+def test(**kwargs):
 
 	print("Testing Download:")
-	download(args)
+	download(kwargs)
 
 	print("Testing Update:")
-	update(args)
+	update(kwargs)
 
 	print("Testing Read:")
-	for databaseName in args.database:
+	for databaseName in kwargs.database:
 		print(f"  {databaseName.replace(os.path.realpath('.'), '.').replace(os.path.expanduser('~'), '~')}")
 		LOGGER.debug(f"{databaseName.replace(os.path.realpath('.'), '.').replace(os.path.expanduser('~'), '~')}")
 
@@ -205,7 +210,7 @@ def main():
 	LOGGER.debug(f"{args.database=}")
 
 	try:
-		args.func(args)
+		args.func(**dict(args._get_kwargs()))
 	except Exception as e:
 		LOGGER.exception(e)
 		print(f"{type(e).__name__}:", e, file=sys.stderr)
