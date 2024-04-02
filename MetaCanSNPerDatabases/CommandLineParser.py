@@ -106,18 +106,18 @@ def test(args):
 
 	print("Testing Read:")
 	for databaseName in args.database:
-		print(f"\t{databaseName}")
-		LOGGER.debug(f"{databaseName}")
+		print(f"  {databaseName.replace(os.path.realpath('.'), '.').replace(os.path.expanduser('~'), '~')}")
+		LOGGER.debug(f"{databaseName.replace(os.path.realpath('.'), '.').replace(os.path.expanduser('~'), '~')}")
 
 		database = openDatabase(databaseName, "r")
 		LOGGER.debug(repr(database))
 
-		print(f"\t\tArbitrary `.get` from one table only.")
+		print(f"    Arbitrary `.get` from one table only.")
 		LOGGER.debug(f"Arbitrary `.get` from one table only.")
 		database.get(Columns.Position, Columns.Ancestral, Columns.Derived, ChromID=1)
 		LOGGER.debug("\n".join(database.get(Columns.Position, Columns.Ancestral, Columns.Derived, ChromID=1)))
 
-		print(f"\t\tGet one entry from a table.")
+		print(f"    Get one entry from a table.")
 		LOGGER.debug(f"Get one entry from a table.")
 		chromID, chromosome, genomeID = database.ChromosomesTable.first()
 		LOGGER.debug(f"{chromID=}, {chromosome=}, {genomeID=}")
@@ -125,11 +125,11 @@ def test(args):
 		genomeID, genome, *rest = database.ChromosomesTable.first()
 		LOGGER.debug(f"{genomeID=}, {genome=}, {rest=}")
 
-		print(f"\t\tArbitrary `.get` from one table referencing adjacent table.")
+		print(f"    Arbitrary `.get` from one table referencing adjacent table.")
 		LOGGER.debug(f"Arbitrary `.get` from one table referencing adjacent table.")
 		LOGGER.debug("\n".join(database.get(Columns.Position, Columns.Ancestral, Columns.Derived, Chromosome=chromosome)))
 
-		print(f"\t\tArbitrary `.get` from one table referencing across more than one chained table.")
+		print(f"    Arbitrary `.get` from one table referencing across more than one chained table.")
 		LOGGER.debug(f"Arbitrary `.get` from one table referencing across more than one chained table.")
 		LOGGER.debug("\n".join(database.get(Columns.Position, Columns.Ancestral, Columns.Derived, Genome=genome)))
 
