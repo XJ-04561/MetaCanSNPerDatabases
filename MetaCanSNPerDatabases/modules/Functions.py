@@ -221,7 +221,7 @@ def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[Co
 	params = list(params)
 	formatDict = {}
 	keys = formatPattern.findall(query)
-	for (i, (name, yn), key) in zip(enumerate(filter(lambda x:x[1], boolWhere)), keys):
+	for (i, (name, yn)), key in zip(enumerate(filter(lambda x:x[1], boolWhere)), keys):
 		params.pop(i)
 		for val in where[name]:
 			params.insert(i, val)
@@ -302,7 +302,7 @@ def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|N
 	params = list(params)
 	formatDict = {}
 	keys = formatPattern.findall(query)
-	for (i, (name, yn), key) in zip(enumerate(filter(lambda x:x[1], boolWhere)), keys):
+	for (i, (name, yn)), key in zip(enumerate(filter(lambda x:x[1], boolWhere)), keys):
 		params.pop(i)
 		for val in where[name]:
 			params.insert(i, val)
