@@ -28,6 +28,10 @@ class Table:
 	
 	def __repr__(self):
 		return object.__repr__(self)[:-1] + f" rows={len(self)} columns={self._columns}>"
+	
+	def __iter__(self):
+		for row in self.get(Columns.ALL):
+			yield row
 
 	def create(self) -> bool:
 		try:

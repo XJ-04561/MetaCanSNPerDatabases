@@ -6,33 +6,26 @@ import argparse, sys
 
 class MissingArgument(Exception): pass
 
-def read(databasePath : str=None, table : str=None, tables : list[str]=None, **kwargs):
+def read(databasePath : str=None, TreeTable : bool=False, SNPTable : bool=False, ChromosomesTable : bool=False, ReferenceTable : bool=False, **kwargs):
 
-	database = openDatabase(databasePath, "r")
+	database : DatabaseReader = openDatabase(databasePath, "r")
 	
 	code = database.checkDatabase()
 
 	database.validateDatabase(code)
-
+	
 	print(database)
-	if tables is None and table is None:
+	if not any([TreeTable, SNPTable, ChromosomesTable, ReferenceTable]):
 		print(database.TreeTable)
 		print(database.SNPTable)
 		print(database.ChromosomesTable)
 		print(database.ReferenceTable)
-	elif tables is None:
-		if table not in database.Tables:
-			raise NameError(f"The following table is not a valid table name: {table}\nCurrent existing table names are: {sorted(database.Tables.keys())}")
-		rowFormat = " | ".join(formatType([tp for tp, *_ in database.Tables[table]._types]))
-		for row in database.Tables[table]:
-			rowFormat.format(*row)
 	else:
-		if len(unidentifieds := [t for t in tables if t not in database.Tables]) > 0:
-			raise NameError(f"The following tables are not valid table names: {unidentifieds}\nCurrent existing table names are: {sorted(database.Tables.keys())}")
-		for table in tables:
-			rowFormat = " | ".join(formatType([tp for tp, *_ in database.Tables[table]._types]))
-			for row in database.Tables[table]:
-				rowFormat.format(*row)
+		for table, flag in {"TreeTable":TreeTable, "SNPTable":SNPTable, "ChromosomesTable":ChromosomesTable, "ReferenceTable":ReferenceTable}.items():
+			if flag:
+				rowFormat = " | ".join(formatType([tp for tp, *_ in database.Tables[table]._types]))
+				for row in database.Tables[table]:
+					rowFormat.format(*row)
 
 def write(databasePath : str=None, rectify : bool=False, SNPFile : str=None, treeFile : str=None, referenceFile : str=None, **kwargs):
 
@@ -144,7 +137,10 @@ def main():
 
 	readParser : argparse.ArgumentParser = modeGroup.add_parser("read", help="Print out data from tables in database.")
 	readParser.add_argument("--database",	type=os.path.realpath)
-	readParser.add_argument("--table",		nargs="+",		default=[],		choices=["TreeTable", "SNPTable", "ChromosomesTable", "ReferenceTable"])
+	readParser.add_argument("--TreeTable",			action="store_true")
+	readParser.add_argument("--SNPTable",			action="store_true")
+	readParser.add_argument("--ChromosomesTable",	action="store_true")
+	readParser.add_argument("--ReferenceTable",		action="store_true")
 	readParser.set_defaults(func=read)
 
 	writeParser : argparse.ArgumentParser = modeGroup.add_parser("write",	help="Create a database with or without data. Data for database is given through the appropriate File flags.")
