@@ -24,9 +24,10 @@ def read(databasePath : str=None, TreeTable : bool=False, SNPTable : bool=False,
 	else:
 		for table, flag in {"TreeTable":TreeTable, "SNPTable":SNPTable, "ChromosomesTable":ChromosomesTable, "ReferenceTable":ReferenceTable}.items():
 			if flag:
+				print(f"{table}:")
 				rowFormat = " | ".join(formatType([tp for tp, *_ in database.Tables[table]._types]))
 				for row in database.Tables[table]:
-					rowFormat.format(*row)
+					print(rowFormat.format(*row))
 
 def write(databasePath : str=None, rectify : bool=False, SNPFile : str=None, treeFile : str=None, referenceFile : str=None, **kwargs):
 
