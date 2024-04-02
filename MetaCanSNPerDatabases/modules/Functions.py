@@ -274,6 +274,7 @@ def generateQueryString(select : tuple[ColumnFlag], orderBy : tuple[ColumnFlag]|
 			subQuery, subParams = generateQueryString(commonColumn, ((Columns.NAMES_STRING[name],val),))
 			conditions.append(f" IN ({subQuery.rstrip(';')})")
 		params.append(val)
+	conditions = " AND ".join(conditions)
 
 	if orderBy is not None and len(orderBy) > 0:
 		keyColumn = ", ".join([f"{Columns.LOOKUP[source][col]} {'DESC' if col > 0 else 'ASC'}" for col in orderBy])
