@@ -154,12 +154,12 @@ def updateFromLegacy(database : DatabaseWriter, refDir : Path|PathGroup=None):
 
 class DownloadFailed(Exception): pass
 
-def downloadDatabase(databaseName : str, dst : str) -> str|None:
+def downloadDatabase(databaseName : str, dst : str, reportHook=lambda block, blockSize, totalSize : None) -> str|None:
 	from urllib.request import urlretrieve
 	
 	for source in SOURCES:
 		try:
-			(filename, msg) = urlretrieve(source.format(databaseName=databaseName), filename=dst) # Throws error if 404
+			(filename, msg) = urlretrieve(source.format(databaseName=databaseName), filename=dst, reporthook=reportHook) # Throws error if 404
 			return filename
 		except Exception as e:
 			LOGGER.info(f"Database {databaseName!r} not found/accessible on {source!r}.")
