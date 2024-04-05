@@ -8,8 +8,7 @@ from MetaCanSNPerDatabases.modules.Databases import DatabaseWriter
 
 import inspect
 
-class MissingReferenceFile(Exception): pass
-class UnableToDefineChromosomes(Exception): pass
+
 
 def interpretSQLtype(flag, val):
 	match Columns.TYPE_LOOKUP[flag][0]:
@@ -155,8 +154,6 @@ def updateFromLegacy(database : DatabaseWriter, refDir : Path|PathGroup=None):
 
 	database._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION};")
 	database._connection.execute("COMMIT;")
-
-class DownloadFailed(Exception): pass
 
 def downloadDatabase(databaseName : str, dst : str, reportHook=lambda block, blockSize, totalSize : None) -> str|None:
 	from urllib.request import urlretrieve

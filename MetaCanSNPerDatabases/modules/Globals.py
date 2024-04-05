@@ -16,6 +16,15 @@ Mode        = Literal["r", "w"]
 ReadMode    = Literal["r"]
 WriteMode   = Literal["w"]
 
+class CanSNPDatabaseError(Exception): pass
+
+class DatabaseNotConnected(CanSNPDatabaseError): pass
+class MissingArgument(CanSNPDatabaseError): pass
+class MissingReferenceFile(CanSNPDatabaseError): pass
+class UnableToDefineChromosomes(CanSNPDatabaseError): pass
+class DownloadFailed(CanSNPDatabaseError): pass
+class TableDefinitionMissmatch(CanSNPDatabaseError): pass
+
 formatPattern = re.compile(r"[{](.*?)[}]")
 
 LOGGER = logging.Logger("MetaCanSNPerDatabases", level=logging.WARNING)
