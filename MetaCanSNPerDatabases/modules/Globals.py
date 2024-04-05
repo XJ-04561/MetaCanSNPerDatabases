@@ -8,6 +8,8 @@ from PseudoPathy import Path, DirectoryPath, FilePath, PathGroup, PathLibrary, P
 from PseudoPathy.Library import CommonGroups
 from PseudoPathy.PathShortHands import *
 
+from MetaCanSNPerDatabases.Exceptions import *
+
 class Mode: pass
 class ReadMode: pass
 class WriteMode: pass
@@ -15,15 +17,6 @@ class WriteMode: pass
 Mode        = Literal["r", "w"]
 ReadMode    = Literal["r"]
 WriteMode   = Literal["w"]
-
-class CanSNPDatabaseError(Exception): pass
-
-class DatabaseNotConnected(CanSNPDatabaseError): pass
-class MissingArgument(CanSNPDatabaseError): pass
-class MissingReferenceFile(CanSNPDatabaseError): pass
-class UnableToDefineChromosomes(CanSNPDatabaseError): pass
-class DownloadFailed(CanSNPDatabaseError): pass
-class TableDefinitionMissmatch(CanSNPDatabaseError): pass
 
 formatPattern = re.compile(r"[{](.*?)[}]")
 

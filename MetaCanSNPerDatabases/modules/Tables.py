@@ -7,7 +7,6 @@ from MetaCanSNPerDatabases.modules._Constants import *
 
 from MetaCanSNPerDatabases.modules.Functions import generateTableQuery
 
-class TableDefinitionMissmatch(Exception): pass
 
 
 class Table:

@@ -4,7 +4,7 @@ from MetaCanSNPerDatabases.modules.Functions import formatType, loadFromReferenc
 from MetaCanSNPerDatabases.modules.Globals import *
 import argparse, sys
 
-class MissingArgument(Exception): pass
+
 
 def read(databasePath : str=None, TreeTable : bool=False, SNPTable : bool=False, ChromosomesTable : bool=False, ReferenceTable : bool=False, **kwargs):
 
