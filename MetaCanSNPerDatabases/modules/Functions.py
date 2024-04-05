@@ -9,6 +9,7 @@ from MetaCanSNPerDatabases.modules.Databases import DatabaseWriter
 import inspect
 
 class MissingReferenceFile(Exception): pass
+class UnableToDefineChromosomes(Exception): pass
 
 def interpretSQLtype(flag, val):
 	match Columns.TYPE_LOOKUP[flag][0]:
@@ -86,6 +87,7 @@ def updateFromLegacy(database : DatabaseWriter, refDir : Path|PathGroup=None):
 
 	import textwrap, gzip
 	from urllib.request import urlretrieve
+	import ncbi.datasets as datasets # type: ignore
 
 	if refDir is None:
 		refDir = CommonGroups.shared / f"{SOFTWARE_NAME}-Data" / pName(database.filename)
@@ -103,20 +105,22 @@ def updateFromLegacy(database : DatabaseWriter, refDir : Path|PathGroup=None):
 	LOGGER.info("Updating 'Chromosomes'-table")
 	database._connection.execute("BEGIN TRANSACTION;")
 	database.ChromosomesTable.create()
+	GenomeAPI = datasets.GenomeApi()
 	for i, genbankID, assembly in database.ReferenceTable.get(Columns.GenomeID, Columns.GenbankID, Columns.Assembly):
 		try:
-			database._connection.execute(f"INSERT INTO {TABLE_NAME_CHROMOSOMES} VALUES (?, ?, ?);", [i, open(refDir.find(f"{assembly}.fna"), "r").readline()[1:].split()[0], i])
-		except FileNotFoundError:
-			LOGGER.warning(f"Couldn't find genome with assembly name {assembly!r} in {os.path.realpath(os.curdir)!r}.")
-			print(f"Couldn't find assembly {assembly!r}, downloading from ncbi... ", end="", flush=True)
-			n1,n2,n3 = textwrap.wrap(genbankID.split("_")[-1].split(".")[0],3)  ## Get the three number parts
-			
-			link = NCBI_FTP_LINK.format(source=SOURCED["genbank"], n1=n1, n2=n2, n3=n3, genome_id=genbankID, assembly=assembly)
-			urlretrieve(link, f"{assembly}.fna.gz")
-			with open(f"{assembly}.fna", "wb") as outFile:
-				outFile.write(gzip.decompress(open(f"{assembly}.fna.gz", "rb").read()))
-			print("Done!", flush=True)
-			database._connection.execute(f"INSERT INTO {TABLE_NAME_CHROMOSOMES} VALUES (?, ?, ?);", [i, open(refDir.find(f"{assembly}.fna"), "r").readline()[1:].split()[0], i])
+			chromosome = GenomeAPI.assembly_descriptors_by_accessions([genbankID])["assemblies"][0]["assembly"]["biosample"]["sample_ids"][0]["value"]
+			assert len(chromosome) != 0, "No genbank entry found"
+			database._connection.execute(f"INSERT INTO {TABLE_NAME_CHROMOSOMES} VALUES (?, ?, ?);", [i, chromosome, i])
+		except Exception as e:
+			LOGGER.exception(e)
+			try:
+				chromosome = open(GenomeAPI.refDir.find(f"{assembly}.fna"), "r").readline()[1:].split()[0]
+			except FileNotFoundError:
+				LOGGER.warning(f"Couldn't find genome with {genbankID=} either online or in {refDir!r}.")
+				raise UnableToDefineChromosomes(f"Could not find naming for chromosomes in entry with {i=}, {genbankID=}, and {assembly=}.")
+		finally:
+			database._connection.execute(f"INSERT INTO {TABLE_NAME_CHROMOSOMES} VALUES (?, ?, ?);", [i, chromosome, i])
+				
 	database._connection.execute("COMMIT;")
 	
 	# SNPs
