@@ -1,14 +1,14 @@
 
 from sqlite3 import Connection
-from MetaCanSNPerDatabases.modules.Globals import *
-import MetaCanSNPerDatabases.modules.Globals as Globals
-import MetaCanSNPerDatabases.modules.Columns as Columns
-from MetaCanSNPerDatabases.modules.Columns import ColumnFlag
-from MetaCanSNPerDatabases.modules._Constants import *
-from MetaCanSNPerDatabases.modules.Tables import Table
+from MetaCanSNPerDatabases.Globals import *
+import MetaCanSNPerDatabases.Globals as Globals
+import MetaCanSNPerDatabases.core.Columns as Columns
+from MetaCanSNPerDatabases.core.Columns import ColumnFlag
+from MetaCanSNPerDatabases.core._Constants import *
+from MetaCanSNPerDatabases.core.Tables import Table
 
 
-from MetaCanSNPerDatabases.modules.Tree import Branch
+from MetaCanSNPerDatabases.core.Tree import Branch
 
 class IsLegacyCanSNPer2(sqlite3.Error): pass
 class OutdatedCanSNPerDatabase(sqlite3.Error): pass
@@ -20,7 +20,7 @@ class Database:
 	filename : str
 
 	def __init__(self, database : sqlite3.Connection):
-		from MetaCanSNPerDatabases.modules.Tables import SNPTable, ReferenceTable, TreeTable, ChromosomesTable
+		from MetaCanSNPerDatabases.core.Tables import SNPTable, ReferenceTable, TreeTable, ChromosomesTable
 		self.filename = os.path.realpath(database.execute("PRAGMA database_list;").fetchone()[2])
 		self._connection = database
 
@@ -50,7 +50,7 @@ class Database:
 			pass
 	
 	def __repr__(self):
-		return object.__repr__(self)[:-1] + f" version={self.__version__} schemaHash={self.schemaHash!r} tables={[(name, len(self.Tables[name])) for name in self.Tables]}>"
+		return object.__repr__(self)[:-1] + f" version={self.__version__} tablesHash={self.tablesHash!r} tables={[(name, len(self.Tables[name])) for name in self.Tables]}>"
 	
 	@property
 	def Tables(self) -> dict[str,Table]:
@@ -62,12 +62,15 @@ class Database:
 			return -2
 		elif self.__version__ == LEGACY_VERSION:
 			return -3
-		elif self.schemaHash != CURRENT_HASH:
-			# Table does not have the right schema version
-			return -4
 		elif self.__version__ != CURRENT_VERSION:
 			# Table does not have the right `user_version` set.
+			return -4
+		elif self.tablesHash != CURRENT_TABLES_HASH:
+			# Table does not have the right schema version
 			return -5
+		elif self.indexesHash != CURRENT_INDEXES_HASH:
+			# Table does not have the right indexes set
+			return -6
 		else:
 			LOGGER.info(f"Database version is up to date! (v. {self.__version__})")
 			return 0
@@ -82,32 +85,35 @@ class Database:
 			case -3:
 				LOGGER.exception(IsLegacyCanSNPer2("Database is a legacy CanSNPer database."))
 				if throwError: raise IsLegacyCanSNPer2("Database is a legacy CanSNPer database. If opened in 'update' mode it can be converted.")
-			case -4: # Transfer data from old tables into new tables
-				LOGGER.exception(OutdatedCanSNPerDatabase(f"Database schema does not match the most up to date schema. (Database: {self.schemaHash!r}, Latest MetaCanSNPerDatabases: {CURRENT_HASH})"))
-				if throwError: raise OutdatedCanSNPerDatabase(f"Database schema does not match the most up to date schema. (Database: {self.schemaHash!r}, Latest MetaCanSNPerDatabases: {CURRENT_HASH})")
-			case -5: # Version number missmatch
-				LOGGER.exception(sqlite3.DatabaseError(f"Table does not have the right `user_version` set. (Determined version is v.{DATABASE_VERSIONS[self.schemaHash]} but user_version is v.{self.__version__})"))
-				if throwError: raise sqlite3.DatabaseError(f"Table does not have the right `user_version` set. (Determined version is v.{DATABASE_VERSIONS[self.schemaHash]} but user_version is v.{self.__version__})")
+			case -4: # Version number missmatch
+				LOGGER.exception(sqlite3.DatabaseError(f"Table does not have the right `user_version` set. (Determined version is v.{DATABASE_VERSIONS[self.tablesHash]} but user_version is v.{self.__version__})"))
+				if throwError: raise sqlite3.DatabaseError(f"Table does not have the right `user_version` set. (Determined version is v.{DATABASE_VERSIONS[self.tablesHash]} but user_version is v.{self.__version__})")
+			case -5: # Tables schema hash doesn't match the current version
+				LOGGER.exception(OutdatedCanSNPerDatabase(f"Table schema does not match the most up to date schema. (Database: {self.tablesHash!r}, Latest MetaCanSNPerDatabases: {CURRENT_TABLES_HASH})"))
+				if throwError: raise OutdatedCanSNPerDatabase(f"Table schema does not match the most up to date schema. (Database: {self.tablesHash!r}, Latest MetaCanSNPerDatabases: {CURRENT_TABLES_HASH})")
+			case -6: # Indexes schema hash doesn't match the current version
+				LOGGER.exception(OutdatedCanSNPerDatabase(f"Index schema does not match the most up to date schema. (Database: {self.indexesHash!r}, Latest MetaCanSNPerDatabases: {CURRENT_INDEXES_HASH})"))
+				if throwError: raise OutdatedCanSNPerDatabase(f"Index schema does not match the most up to date schema. (Database: {self.indexesHash!r}, Latest MetaCanSNPerDatabases: {CURRENT_INDEXES_HASH})")
 			case _:
-				LOGGER.exception(sqlite3.DatabaseError(f"Unkown Database error. Current Database version is v.{CURRENT_VERSION}, and this database has version v.{self.__version__} (schemaHash={self.schemaHash!r})."))
-				if throwError: raise sqlite3.DatabaseError(f"Unkown Database error. Current Database version is v.{CURRENT_VERSION}, and this database has version v.{self.__version__} (schemaHash={self.schemaHash!r}).")
+				LOGGER.exception(sqlite3.DatabaseError(f"Unkown Database error. Current Database version is v.{CURRENT_VERSION}, and this database has version v.{self.__version__} (tablesHash={self.tablesHash!r})."))
+				if throwError: raise sqlite3.DatabaseError(f"Unkown Database error. Current Database version is v.{CURRENT_VERSION}, and this database has version v.{self.__version__} (tablesHash={self.tablesHash!r}).")
 
 	def rectifyDatabase(self, code : int):
 		raise NotImplementedError("Not implemented in the base class.")
 
 	@overload
-	def get(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, TreeParent : int=None, TreeChild : int=None, NodeID : int=None, Genotype : str=None, SNPID : str=None, Position : int=None, Ancestral : Literal["A","T","C","G"]=None, Derived : Literal["A","T","C","G"]=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> Generator[tuple[Any],None,None]|None:
+	def get(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, Parent : int=None, NodeID : int=None, Genotype : str=None, Position : int=None, Ancestral : Nucleotides=None, Derived : Nucleotides=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> Generator[tuple[Any],None,None]|None:
 		pass
 
 	@final
 	def get(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, **where : Any) -> Generator[tuple[Any],None,None]|None:
 		
-		from MetaCanSNPerDatabases.modules.Functions import generateQuery, interpretSQLtype
+		from MetaCanSNPerDatabases.core.Functions import generateQuery, interpretSQLtype
 		for row in self._connection.execute(*generateQuery(*select, orderBy=orderBy, **where)):
 			yield map(interpretSQLtype, row)
 	
 	@overload
-	def first(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, TreeParent : int=None, TreeChild : int=None, NodeID : int=None, Genotype : str=None, SNPID : str=None, Position : int=None, Ancestral : Literal["A","T","C","G"]=None, Derived : Literal["A","T","C","G"]=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> tuple[Any]:
+	def first(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, Parent : int=None, NodeID : int=None, Genotype : str=None, Position : int=None, Ancestral : Nucleotides=None, Derived : Nucleotides=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> tuple[Any]:
 		pass
 	
 	@final
@@ -116,7 +122,7 @@ class Database:
 			return row
 	
 	@overload
-	def all(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, TreeParent : int=None, TreeChild : int=None, NodeID : int=None, Genotype : str=None, SNPID : str=None, Position : int=None, Ancestral : Literal["A","T","C","G"]=None, Derived : Literal["A","T","C","G"]=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> list[tuple[Any]]:
+	def all(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, Parent : int=None, NodeID : int=None, Genotype : str=None, Position : int=None, Ancestral : Nucleotides=None, Derived : Nucleotides=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> list[tuple[Any]]:
 		pass
 	
 	@final
@@ -138,17 +144,36 @@ class Database:
 	@cached_property
 	def tree(self) -> Branch:
 		
-		return Branch(self._connection, *self.TreeTable.first(Columns.TreeChild, TreeParent=0))
+		return Branch(self._connection, *self.TreeTable.first(Columns.NodeID, TreeParent=0))
 
 	@property
-	def schemaHash(self):
-		from MetaCanSNPerDatabases.modules.Functions import whitespacePattern
+	def indexes(self):
+		return [row[0] for row in self._connection.execute("SELECT sql FROM sqlite_master WHERE type = 'index' ORDER BY name DESC;")]
+
+	@property
+	def indexesHash(self):
+		from MetaCanSNPerDatabases.core.Functions import whitespacePattern
+		indices = [name for table in self.Tables.values() for name, *_ in table._indexes]
 		return hashlib.md5(
 			whitespacePattern.sub(
 				" ",
 				"; ".join([
 					x[0]
-					for x in self._connection.execute(f"SELECT sql FROM sqlite_schema ORDER BY sql DESC;")
+					for x in self._connection.execute(f"SELECT sql FROM sqlite_schema WHERE type='index' AND name IN ({', '.join(['?']*len(indices))}) ORDER BY sql DESC;", indices)
+					if type(x) is tuple and x[0] is not None
+				])
+			).encode("utf-8")
+		).hexdigest()
+
+	@property
+	def tablesHash(self):
+		from MetaCanSNPerDatabases.core.Functions import whitespacePattern
+		return hashlib.md5(
+			whitespacePattern.sub(
+				" ",
+				"; ".join([
+					x[0]
+					for x in self._connection.execute(f"SELECT sql FROM sqlite_schema WHERE type='table' ORDER BY sql DESC;")
 					if type(x) is tuple and x[0] is not None
 				])
 			).encode("utf-8")
@@ -172,7 +197,7 @@ class DatabaseWriter(Database):
 	_mode = "w"
 
 	def rectifyDatabase(self, code : int, copy : bool=True, refDir : Path|PathGroup=None):
-		from MetaCanSNPerDatabases.modules.Functions import updateFromLegacy
+		from MetaCanSNPerDatabases.core.Functions import updateFromLegacy
 		if copy: shutil.copy(self.filename, self.filename+".backup")
 		if refDir is None:
 			refDir = CommonGroups.shared / f"{SOFTWARE_NAME}-Data" / pName(self.filename)
@@ -183,15 +208,20 @@ class DatabaseWriter(Database):
 				self._connection.execute("BEGIN TRANSACTION;")
 				for table in self.Tables.values():
 					table.create()
-					table.recreateIndexes()
 				self._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION:d};")
 				self._connection.execute("COMMIT;")
 			case -3: # Legacy CanSNPer table
 				updateFromLegacy(self, refDir=refDir)
-			case -4: # Transfer data from old tables into new tables
+			case -4:
 				self._connection.execute("BEGIN TRANSACTION;")
+				self._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION:d};")
+				self._connection.execute("COMMIT;")
+			case -5: # Transfer data from old tables into new tables
+				self._connection.execute("BEGIN TRANSACTION;")
+				self.clearIndexes()
 				for table in self.Tables.values():
 					table.recreate()
+					table.createIndex()
 				self._connection.execute("COMMIT;")
 				self._connection.execute("BEGIN TRANSACTION;")
 				for (table,) in self._connection.execute("SELECT name FROM sqlite_master WHERE type='table';"):
@@ -199,10 +229,16 @@ class DatabaseWriter(Database):
 						self._connection.execute(f"DROP TABLE {table};")
 				self._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION:d};")
 				self._connection.execute("COMMIT;")
-			case -5:
+			case -6:
 				self._connection.execute("BEGIN TRANSACTION;")
-				self._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION:d};")
+				self.clearIndexes()
+				for table in self.Tables.values():
+					table.createIndex()
 				self._connection.execute("COMMIT;")
+
+	def clearIndexes(self):
+		for (indexName, ) in self._connection.execute("SELECT name FROM sqlite_schema WHERE type='index';"):
+			self._connection.execute(f"DROP INDEX {indexName};")
 
 	def addSNP(self, nodeID, snpID, position, ancestral, derived, reference, date, chromosomeID):
 		self._connection.execute(f"INSERT (?,?,?,?,?,?,?,?) INTO {TABLE_NAME_SNP_ANNOTATION};", [nodeID, snpID, position, ancestral, derived, reference, date, chromosomeID])
@@ -226,12 +262,10 @@ class DatabaseWriter(Database):
 		self._connection.commit()
 
 @overload
-def openDatabase(database : str, mode : ReadMode) -> DatabaseReader:
-	pass
+def openDatabase(database : str, mode : ReadMode) -> DatabaseReader: pass
 
 @overload
-def openDatabase(database : str, mode : WriteMode) -> DatabaseWriter:
-	pass
+def openDatabase(database : str, mode : WriteMode) -> DatabaseWriter: pass
 
 @final
 def openDatabase(database : str, mode : Mode) -> DatabaseReader | DatabaseWriter | None:
@@ -251,7 +285,6 @@ def openDatabase(database : str, mode : Mode) -> DatabaseReader | DatabaseWriter
 			except Exception as e:
 				LOGGER.error("Failed to connect to database using URI: "+f"file:{cDatabase}?immutable=1")
 				raise e
-			
 		case "w":
 			if os.path.exists(database):
 				return DatabaseWriter(sqlite3.connect(database))

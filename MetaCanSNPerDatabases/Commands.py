@@ -1,7 +1,7 @@
 
 from MetaCanSNPerDatabases import *
-from MetaCanSNPerDatabases.modules.Functions import formatType, loadFromReferenceFile, loadFromTreeFile, loadFromSNPFile, DownloadFailed
-from MetaCanSNPerDatabases.modules.Globals import *
+from MetaCanSNPerDatabases.core.Functions import formatType, loadFromReferenceFile, loadFromTreeFile, loadFromSNPFile, DownloadFailed
+from MetaCanSNPerDatabases.Globals import *
 import argparse, sys
 
 

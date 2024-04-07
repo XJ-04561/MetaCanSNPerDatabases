@@ -1,26 +1,24 @@
 
-from MetaCanSNPerDatabases.modules.Globals import *
-import MetaCanSNPerDatabases.modules.Globals as Globals
-import MetaCanSNPerDatabases.modules.Columns as Columns
-from MetaCanSNPerDatabases.modules.Columns import ColumnFlag
-from MetaCanSNPerDatabases.modules._Constants import *
-from MetaCanSNPerDatabases.modules.Databases import DatabaseWriter
-from MetaCanSNPerDatabases.modules.Tables import Table
+from MetaCanSNPerDatabases.Globals import *
+import MetaCanSNPerDatabases.Globals as Globals
+import MetaCanSNPerDatabases.core.Columns as Columns
+from MetaCanSNPerDatabases.core.Columns import Column
+from MetaCanSNPerDatabases.core._Constants import *
+from MetaCanSNPerDatabases.core.Databases import DatabaseWriter
+from MetaCanSNPerDatabases.core.Tables import Table
 
 import inspect
 
 
 
 def interpretSQLtype(flag, val):
-	match Columns.TYPE_LOOKUP[flag][0]:
-		case "INTEGER":
-			return int(val)
-		case _:
-			return val
-
-def private(func):
-	print("\n".join(map(repr, inspect.stack()[0])))
-	return func
+	for typeLookup in Columns.TYPE_LOOKUP.values():
+		if flag in typeLookup:
+			match typeLookup[flag][0]:
+				case "INTEGER":
+					return int(val)
+				case _:
+					return val
 
 whitespacePattern = re.compile(r"\s+")
 sqlite3TypePattern = re.compile(r"(?P<integer>INTEGER)|(?P<varchar>VARCHAR[(](?P<number>[0-9]*)[)])|(?P<date>DATE)|(?P<text>TEXT)")
@@ -128,7 +126,7 @@ def updateFromLegacy(database : DatabaseWriter, refDir : Path|PathGroup=None):
 	database._connection.execute("BEGIN TRANSACTION;")
 	database._connection.execute("ALTER TABLE snp_annotation RENAME TO snp_annotation_old;")
 	database.SNPTable.create()
-	database._connection.execute(f"INSERT INTO {TABLE_NAME_SNP_ANNOTATION} ({SNP_COLUMN_NODE_ID}, {SNP_COLUMN_POSITION}, {SNP_COLUMN_ANCESTRAL}, {SNP_COLUMN_DERIVED}, {SNP_COLUMN_REFERENCE}, {SNP_COLUMN_DATE}, {SNP_COLUMN_CHROMOSOMES_ID}) SELECT node_id-1, position, ancestral_base, derived_base, reference, date, genome_i FROM snp_annotation_old;")
+	database._connection.execute(f"INSERT INTO {TABLE_NAME_SNP_ANNOTATION} ({COLUMN_NODE_ID}, {COLUMN_POSITION}, {COLUMN_ANCESTRAL}, {COLUMN_DERIVED}, {COLUMN_REFERENCE}, {COLUMN_DATE}, {COLUMN_CHROMOSOME_ID}) SELECT node_id-1, position, ancestral_base, derived_base, reference, date, genome_i FROM snp_annotation_old;")
 	database._connection.execute("DROP TABLE snp_annotation_old;")
 	database._connection.execute("COMMIT;")
 	
@@ -141,7 +139,7 @@ def updateFromLegacy(database : DatabaseWriter, refDir : Path|PathGroup=None):
 	database.TreeTable.create()
 	database._connection.execute("COMMIT;")
 	database._connection.execute("BEGIN TRANSACTION;")
-	database._connection.execute(f"INSERT INTO {TABLE_NAME_TREE} ({TREE_COLUMN_PARENT}, {TREE_COLUMN_CHILD}, {TREE_COLUMN_NAME}) SELECT tree_old.parent-1, null, nodes.name FROM tree_old, nodes WHERE tree_old.child = nodes.id AND tree_old.child > 1 ORDER BY tree_old.child ASC;")
+	database._connection.execute(f"INSERT INTO {TABLE_NAME_TREE} ({COLUMN_PARENT}, {COLUMN_NODE_ID}, {COLUMN_GENOTYPE}) SELECT tree_old.parent-1, null, nodes.name FROM tree_old, nodes WHERE tree_old.child = nodes.id AND tree_old.child > 1 ORDER BY tree_old.child ASC;")
 	database._connection.execute("COMMIT;")
 	database._connection.execute("BEGIN TRANSACTION;")
 	database._connection.execute(f"UPDATE {TABLE_NAME_TREE} SET parent=0 WHERE child = 1;")
@@ -154,7 +152,7 @@ def updateFromLegacy(database : DatabaseWriter, refDir : Path|PathGroup=None):
 	database._connection.execute("DROP TABLE rank;")
 	
 	for table in database.Tables.values():
-		table.recreateIndexes()
+		table.createIndex()
 
 	database._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION};")
 	database._connection.execute("COMMIT;")
@@ -173,7 +171,7 @@ def downloadDatabase(databaseName : str, dst : str, reportHook=lambda block, blo
 	return None
 
 @cache
-def generateTableQueryString(self, select : tuple[ColumnFlag], orderBy : tuple[ColumnFlag]|None=None, where : tuple[str,bool]=tuple()) -> tuple[str,tuple[str]]:
+def generateTableQueryString(self : Table, select : tuple[Column], orderBy : tuple[Column]|None=None, where : tuple[str,bool]=tuple()) -> tuple[str,tuple[str]]:
 	"""All positional arguments should be `ColumnFlag` objects and they are used to
 	determine what information to be gathered from the database.
 	
@@ -185,7 +183,7 @@ def generateTableQueryString(self, select : tuple[ColumnFlag], orderBy : tuple[C
 	Direction is indicated by negating the the flag. A positive flag is the default
 	of "DESC" and negative flags indicate "ASC"."""
 	if len(select) > 0:
-		query = f"SELECT {', '.join(map(Columns.LOOKUP[self._tableName].__getitem__, select))} FROM {self._tableName}"
+		query = f"SELECT {', '.join(map(str, select))} FROM {self._tableName}"
 	else:
 		query = f"SELECT * FROM {self._tableName}"
 	params = []
@@ -193,19 +191,17 @@ def generateTableQueryString(self, select : tuple[ColumnFlag], orderBy : tuple[C
 		_tmp = []
 		for col, val in where:
 			if val is False:
-				_tmp.append(f"{Columns.LOOKUP[self._tableName][Columns.NAMES_DICT[col]]} = ?")
+				_tmp.append(f"{Columns.COLUMN_LOOKUP[col]} = ?")
 				params.append(col)
 			elif val is True:
-				_tmp.append(f"{Columns.LOOKUP[self._tableName][Columns.NAMES_DICT[col]]} IN " + "({"+Columns.LOOKUP[self._tableName][Columns.NAMES_DICT[col]]+"})")
+				_tmp.append(f"{Columns.COLUMN_LOOKUP[col]} IN " + "({"+col+"})")
 				params.append(col)
 		query += f" WHERE {' AND '.join(_tmp)}"
 	
 	if orderBy is not None and len(orderBy) > 0:
-		# Create an ordered list of all "ORDER BY X [DIRECTION]"-statements
-		orderBy = [f"{Columns.LOOKUP[self._tableName][abs(flag)]} {'DESC' if flag > 0 else 'ASC'}" for flag in orderBy]
-		query += f" ORDER BY {', '.join(orderBy)};"
+		query += f" ORDER BY {', '.join(map(str, orderBy))}"
 	
-	return query, params
+	return f"{query};", params
 
 @cache
 def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, **where : Any) -> tuple[str,list[Any]]:

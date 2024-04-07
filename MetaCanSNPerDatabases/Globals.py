@@ -1,6 +1,6 @@
 
 
-from functools import cached_property, cache
+from functools import cached_property, cache, singledispatch as dispatch
 import sqlite3, hashlib, re, os, logging, shutil, sys
 from typing import Generator, Callable, Iterable, Self, overload, final, Literal, LiteralString, Any, TextIO, BinaryIO, Never, Iterator
 
@@ -14,11 +14,13 @@ class Mode: pass
 class ReadMode: pass
 class WriteMode: pass
 class Direction: pass
+class Nucleotides: pass
 
 Mode        = Literal["r", "w"]
 ReadMode    = Literal["r"]
 WriteMode   = Literal["w"]
 Direction   = Literal["DESC","ASC"]
+Nucleotides = Nucleotides
 
 formatPattern = re.compile(r"[{](.*?)[}]")
 
@@ -34,7 +36,8 @@ DATABASE_VERSIONS : dict[str,int] = {
 }
 LEGACY_VERSION = 0
 CURRENT_VERSION = 2
-CURRENT_HASH = "175c47f1ad61ec81a7d11d8a8e1887ff"
+CURRENT_TABLES_HASH = ""
+CURRENT_INDEXES_HASH = ""
 STRICT : bool = False
 SOFTWARE_NAME = "MetaCanSNPer"
 

@@ -1,7 +1,6 @@
 
-
-class CanSNPDatabaseError(Exception): pass
-
+from sqlite3 import DatabaseError
+class CanSNPDatabaseError(DatabaseError): pass
 class DatabaseNotConnected(CanSNPDatabaseError): pass
 class MissingArgument(CanSNPDatabaseError): pass
 class MissingReferenceFile(CanSNPDatabaseError): pass

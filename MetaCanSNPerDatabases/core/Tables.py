@@ -1,9 +1,9 @@
 
-from MetaCanSNPerDatabases.modules.Globals import *
-import MetaCanSNPerDatabases.modules.Globals as Globals
-import MetaCanSNPerDatabases.modules.Columns as Columns
-from MetaCanSNPerDatabases.modules.Columns import ColumnFlag
-from MetaCanSNPerDatabases.modules._Constants import *
+from MetaCanSNPerDatabases.Globals import *
+import MetaCanSNPerDatabases.Globals as Globals
+import MetaCanSNPerDatabases.core.Columns as Columns
+from MetaCanSNPerDatabases.core.Columns import ColumnFlag
+from MetaCanSNPerDatabases.core._Constants import *
 
 
 
@@ -62,15 +62,18 @@ class Table:
 		except:
 			return False
 
-	@overload
-	def createIndex(self, *cols : ColumnFlag, name : str=None): pass
+	@dispatch(Self)
+	def createIndex(self : Self):
+		pass
 
-	@overload
-	def createIndex(self, *cols : ColumnFlag, name : str=None): pass
+	@dispatch(Self)
+	def createIndex(self : Self, *cols : ColumnFlag, name : str=None):
+		"""Create an index on this table `self` with the columns that are given in the method call. If no columns are specified, will create the default indexes defined in the `self._indexes` attribute.
 
-	@final
-	def createIndex(self, *cols : ColumnFlag, name : str=None):
-		
+		Args:
+			*cols (ColumnFlarg, optional): Columns to be used in the index.
+			name (str, optional): Name of index to be created, a value of None will generate a name based on the table and the columns involved. Defaults to None.
+		"""
 		if len(cols) > 0:
 			if name is None:
 				name = f"{self._tableName}By{''.join(map(Columns.NAMES_STRING.__getitem__, cols))}"
@@ -87,17 +90,17 @@ class Table:
 			self._conn.execute(f"DROP INDEX IF EXISTS {indexName};")
 
 	@overload
-	def get(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, TreeParent : int=None, TreeChild : int=None, NodeID : int=None, Genotype : str=None, SNPID : str=None, Position : int=None, Ancestral : Literal["A","T","C","G"]=None, Derived : Literal["A","T","C","G"]=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> Generator[tuple[Any],None,None]|None:
+	def get(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, TreeParent : int=None, NodeID : int=None, Genotype : str=None, Position : int=None, Ancestral : Nucleotides=None, Derived : Nucleotides=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> Generator[tuple[Any],None,None]|None:
 		pass
 	
 	@final
 	def get(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, **where : Any) -> Generator[tuple[Any],None,None]|None:
-		from MetaCanSNPerDatabases.modules.Functions import generateTableQuery
+		from MetaCanSNPerDatabases.core.Functions import generateTableQuery
 		for row in self._conn.execute(*generateTableQuery(self, *select, orderBy=orderBy, **where)):
 			yield row
 
 	@overload
-	def first(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, TreeParent : int=None, TreeChild : int=None, NodeID : int=None, Genotype : str=None, SNPID : str=None, Position : int=None, Ancestral : Literal["A","T","C","G"]=None, Derived : Literal["A","T","C","G"]=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> tuple[Any]:
+	def first(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, TreeParent : int=None, NodeID : int=None, Genotype : str=None, Position : int=None, Ancestral : Nucleotides=None, Derived : Nucleotides=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> tuple[Any]:
 		pass
 	
 	@final
@@ -106,7 +109,7 @@ class Table:
 			return row
 	
 	@overload
-	def all(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, TreeParent : int=None, TreeChild : int=None, NodeID : int=None, Genotype : str=None, SNPID : str=None, Position : int=None, Ancestral : Literal["A","T","C","G"]=None, Derived : Literal["A","T","C","G"]=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> list[tuple[Any]]:
+	def all(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, TreeParent : int=None, NodeID : int=None, Genotype : str=None, Position : int=None, Ancestral : Nucleotides=None, Derived : Nucleotides=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> list[tuple[Any]]:
 		pass
 	
 	@final
@@ -117,23 +120,15 @@ class SNPTable(Table):
 
 	_tableName = TABLE_NAME_SNP_ANNOTATION
 	_columns = [
-		SNP_COLUMN_NODE_ID,
-		SNP_COLUMN_POSITION,
-		SNP_COLUMN_ANCESTRAL,
-		SNP_COLUMN_DERIVED,
-		SNP_COLUMN_REFERENCE,
-		SNP_COLUMN_DATE,
-		SNP_COLUMN_CHROMOSOMES_ID
+		COLUMN_NODE_ID,
+		COLUMN_POSITION,
+		COLUMN_ANCESTRAL,
+		COLUMN_DERIVED,
+		COLUMN_REFERENCE,
+		COLUMN_DATE,
+		COLUMN_CHROMOSOME_ID
 	]
-	_types = [
-		SNP_COLUMN_NODE_ID_TYPE,
-		SNP_COLUMN_POSITION_TYPE,
-		SNP_COLUMN_ANCESTRAL_TYPE,
-		SNP_COLUMN_DERIVED_TYPE,
-		SNP_COLUMN_REFERENCE_TYPE,
-		SNP_COLUMN_DATE_TYPE,
-		SNP_COLUMN_CHROMOSOMES_ID_TYPE
-	]
+	_types = SNP_COLUMN_TYPES
 	_appendRows = SNP_APPEND
 	_indexes = SNP_INDEXES
 
@@ -141,21 +136,14 @@ class ReferenceTable(Table):
 
 	_tableName = TABLE_NAME_REFERENCES
 	_columns = [
-		REFERENCE_COLUMN_GENOME_ID,
-		REFERENCE_COLUMN_GENOME,
-		REFERENCE_COLUMN_STRAIN,
-		REFERENCE_COLUMN_GENBANK,
-		REFERENCE_COLUMN_REFSEQ,
-		REFERENCE_COLUMN_ASSEMBLY
+		COLUMN_GENOME_ID,
+		COLUMN_GENOME,
+		COLUMN_STRAIN,
+		COLUMN_GENBANK,
+		COLUMN_REFSEQ,
+		COLUMN_ASSEMBLY
 	]
-	_types = [
-		REFERENCE_COLUMN_GENOME_ID_TYPE,
-		REFERENCE_COLUMN_GENOME_TYPE,
-		REFERENCE_COLUMN_STRAIN_TYPE,
-		REFERENCE_COLUMN_GENBANK_TYPE,
-		REFERENCE_COLUMN_REFSEQ_TYPE,
-		REFERENCE_COLUMN_ASSEMBLY_TYPE
-	]
+	_types = REFERENCES_COLUMN_TYPES
 	_appendRows = REFERENCE_APPEND
 	_indexes = REFERENCE_INDEXES
 
@@ -163,15 +151,11 @@ class TreeTable(Table):
 
 	_tableName = TABLE_NAME_TREE
 	_columns = [
-		TREE_COLUMN_PARENT,
-		TREE_COLUMN_CHILD,
-		TREE_COLUMN_NAME
+		COLUMN_PARENT,
+		COLUMN_NODE_ID,
+		COLUMN_GENOTYPE
 	]
-	_types = [
-		TREE_COLUMN_PARENT_TYPE,
-		TREE_COLUMN_CHILD_TYPE,
-		TREE_COLUMN_NAME_TYPE
-	]
+	_types = TREE_COLUMN_TYPES
 	_appendRows = TREE_APPEND
 	_indexes = TREE_INDEXES
 
@@ -179,14 +163,10 @@ class ChromosomesTable(Table):
 	
 	_tableName = TABLE_NAME_CHROMOSOMES
 	_columns = [		
-		CHROMOSOMES_COLUMN_ID,
-		CHROMOSOMES_COLUMN_NAME,
-		CHROMOSOMES_COLUMN_GENOME_ID
+		COLUMN_CHROMOSOME_ID,
+		COLUMN_CHROMOSOME,
+		COLUMN_GENOME_ID
 	]
-	_types = [
-		CHROMOSOMES_COLUMN_ID_TYPE,
-		CHROMOSOMES_COLUMN_NAME_TYPE,
-		CHROMOSOMES_COLUMN_GENOME_ID_TYPE
-	]
+	_types = CHROMOSOMES_COLUMN_TYPES
 	_appendRows = CHROMOSOMES_APPEND
 	_indexes = CHROMOSOMES_INDEXES
