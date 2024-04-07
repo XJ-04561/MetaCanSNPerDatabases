@@ -5,6 +5,7 @@ import MetaCanSNPerDatabases.modules.Columns as Columns
 from MetaCanSNPerDatabases.modules.Columns import ColumnFlag
 from MetaCanSNPerDatabases.modules._Constants import *
 from MetaCanSNPerDatabases.modules.Databases import DatabaseWriter
+from MetaCanSNPerDatabases.modules.Tables import Table
 
 import inspect
 
@@ -151,6 +152,9 @@ def updateFromLegacy(database : DatabaseWriter, refDir : Path|PathGroup=None):
 
 	database._connection.execute("DROP TABLE genomes;")
 	database._connection.execute("DROP TABLE rank;")
+	
+	for table in database.Tables.values():
+		table.recreateIndexes()
 
 	database._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION};")
 	database._connection.execute("COMMIT;")
@@ -314,6 +318,8 @@ def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|N
 	
 	LOGGER.debug(out := (query.format(**formatDict), tuple(params)))
 	return out
+
+Table.get.__doc__ = Table.first.__doc__ = Table.all.__doc__ = generateTableQuery.__doc__
 
 # @cache
 # def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, **where : Any) -> tuple[str,list[Any]]:

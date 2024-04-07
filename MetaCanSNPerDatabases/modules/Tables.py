@@ -5,8 +5,6 @@ import MetaCanSNPerDatabases.modules.Columns as Columns
 from MetaCanSNPerDatabases.modules.Columns import ColumnFlag
 from MetaCanSNPerDatabases.modules._Constants import *
 
-from MetaCanSNPerDatabases.modules.Functions import generateTableQuery
-
 
 
 class Table:
@@ -16,6 +14,7 @@ class Table:
 	_columns : list[str]
 	_types : list[tuple[str]]
 	_appendRows : list[str]
+	_indexes : list[tuple[str]]
 	_mode : str
 
 	def __init__(self, conn : sqlite3.Connection, mode : str):
@@ -45,6 +44,7 @@ class Table:
 	def recreate(self) -> bool:
 		try:
 			try:
+				self.clearIndexes()
 				self._conn.execute(f"ALTER TABLE {self._tableName} RENAME TO {self._tableName}2;")
 			except:
 				# Table doesn't exist
@@ -56,9 +56,35 @@ class Table:
 				self._conn.execute(f"INSERT INTO {self._tableName} SELECT * FROM {self._tableName}2;")
 			except:
 				pass
+
+			self.recreateIndexes()
 			return True
 		except:
 			return False
+
+	@overload
+	def createIndex(self, *cols : ColumnFlag, name : str=None): pass
+
+	@overload
+	def createIndex(self, *cols : ColumnFlag, name : str=None): pass
+
+	@final
+	def createIndex(self, *cols : ColumnFlag, name : str=None):
+		
+		if len(cols) > 0:
+			if name is None:
+				name = f"{self._tableName}By{''.join(map(Columns.NAMES_STRING.__getitem__, cols))}"
+			self._conn.execute(f"CREATE INDEX {name} ON {self._tableName}({', '.join(map(Columns.LOOKUP[self._tableName].__getitem__, cols))});")
+		else:
+			for indexName, *indexColumns in self._indexes:
+				for (indexName,) in self._conn.execute("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = ?", [self._tableName]):
+					self._conn.execute(f"DROP INDEX IF EXISTS {indexName};")
+				if indexName.isalnum() and all(map(str.isalnum, indexColumns)):
+					self._conn.execute(f"CREATE INDEX {indexName} ON {self._tableName}({', '.join(indexColumns)});")
+
+	def clearIndexes(self):
+		for (indexName,) in self._conn.execute("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = ?", [self._tableName]):
+			self._conn.execute(f"DROP INDEX IF EXISTS {indexName};")
 
 	@overload
 	def get(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, TreeParent : int=None, TreeChild : int=None, NodeID : int=None, Genotype : str=None, SNPID : str=None, Position : int=None, Ancestral : Literal["A","T","C","G"]=None, Derived : Literal["A","T","C","G"]=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> Generator[tuple[Any],None,None]|None:
@@ -66,6 +92,7 @@ class Table:
 	
 	@final
 	def get(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, **where : Any) -> Generator[tuple[Any],None,None]|None:
+		from MetaCanSNPerDatabases.modules.Functions import generateTableQuery
 		for row in self._conn.execute(*generateTableQuery(self, *select, orderBy=orderBy, **where)):
 			yield row
 
@@ -85,8 +112,6 @@ class Table:
 	@final
 	def all(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, **where : Any) -> list[tuple[Any]]:
 		return list(self.get(*select, orderBy=orderBy, **where))
-
-Table.get.__doc__ = Table.first.__doc__ = Table.all.__doc__ = generateTableQuery.__doc__
 
 class SNPTable(Table):
 
@@ -110,6 +135,7 @@ class SNPTable(Table):
 		SNP_COLUMN_CHROMOSOMES_ID_TYPE
 	]
 	_appendRows = SNP_APPEND
+	_indexes = SNP_INDEXES
 
 class ReferenceTable(Table):
 
@@ -131,6 +157,7 @@ class ReferenceTable(Table):
 		REFERENCE_COLUMN_ASSEMBLY_TYPE
 	]
 	_appendRows = REFERENCE_APPEND
+	_indexes = REFERENCE_INDEXES
 
 class TreeTable(Table):
 
@@ -146,6 +173,7 @@ class TreeTable(Table):
 		TREE_COLUMN_NAME_TYPE
 	]
 	_appendRows = TREE_APPEND
+	_indexes = TREE_INDEXES
 
 class ChromosomesTable(Table):
 	
@@ -161,3 +189,4 @@ class ChromosomesTable(Table):
 		CHROMOSOMES_COLUMN_GENOME_ID_TYPE
 	]
 	_appendRows = CHROMOSOMES_APPEND
+	_indexes = CHROMOSOMES_INDEXES

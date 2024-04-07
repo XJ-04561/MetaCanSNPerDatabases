@@ -5,6 +5,7 @@ import MetaCanSNPerDatabases.modules.Globals as Globals
 import MetaCanSNPerDatabases.modules.Columns as Columns
 from MetaCanSNPerDatabases.modules.Columns import ColumnFlag
 from MetaCanSNPerDatabases.modules._Constants import *
+from MetaCanSNPerDatabases.modules.Tables import Table
 
 
 from MetaCanSNPerDatabases.modules.Tree import Branch
@@ -52,7 +53,7 @@ class Database:
 		return object.__repr__(self)[:-1] + f" version={self.__version__} schemaHash={self.schemaHash!r} tables={[(name, len(self.Tables[name])) for name in self.Tables]}>"
 	
 	@property
-	def Tables(self) -> dict:
+	def Tables(self) -> dict[str,Table]:
 		return {name:self.__getattribute__(name) for name in sorted(filter(lambda s : s.endswith("Table"), self.__dict__))}
 
 	def checkDatabase(self) -> int:
@@ -182,6 +183,7 @@ class DatabaseWriter(Database):
 				self._connection.execute("BEGIN TRANSACTION;")
 				for table in self.Tables.values():
 					table.create()
+					table.recreateIndexes()
 				self._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION:d};")
 				self._connection.execute("COMMIT;")
 			case -3: # Legacy CanSNPer table

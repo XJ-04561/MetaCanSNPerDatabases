@@ -13,10 +13,12 @@ from MetaCanSNPerDatabases.Exceptions import *
 class Mode: pass
 class ReadMode: pass
 class WriteMode: pass
+class Direction: pass
 
 Mode        = Literal["r", "w"]
 ReadMode    = Literal["r"]
 WriteMode   = Literal["w"]
+Direction   = Literal["DESC","ASC"]
 
 formatPattern = re.compile(r"[{](.*?)[}]")
 
@@ -25,10 +27,6 @@ LOGGER = logging.Logger("MetaCanSNPerDatabases", level=logging.WARNING)
 LOGGER_FILEHANDLER = logging.FileHandler("MetaCanSNPerDatabases.log")
 LOGGER_FILEHANDLER.setFormatter(logging.Formatter("[%(name)s] %(asctime)s - %(levelname)s: %(message)s"))
 LOGGER.addHandler(LOGGER_FILEHANDLER)
-# type Mode = Literal["r", "w"]
-# type ReadMode = Literal["r"]
-# type WriteMode = Literal["w"]
-# type Direction = Literal["DESC","ASC"]
 
 DATABASE_VERSIONS : dict[str,int] = {
     "7630f33662e27489b7bb7b3b121ca4ff" : 1, # Legacy CanSNPer
