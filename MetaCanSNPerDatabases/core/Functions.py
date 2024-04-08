@@ -2,7 +2,7 @@
 from MetaCanSNPerDatabases.Globals import *
 import MetaCanSNPerDatabases.Globals as Globals
 import MetaCanSNPerDatabases.core.Columns as Columns
-from MetaCanSNPerDatabases.core.Columns import Column
+from MetaCanSNPerDatabases.core.Columns import *
 from MetaCanSNPerDatabases.core._Constants import *
 from MetaCanSNPerDatabases.core.Databases import DatabaseWriter
 from MetaCanSNPerDatabases.core.Tables import Table
@@ -94,7 +94,7 @@ def updateFromLegacy(database : DatabaseWriter, refDir : Path|PathGroup=None):
 	LOGGER.info("Updating 'References'-table")
 	database._connection.execute("BEGIN TRANSACTION;")
 	database._connection.execute("ALTER TABLE snp_references RENAME TO snp_references_old;")
-	database.ReferenceTable.create()
+	database.ReferencesTable.create()
 	database._connection.execute(f"INSERT INTO {TABLE_NAME_REFERENCES} SELECT * FROM snp_references_old;")
 	database._connection.execute("DROP TABLE snp_references_old;")
 	database._connection.execute("COMMIT;")
@@ -104,7 +104,7 @@ def updateFromLegacy(database : DatabaseWriter, refDir : Path|PathGroup=None):
 	database._connection.execute("BEGIN TRANSACTION;")
 	database.ChromosomesTable.create()
 	GenomeAPI = datasets.GenomeApi()
-	for i, genbankID, assembly in database.ReferenceTable.get(Columns.GenomeID, Columns.GenbankID, Columns.Assembly):
+	for i, genbankID, assembly in database.ReferencesTable.get(Columns.GenomeID, Columns.GenbankID, Columns.Assembly):
 		try:
 			chromosome = GenomeAPI.assembly_descriptors_by_accessions([genbankID])["assemblies"][0]["assembly"]["biosample"]["sample_ids"][0]["value"]
 			assert len(chromosome) != 0, "No genbank entry found"
@@ -125,7 +125,7 @@ def updateFromLegacy(database : DatabaseWriter, refDir : Path|PathGroup=None):
 	LOGGER.info("Updating 'SNP'-table")
 	database._connection.execute("BEGIN TRANSACTION;")
 	database._connection.execute("ALTER TABLE snp_annotation RENAME TO snp_annotation_old;")
-	database.SNPTable.create()
+	database.SNPsTable.create()
 	database._connection.execute(f"INSERT INTO {TABLE_NAME_SNP_ANNOTATION} ({COLUMN_NODE_ID}, {COLUMN_POSITION}, {COLUMN_ANCESTRAL}, {COLUMN_DERIVED}, {COLUMN_REFERENCE}, {COLUMN_DATE}, {COLUMN_CHROMOSOME_ID}) SELECT node_id-1, position, ancestral_base, derived_base, reference, date, genome_i FROM snp_annotation_old;")
 	database._connection.execute("DROP TABLE snp_annotation_old;")
 	database._connection.execute("COMMIT;")
@@ -172,14 +172,14 @@ def downloadDatabase(databaseName : str, dst : str, reportHook=lambda block, blo
 
 @cache
 def generateTableQueryString(self : Table, select : tuple[Column], orderBy : tuple[Column]|None=None, where : tuple[str,bool]=tuple()) -> tuple[str,tuple[str]]:
-	"""All positional arguments should be `ColumnFlag` objects and they are used to
+	"""All positional arguments should be `Column` objects and they are used to
 	determine what information to be gathered from the database.
 	
 	All keyword arguments (except `orderBy`) are the conditions by which each row
 	is selected. For example, if you inted to get the row for a specific genbankID
 	then you would use the keyword argument as such: `genbankID="GCA_123123123.1"`.
 	
-	`orderBy` is used to sort the selected data according to `ColumnFlag`.
+	`orderBy` is used to sort the selected data according to `Column`.
 	Direction is indicated by negating the the flag. A positive flag is the default
 	of "DESC" and negative flags indicate "ASC"."""
 	if len(select) > 0:
@@ -204,19 +204,19 @@ def generateTableQueryString(self : Table, select : tuple[Column], orderBy : tup
 	return f"{query};", params
 
 @cache
-def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, **where : Any) -> tuple[str,list[Any]]:
-	"""All positional arguments should be `ColumnFlag` objects and they are used to
+def generateTableQuery(self, *select : Column, orderBy : Column|tuple[Column]|None=None, **where : Any) -> tuple[str,list[Any]]:
+	"""All positional arguments should be `Column` objects and they are used to
 	determine what information to be gathered from the database.
 	
 	All keyword arguments (except `orderBy`) are the conditions by which each row
 	is selected. For example, if you inted to get the row for a specific genbankID
 	then you would use the keyword argument as such: `genbankID="GCA_123123123.1"`.
 	
-	`orderBy` is used to sort the selected data according to `ColumnFlag`.
+	`orderBy` is used to sort the selected data according to `Column`.
 	Direction is indicated by negating the the flag. A positive flag is the default
 	of "DESC" and negative flags indicate "ASC"."""
 	
-	if isinstance(orderBy, ColumnFlag):
+	if isinstance(orderBy, Column):
 		orderBy = (orderBy,)
 
 	boolWhere = tuple(sorted(map(lambda kv:(kv[0],isinstance(kv[1], list|tuple|set)), filter(lambda kv:kv[1] is not None, where.items()))))
@@ -234,16 +234,79 @@ def generateTableQuery(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[Co
 	LOGGER.debug(out := (query.format(**formatDict), tuple(params)))
 	return out
 
+class SQL_STATEMENT:
+	
+	select : tuple[Column] = ()
+	_select : tuple[Column] = None
+
+	tables : tuple[Type[Table]] = ()
+	_tables : tuple[Type[Table]] = None
+
+	where : dict[Column,Any] = ()
+	_where : dict[Column,Any] = None
+
+	orderBy : tuple[Column] = ()
+	_orderBy : tuple[Column] = None
+
+	@property
+	def select(self):
+		if len(self._select) > 0:
+
+class SELECT(SQL_STATEMENT):
+	def __init__(self, *columns):
+		self.select = columns
+	
+	def __iter__(self):
+		queryString = f"SELECT {', '.join(self.select)}"
+		if len(self.tables) > 0:
+			queryString = f" FROM {', '.join(self.tables)}"
+		else:
+			allSelects = None
+			allSelectsAndWheres = None
+			for table in Table.__subclasses__():
+				if not all(select in table._columns for select in self.select):
+					continue
+				elif not all(where in table._columns for where in map(COLUMN_LOOKUP.__getitem__, self.where)):
+					allSelects = f" FROM {table._tableName}"
+					continue
+				else:
+					allSelectsAndWheres = f" FROM {table._tableName}"
+					break
+			if allSelectsAndWheres is not None:
+				queryString += allSelectsAndWheres
+			elif allSelects is not None:
+				queryString += allSelects
+		if hasattr(self, "tables"):
+			queryString = f" FROM {', '.join(self.tables)}"
+		else:
+
+		return queryString, params
+
+	def FROM(self, *tables : tuple[Type[Table]]):
+		self.tables = tables
+		return self
+	
+	def WHERE(self, **wheres : dict[str,Any|Column]):
+		self.where = wheres
+		return self
+	
+	def ORDER_BY(self, *orderBy : tuple[Column]):
+		self.orderBy = orderBy
+		return self
+	
+	def LIMIT(self, limit : int):
+		self.limit = limit
+
 @cache
-def generateQueryString(select : tuple[ColumnFlag], orderBy : tuple[ColumnFlag]|None=None, table:str|None=None, where : tuple[tuple[str,bool]]|None=tuple()) -> tuple[str,tuple[Any]]:
-	"""All positional arguments should be `ColumnFlag` objects and they are used to
+def generateQueryString(select : tuple[Column], orderBy : tuple[Column]|None=None, table:str|None=None, where : tuple[tuple[str,bool]]|None=tuple()) -> tuple[str,tuple[Any]]:
+	"""All positional arguments should be `Column` objects and they are used to
 	determine what information to be gathered from the database.
 	
 	All keyword arguments (except `orderBy`) are the conditions by which each row
 	is selected. For example, if you inted to get the row for a specific genbankID
 	then you would use the keyword argument as such: `genbankID="GCA_123123123.1"`.
 	
-	`orderBy` is used to sort the selected data according to `ColumnFlag`.
+	`orderBy` is used to sort the selected data according to `Column`.
 	Direction is indicated by negating the the flag. A positive flag is the default
 	of "DESC" and negative flags indicate "ASC"."""
 
@@ -295,9 +358,9 @@ def generateQueryString(select : tuple[ColumnFlag], orderBy : tuple[ColumnFlag]|
 		return f"SELECT {selection} FROM {source} WHERE {conditions};", tuple(params)
 
 @cache
-def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, table:str|None=None, **where : Any) -> tuple[str,tuple[Any]]:
+def generateQuery(*select : Column, orderBy : Column|tuple[Column]|None=None, table:str|None=None, **where : Any) -> tuple[str,tuple[Any]]:
 
-	if isinstance(orderBy, ColumnFlag):
+	if isinstance(orderBy, Column):
 		orderBy = (orderBy,)
 
 	boolWhere = tuple(sorted(map(lambda kv:(kv[0],isinstance(kv[1], list|tuple|set)), filter(lambda kv:kv[1] is not None, where.items()))))
@@ -318,20 +381,20 @@ def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|N
 Table.get.__doc__ = Table.first.__doc__ = Table.all.__doc__ = generateTableQuery.__doc__
 
 # @cache
-# def generateQuery(*select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, **where : Any) -> tuple[str,list[Any]]:
-# 	"""All positional arguments should be `ColumnFlag` objects and they are used to
+# def generateQuery(*select : Column, orderBy : Column|tuple[Column]|None=None, **where : Any) -> tuple[str,list[Any]]:
+# 	"""All positional arguments should be `Column` objects and they are used to
 # 	determine what information to be gathered from the database.
 	
 # 	All keyword arguments (except `orderBy`) are the conditions by which each row
 # 	is selected. For example, if you inted to get the row for a specific genbankID
 # 	then you would use the keyword argument as such: `genbankID="GCA_123123123.1"`.
 	
-# 	`orderBy` is used to sort the selected data according to `ColumnFlag`.
+# 	`orderBy` is used to sort the selected data according to `Column`.
 # 	Direction is indicated by negating the the flag. A positive flag is the default
 # 	of "DESC" and negative flags indicate "ASC"."""
 
 # 	# Find out which tables are involved in this query. Also makes some necessary assertions for the rest of the function.
-# 	tables = {Columns.UNIQUELOOKUP[col] for col in Columns.UNIQUES.intersection(select, where, map(lambda x : x if type(x) is ColumnFlag else x[0], orderBy))}
+# 	tables = {Columns.UNIQUELOOKUP[col] for col in Columns.UNIQUES.intersection(select, where, map(lambda x : x if type(x) is Column else x[0], orderBy))}
 # 	for col in Columns.COMMONS.intersection(select, where, map(lambda x : x[0], orderBy)):
 # 		assert col in Columns.NAMES, f"No such column `{col}` in `Columns.NAMES`"
 # 		if tables.isdisjoint(Columns.COMMONLOOKUP[col]):
@@ -366,7 +429,7 @@ Table.get.__doc__ = Table.first.__doc__ = Table.all.__doc__ = generateTableQuery
 # 	params = list(where.values())
 # 	conditions = " AND ".join([f"{table}.{Columns.LOOKUP[table][col]} = ?" for table, col in zip(map(getTable, params), params)])
 
-# 	if isinstance(orderBy, ColumnFlag):
+# 	if isinstance(orderBy, Column):
 # 		orderBy = (orderBy,)
 
 # 	if orderBy is not None and len(orderBy) > 0:

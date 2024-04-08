@@ -9,12 +9,12 @@ from MetaCanSNPerDatabases.Exceptions import (
     DownloadFailed, TableDefinitionMissmatch
 )
 
-from MetaCanSNPerDatabases.core.Columns import ColumnFlag
+from MetaCanSNPerDatabases.core.Columns import Column
 import MetaCanSNPerDatabases.core.Columns as Columns
 
 from MetaCanSNPerDatabases.core.Functions import downloadDatabase, updateFromLegacy
 
-from MetaCanSNPerDatabases.core.Tables import SNPTable, ReferenceTable, TreeTable
+from MetaCanSNPerDatabases.core.Tables import SNPsTable, ReferencesTable, TreeTable
 from MetaCanSNPerDatabases.core.Tree import Branch
 import MetaCanSNPerDatabases.core.Test as Test
 from MetaCanSNPerDatabases import Commands

@@ -6,7 +6,7 @@ import argparse, sys
 
 
 
-def read(databasePath : str=None, TreeTable : bool=False, SNPTable : bool=False, ChromosomesTable : bool=False, ReferenceTable : bool=False, **kwargs):
+def read(databasePath : str=None, TreeTable : bool=False, SNPsTable : bool=False, ChromosomesTable : bool=False, ReferencesTable : bool=False, **kwargs):
 
 	LOGGER.debug(f"{databasePath=}")
 	database : DatabaseReader = openDatabase(databasePath, "r")
@@ -16,13 +16,13 @@ def read(databasePath : str=None, TreeTable : bool=False, SNPTable : bool=False,
 	database.validateDatabase(code)
 	
 	print(database)
-	if not any([TreeTable, SNPTable, ChromosomesTable, ReferenceTable]):
+	if not any([TreeTable, SNPsTable, ChromosomesTable, ReferencesTable]):
 		print(database.TreeTable)
-		print(database.SNPTable)
+		print(database.SNPsTable)
 		print(database.ChromosomesTable)
-		print(database.ReferenceTable)
+		print(database.ReferencesTable)
 	else:
-		for table, flag in {"TreeTable":TreeTable, "SNPTable":SNPTable, "ChromosomesTable":ChromosomesTable, "ReferenceTable":ReferenceTable}.items():
+		for table, flag in {"TreeTable":TreeTable, "SNPsTable":SNPsTable, "ChromosomesTable":ChromosomesTable, "ReferencesTable":ReferencesTable}.items():
 			if flag:
 				print(f"{table}:")
 				rowFormat = " | ".join(formatType([tp for tp, *_ in database.Tables[table]._types]))
@@ -145,9 +145,9 @@ def main():
 	readParser : argparse.ArgumentParser = modeGroup.add_parser("read", help="Print out data from tables in database.")
 	readParser.add_argument("databasePath",	type=os.path.realpath)
 	readParser.add_argument("--TreeTable",			action="store_true")
-	readParser.add_argument("--SNPTable",			action="store_true")
+	readParser.add_argument("--SNPsTable",			action="store_true")
 	readParser.add_argument("--ChromosomesTable",	action="store_true")
-	readParser.add_argument("--ReferenceTable",		action="store_true")
+	readParser.add_argument("--ReferencesTable",		action="store_true")
 	readParser.set_defaults(func=read)
 
 	writeParser : argparse.ArgumentParser = modeGroup.add_parser("write",	help="Create a database with or without data. Data for database is given through the appropriate File flags.")

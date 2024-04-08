@@ -3,7 +3,7 @@ from sqlite3 import Connection
 from MetaCanSNPerDatabases.Globals import *
 import MetaCanSNPerDatabases.Globals as Globals
 import MetaCanSNPerDatabases.core.Columns as Columns
-from MetaCanSNPerDatabases.core.Columns import ColumnFlag
+from MetaCanSNPerDatabases.core.Columns import Column
 from MetaCanSNPerDatabases.core._Constants import *
 from MetaCanSNPerDatabases.core.Tables import Table
 
@@ -20,12 +20,12 @@ class Database:
 	filename : str
 
 	def __init__(self, database : sqlite3.Connection):
-		from MetaCanSNPerDatabases.core.Tables import SNPTable, ReferenceTable, TreeTable, ChromosomesTable
+		from MetaCanSNPerDatabases.core.Tables import SNPsTable, ReferencesTable, TreeTable, ChromosomesTable
 		self.filename = os.path.realpath(database.execute("PRAGMA database_list;").fetchone()[2])
 		self._connection = database
 
-		self.SNPTable = SNPTable(self._connection, self._mode)
-		self.ReferenceTable = ReferenceTable(self._connection, self._mode)
+		self.SNPsTable = SNPsTable(self._connection, self._mode)
+		self.ReferencesTable = ReferencesTable(self._connection, self._mode)
 		self.TreeTable = TreeTable(self._connection, self._mode)
 		self.ChromosomesTable = ChromosomesTable(self._connection, self._mode)
 	
@@ -102,40 +102,40 @@ class Database:
 		raise NotImplementedError("Not implemented in the base class.")
 
 	@overload
-	def get(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, Parent : int=None, NodeID : int=None, Genotype : str=None, Position : int=None, Ancestral : Nucleotides=None, Derived : Nucleotides=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> Generator[tuple[Any],None,None]|None:
+	def get(self, *columnsToGet : Column, orderBy : Column|tuple[Column]|None=None, Parent : int=None, NodeID : int=None, Genotype : str=None, Position : int=None, Ancestral : Nucleotides=None, Derived : Nucleotides=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> Generator[tuple[Any],None,None]|None:
 		pass
 
 	@final
-	def get(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, **where : Any) -> Generator[tuple[Any],None,None]|None:
+	def get(self, *select : Column, orderBy : Column|tuple[Column]|None=None, **where : Any) -> Generator[tuple[Any],None,None]|None:
 		
 		from MetaCanSNPerDatabases.core.Functions import generateQuery, interpretSQLtype
 		for row in self._connection.execute(*generateQuery(*select, orderBy=orderBy, **where)):
 			yield map(interpretSQLtype, row)
 	
 	@overload
-	def first(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, Parent : int=None, NodeID : int=None, Genotype : str=None, Position : int=None, Ancestral : Nucleotides=None, Derived : Nucleotides=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> tuple[Any]:
+	def first(self, *columnsToGet : Column, orderBy : Column|tuple[Column]|None=None, Parent : int=None, NodeID : int=None, Genotype : str=None, Position : int=None, Ancestral : Nucleotides=None, Derived : Nucleotides=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> tuple[Any]:
 		pass
 	
 	@final
-	def first(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, **where : Any) -> tuple[Any]:
+	def first(self, *select : Column, orderBy : Column|tuple[Column]|None=None, **where : Any) -> tuple[Any]:
 		for row in self.get(*select, orderBy=orderBy, **where):
 			return row
 	
 	@overload
-	def all(self, *columnsToGet : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, Parent : int=None, NodeID : int=None, Genotype : str=None, Position : int=None, Ancestral : Nucleotides=None, Derived : Nucleotides=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> list[tuple[Any]]:
+	def all(self, *columnsToGet : Column, orderBy : Column|tuple[Column]|None=None, Parent : int=None, NodeID : int=None, Genotype : str=None, Position : int=None, Ancestral : Nucleotides=None, Derived : Nucleotides=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> list[tuple[Any]]:
 		pass
 	
 	@final
-	def all(self, *select : ColumnFlag, orderBy : ColumnFlag|tuple[ColumnFlag]|None=None, **where : Any) -> list[tuple[Any]]:
+	def all(self, *select : Column, orderBy : Column|tuple[Column]|None=None, **where : Any) -> list[tuple[Any]]:
 		return list(self.get(*select, orderBy=orderBy, **where))
 
 	@property
 	def SNPs(self) -> Generator[tuple[str,int,str,str],None,None]:
-		return self.SNPTable.get(Columns.ALL)
+		return self.SNPsTable.get(Columns.ALL)
 
 	@property
 	def references(self) -> Generator[tuple[int,str,str,str,str],None,None]:
-		return self.ReferenceTable.get(Columns.ALL)
+		return self.ReferencesTable.get(Columns.ALL)
 	
 	@property
 	def chromosomes(self) -> Generator[tuple[int,str],None,None]:
@@ -293,10 +293,10 @@ def openDatabase(database : str, mode : Mode) -> DatabaseReader | DatabaseWriter
 				conn.execute(f"PRAGMA user_version = {CURRENT_VERSION};")
 				ret = DatabaseWriter(conn)
 
-				ret.ReferenceTable.create()
+				ret.ReferencesTable.create()
 				ret.ChromosomesTable.create()
 				ret.TreeTable.create()
-				ret.SNPTable.create()
+				ret.SNPsTable.create()
 
 				return ret
 		case _:

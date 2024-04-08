@@ -7,40 +7,50 @@ class Column:
 	
 	name : str
 	databaseName : str
+	dataType : str
 	
-	def __init__(self, name : str, databaseName : str):
+	def __init__(self, name : str, databaseName : str, dataType : str):
 		self.name = name
 		self.databaseName = databaseName
+		self.dataType = dataType
 	
 	def __repr__(self):
-		return self.name
+		return f"<{__name__}.{self.__class__.__name__} name={self.name!r} databaseName={self.databaseName!r} at {hex(id(self))}>"
 		
 	def __str__(self):
-		return self.databaseName
+		return self.name
 	
 	def __hash__(self):
 		return self.name.__hash__()
 	
 	def __neg__(self):
 		return Column(self.name, f"{self.databaseName} ASC")
+	
+	def __format__(self, format_spec):
+		if format_spec.endswith("!sql"):
+			return self.databaseName.__format__(format_spec.rstrip("!sql"))
+		else:
+			return self.name.__format__(format_spec)
 
-ALL				= Column("ALL", "*")
-Parent			= Column("Parent", COLUMN_PARENT)
-NodeID			= Column("NodeID", COLUMN_NODE_ID)
-GenoType		= Column("GenoType", COLUMN_GENOTYPE)
-Position		= Column("Position", COLUMN_POSITION)
-Ancestral		= Column("Ancestral", COLUMN_ANCESTRAL)
-Derived			= Column("Derived", COLUMN_DERIVED)
-SNPReference	= Column("SNPReference", COLUMN_REFERENCE)
-Date			= Column("Date", COLUMN_DATE)
-ChromID			= Column("ChromID", COLUMN_CHROMOSOME_ID)
-Chromosome		= Column("Chromosome", COLUMN_CHROMOSOME)
-GenomeID		= Column("GenomeID", COLUMN_GENOME_ID)
-Genome			= Column("Genome", COLUMN_GENOME)
-Strain			= Column("Strain", COLUMN_STRAIN)
-GenbankID		= Column("GenbankID", COLUMN_GENBANK)
-RefseqID		= Column("RefseqID", COLUMN_REFSEQ)
-Assembly		= Column("Assembly", COLUMN_ASSEMBLY)
+ALL				= Column("ALL",				"*",					"tuple")
+Parent			= Column("Parent",			COLUMN_PARENT,			COLUMN_PARENT_TYPE)
+NodeID			= Column("NodeID",			COLUMN_NODE_ID,			COLUMN_GENOTYPE_TYPE)
+GenoType		= Column("GenoType",		COLUMN_GENOTYPE,		COLUMN_NODE_ID_TYPE)
+Position		= Column("Position",		COLUMN_POSITION,		COLUMN_POSITION_TYPE)
+Ancestral		= Column("Ancestral",		COLUMN_ANCESTRAL,		COLUMN_ANCESTRAL_TYPE)
+Derived			= Column("Derived",			COLUMN_DERIVED,			COLUMN_DERIVED_TYPE)
+SNPReference	= Column("SNPReference",	COLUMN_REFERENCE,		COLUMN_REFERENCE_TYPE)
+Date			= Column("Date",			COLUMN_DATE,			COLUMN_DATE_TYPE)
+ChromID			= Column("ChromID",			COLUMN_CHROMOSOME_ID,	COLUMN_CHROMOSOME_ID_TYPE)
+Chromosome		= Column("Chromosome",		COLUMN_CHROMOSOME,		COLUMN_CHROMOSOME_TYPE)
+GenomeID		= Column("GenomeID",		COLUMN_GENOME_ID,		COLUMN_GENOME_ID_TYPE)
+Genome			= Column("Genome",			COLUMN_GENOME,			COLUMN_GENOME_TYPE)
+Strain			= Column("Strain",			COLUMN_STRAIN,			COLUMN_STRAIN_TYPE)
+GenbankID		= Column("GenbankID",		COLUMN_GENBANK,			COLUMN_GENBANK_TYPE)
+RefseqID		= Column("RefseqID",		COLUMN_REFSEQ,			COLUMN_REFSEQ_TYPE)
+Assembly		= Column("Assembly",		COLUMN_ASSEMBLY,		COLUMN_ASSEMBLY_TYPE)
+
+
 
 class TreeColumns: pass
 class SNPColumns: pass
@@ -50,6 +60,7 @@ TreeColumns			= Literal[Parent, NodeID, GenoType] # type: ignore
 SNPColumns			= Literal[NodeID, Position, Ancestral, Derived, SNPReference, Date, ChromID] # type: ignore
 ChromosomesColumns	= Literal[ChromID, Chromosome, GenomeID] # type: ignore
 ReferencesColumns	= Literal[GenomeID, Genome, Strain, GenbankID, RefseqID, Assembly] # type: ignore
+
 
 COLUMN_LOOKUP = {
 	"ALL"			: ALL,
