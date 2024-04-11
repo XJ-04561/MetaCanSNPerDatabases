@@ -1,13 +1,34 @@
 
 from MetaCanSNPerDatabases.Globals import *
+from MetaCanSNPerDatabases.core.SQL import *
 
-class Column: pass
-class Table: pass
-class Index: pass
-class PrimaryKey: pass
-class ForeignKey: pass
-class Unique: pass
-class Database: pass
+class SQLObject(AutoObject):
+	
+	__name__ : str
+	name : str
+	_database : Database
+	
+	def __repr__(self):
+		return f"<{pluralize(self.__class__.__name__)}.{self.__name__} {' '.join(map(lambda keyVal : '{}={:!r}'.format(*keyVal), vars(self).items()))} at {hex(id(self))}>"
+		
+	def __str__(self):
+		return self.name
+	
+	def __sql__(self):
+		return self.name
+	
+	def __hash__(self):
+		return self.__sql__().__hash__()
+	
+	def __format__(self, format_spec : str):
+		if format_spec.endswith("!sql"):
+			return self.__sql__().__format__(format_spec.rstrip("!sql"))
+		elif format_spec.endswith("!r"):
+			return self.__repr__().__format__(format_spec.rstrip("!r"))
+		elif format_spec.endswith("!s"):
+			return self.__str__().__format__(format_spec.rstrip("!s"))
+		else:
+			return self.__str__().__format__(format_spec)
 
 class Column(SQLObject):
 	
@@ -19,6 +40,21 @@ class Column(SQLObject):
 	def __neg__(self):
 		"""Only exists for 'ORDER BY'-usage. Will create a copy of the Column object with ' ASC' appended to the in-table name of the column."""
 		return Column(self.__name__, f"{self.name} ASC", self.type)
+	
+	def __lt__(self, right):
+		return Comparison(self, "<", right)
+	def __gt__(self, right):
+		return Comparison(self, ">", right)
+	def __le__(self, right):
+		return Comparison(self, "<=", right)
+	def __ge__(self, right):
+		return Comparison(self, ">=", right)
+	def __eq__(self, right):
+		return Comparison(self, "==", right)
+	def __ne__(self, right):
+		return Comparison(self, "!=", right)
+	def __contains__(self, right):
+		return Comparison(self, "IN", right)
 
 class Table(SQLObject):
 
@@ -89,25 +125,3 @@ class Index:
 
 	def __sql__(self):
 		return f"{self} ON {self.table}({', '.join(map(str, self.columns))})"
-
-class PrimaryKey(SQLObject):
-
-	columns : list[Column]
-
-	def __sql__(self):
-		return f"PRIMARY KEY ({', '.join(map(str, self.columns))})"
-	
-class ForeignKey(SQLObject):
-
-	table : Table
-	columns : list[Column]
-
-	def __sql__(self):
-		return f"FOREIGN KEY ({', '.join(map(str, self.columns))}) REFERENCES {self.table}({', '.join(map(str, self.columns))})"
-
-class Unique(SQLObject):
-
-	columns : list[Column]
-
-	def __sql__(self):
-		return f"UNIQUE ({', '.join(map(str, self.columns))})"

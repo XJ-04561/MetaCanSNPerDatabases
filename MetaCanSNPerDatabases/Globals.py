@@ -143,3 +143,17 @@ SOURCES = [
 
 SOURCED = {"refseq":"F", "genbank": "A"}
 NCBI_FTP_LINK = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GC{source}/{n1}/{n2}/{n3}/{genome_id}_{assembly}/{genome_id}_{assembly}_genomic.fna.gz"
+
+
+class SQL_STATEMENT: pass
+class Comparison: pass
+
+class Column: pass
+class Table: pass
+class Index: pass
+class PrimaryKey: pass
+class ForeignKey: pass
+class Unique: pass
+class Database: pass
+class Word: pass
+class Aggregate: pass
