@@ -2,7 +2,7 @@
 
 from functools import cached_property, cache
 import sqlite3, hashlib, re, os, logging, shutil, sys
-from typing import Generator, Callable, Iterable, Self, Literal, LiteralString, Any, TextIO, BinaryIO, Never, Iterator, TypeVar, Type, get_args, get_origin, ChainMap
+from typing import Generator, Callable, Iterable, Self, Literal, LiteralString, Any, TextIO, BinaryIO, Never, Iterator, TypeVar, Type, get_args, get_origin, ChainMap, Union, Type
 import typing
 
 from PseudoPathy import Path, DirectoryPath, FilePath, PathGroup, PathLibrary, PathList
@@ -110,10 +110,12 @@ Nucleotides = Literal["A", "T", "C", "G", "N"]
 
 SQL_TYPES = {
 	"INTEGER" : int,
-	"VARCHAR" : str,
 	"TEXT" : str,
+	"VARCHAR" : str,
 	"CHAR" : str,
-	"DOUBLE" : float,
+	"DATE" : str,
+	"DATETIME" : str,
+	"DECIMAL" : float,
 	"NULL" : None
 }
 
@@ -145,7 +147,7 @@ SOURCED = {"refseq":"F", "genbank": "A"}
 NCBI_FTP_LINK = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GC{source}/{n1}/{n2}/{n3}/{genome_id}_{assembly}/{genome_id}_{assembly}_genomic.fna.gz"
 
 
-class SQL_STATEMENT: pass
+class Query: pass
 class Comparison: pass
 
 class Column: pass

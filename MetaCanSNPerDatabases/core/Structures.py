@@ -125,3 +125,68 @@ class Index:
 
 	def __sql__(self):
 		return f"{self} ON {self.table}({', '.join(map(str, self.columns))})"
+
+class Query:
+
+	words : tuple[Word] = tuple()
+
+	def __init__(self, *words):
+		self.words = words
+
+	def __iter__(self):
+		yield f"{' '.join(map(str, self.words))};"
+		yield self.params
+	
+	def __str__(self):
+		return f"({' '.join(map(str, self.words))})"
+
+	@property
+	def params(self):
+		return [word.params for word in self.words if hasattr(word, "params")]
+
+	def __getattr__(self, key):
+		if key in map(lambda obj : obj.__name__, Word.__subclasses__()):
+			return next(filter(lambda obj : obj.__name__ == key, Word.__subclasses__()))
+		return self.__getattribute__(key)
+
+class Word:
+	
+	__name__ : str
+	__content__ : tuple
+	sep : str = ", "
+
+	def __init__(self, *args : tuple[Table|Column|Index|Comparison]):
+		self.__content__ = args
+
+	def __getattr__(self, key):
+		return getattr(Query(self), key)
+
+	def __repr__(self):
+		return f"<{pluralize(self.__class__.__base__.__name__)}.{self.__class__.__name__} content={self.__content__}>"
+		
+	def __str__(self) -> str:
+		return f"{self.__name__} {self.sep.join(self.__content__)}"
+	
+	def __sql__(self):
+		return self.__str__()
+	
+	def __hash__(self):
+		return self.__sql__().__hash__()
+	
+	def __format__(self, format_spec : str):
+		if format_spec.endswith("!sql"):
+			return self.__sql__().__format__(format_spec.rstrip("!sql"))
+		elif format_spec.endswith("!r"):
+			return self.__repr__().__format__(format_spec.rstrip("!r"))
+		elif format_spec.endswith("!s"):
+			return self.__str__().__format__(format_spec.rstrip("!s"))
+		else:
+			return self.__str__().__format__(format_spec)
+	
+	@property
+	def params(self):
+		return [getattr(item, "params", None) or item for item in self.__content__ if not isinstance(item, Column|Table|Index)]
+		
+class EnclosedWord(Word):
+	def __str__(self):
+		return f"{self.__name__} ({self.sep.join(map(str, self.__content__))})"
