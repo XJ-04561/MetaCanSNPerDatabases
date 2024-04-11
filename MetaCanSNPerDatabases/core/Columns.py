@@ -2,36 +2,6 @@
 from MetaCanSNPerDatabases.core._Constants import *
 from MetaCanSNPerDatabases.Globals import *
 
-
-class Column:
-	
-	name : str
-	databaseName : str
-	dataType : str
-	
-	def __init__(self, name : str, databaseName : str, dataType : str):
-		self.name = name
-		self.databaseName = databaseName
-		self.dataType = dataType
-	
-	def __repr__(self):
-		return f"<{__name__}.{self.__class__.__name__} name={self.name!r} databaseName={self.databaseName!r} at {hex(id(self))}>"
-		
-	def __str__(self):
-		return self.name
-	
-	def __hash__(self):
-		return self.name.__hash__()
-	
-	def __neg__(self):
-		return Column(self.name, f"{self.databaseName} ASC")
-	
-	def __format__(self, format_spec):
-		if format_spec.endswith("!sql"):
-			return self.databaseName.__format__(format_spec.rstrip("!sql"))
-		else:
-			return self.name.__format__(format_spec)
-
 ALL				= Column("ALL",				"*",					"tuple")
 Parent			= Column("Parent",			COLUMN_PARENT,			COLUMN_PARENT_TYPE)
 NodeID			= Column("NodeID",			COLUMN_NODE_ID,			COLUMN_GENOTYPE_TYPE)

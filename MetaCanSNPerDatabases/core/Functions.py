@@ -234,68 +234,6 @@ def generateTableQuery(self, *select : Column, orderBy : Column|tuple[Column]|No
 	LOGGER.debug(out := (query.format(**formatDict), tuple(params)))
 	return out
 
-class SQL_STATEMENT:
-	
-	select : tuple[Column] = ()
-	_select : tuple[Column] = None
-
-	tables : tuple[Type[Table]] = ()
-	_tables : tuple[Type[Table]] = None
-
-	where : dict[Column,Any] = ()
-	_where : dict[Column,Any] = None
-
-	orderBy : tuple[Column] = ()
-	_orderBy : tuple[Column] = None
-
-	@property
-	def select(self):
-		if len(self._select) > 0:
-
-class SELECT(SQL_STATEMENT):
-	def __init__(self, *columns):
-		self.select = columns
-	
-	def __iter__(self):
-		queryString = f"SELECT {', '.join(self.select)}"
-		if len(self.tables) > 0:
-			queryString = f" FROM {', '.join(self.tables)}"
-		else:
-			allSelects = None
-			allSelectsAndWheres = None
-			for table in Table.__subclasses__():
-				if not all(select in table._columns for select in self.select):
-					continue
-				elif not all(where in table._columns for where in map(COLUMN_LOOKUP.__getitem__, self.where)):
-					allSelects = f" FROM {table._tableName}"
-					continue
-				else:
-					allSelectsAndWheres = f" FROM {table._tableName}"
-					break
-			if allSelectsAndWheres is not None:
-				queryString += allSelectsAndWheres
-			elif allSelects is not None:
-				queryString += allSelects
-		if hasattr(self, "tables"):
-			queryString = f" FROM {', '.join(self.tables)}"
-		else:
-
-		return queryString, params
-
-	def FROM(self, *tables : tuple[Type[Table]]):
-		self.tables = tables
-		return self
-	
-	def WHERE(self, **wheres : dict[str,Any|Column]):
-		self.where = wheres
-		return self
-	
-	def ORDER_BY(self, *orderBy : tuple[Column]):
-		self.orderBy = orderBy
-		return self
-	
-	def LIMIT(self, limit : int):
-		self.limit = limit
 
 @cache
 def generateQueryString(select : tuple[Column], orderBy : tuple[Column]|None=None, table:str|None=None, where : tuple[tuple[str,bool]]|None=tuple()) -> tuple[str,tuple[Any]]:

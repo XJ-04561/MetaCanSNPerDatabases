@@ -5,13 +5,9 @@ import MetaCanSNPerDatabases.Globals as Globals
 import MetaCanSNPerDatabases.core.Columns as Columns
 from MetaCanSNPerDatabases.core.Columns import Column
 from MetaCanSNPerDatabases.core._Constants import *
+from MetaCanSNPerDatabases.core.Exceptions import *
 from MetaCanSNPerDatabases.core.Tables import Table
-
-
 from MetaCanSNPerDatabases.core.Tree import Branch
-
-class IsLegacyCanSNPer2(sqlite3.Error): pass
-class OutdatedCanSNPerDatabase(sqlite3.Error): pass
 
 class Database:
 

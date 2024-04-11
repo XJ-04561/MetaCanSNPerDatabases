@@ -2,7 +2,7 @@
 
 from functools import cached_property, cache
 import sqlite3, hashlib, re, os, logging, shutil, sys
-from typing import Generator, Callable, Iterable, Self, Literal, LiteralString, Any, TextIO, BinaryIO, Never, Iterator, TypeVar, Type, get_args, get_origin
+from typing import Generator, Callable, Iterable, Self, Literal, LiteralString, Any, TextIO, BinaryIO, Never, Iterator, TypeVar, Type, get_args, get_origin, ChainMap
 import typing
 
 from PseudoPathy import Path, DirectoryPath, FilePath, PathGroup, PathLibrary, PathList
@@ -10,6 +10,37 @@ from PseudoPathy.Library import CommonGroups
 from PseudoPathy.PathShortHands import *
 
 from MetaCanSNPerDatabases.Exceptions import *
+
+pluralPattern = re.compile(r"s$|x$|z$|sh$|ch$")
+hiddenPattern = re.compile(r"^_[^_].*")
+
+def pluralize(string : str) -> str:
+	match pluralPattern.search(string):
+		case None:
+			return f"{string}s"
+		case _:
+			return f"{string}es"
+
+class AutoObject:
+	"""Automatically assigns values passed to the constructor to the annotations
+	of the object class. Skips 'hidden' attributes starting with only one
+	underscore. Meaning, _name would not be assigned a value from the
+	construction call, but __name__ would, as it starts with one, and not two
+	underscores."""
+	def __init__(self, *args, **kwargs):
+		i = 0
+		for name, typeHint in self.__annotations__.items():
+			if hiddenPattern.fullmatch(name) is None:
+				continue
+			elif name in kwargs:
+				self.__setattr__(name, kwargs[name])
+			elif len(args) > i:
+				self.__setattr__(name, args[i])
+				i += 1
+			else:
+				if not hasattr(self, name):
+					raise MissingArgument(f"Missing required argument {name} for {self.__class__.__name__}.__init__")
+
 
 def isType(value, typed):
 	try:
@@ -76,6 +107,15 @@ ReadMode    = Literal["r"]
 WriteMode   = Literal["w"]
 Direction   = Literal["DESC","ASC"]
 Nucleotides = Literal["A", "T", "C", "G", "N"]
+
+SQL_TYPES = {
+	"INTEGER" : int,
+	"VARCHAR" : str,
+	"TEXT" : str,
+	"CHAR" : str,
+	"DOUBLE" : float,
+	"NULL" : None
+}
 
 formatPattern = re.compile(r"[{](.*?)[}]")
 
