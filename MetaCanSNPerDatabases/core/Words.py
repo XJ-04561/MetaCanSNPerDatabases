@@ -1,52 +1,69 @@
 
 from MetaCanSNPerDatabases.Globals import *
 from MetaCanSNPerDatabases.core.Structures import *
-from MetaCanSNPerDatabases.core.SQL import *
-
-
-class PRIMARY_KEY(EnclosedWord):
-	__name__ : str = "PRIMARY KEY"
-	
-class FOREIGN_KEY(EnclosedWord):
-	__name__ : str = "FOREIGN KEY"
-	table : Table
-
-	@Overload
-	def __init__(self, keys : tuple[Column], table : Table, foreignKeys : tuple[Column]):
-		self.table = table
-		self._left = keys
-		self._right = foreignKeys
-		self.__content__ = self._left + self._right
-
-	@__init__.add
-	def _(self, keys : tuple[Column], table : Table):
-		self.table = table
-		self.__content__= self._left = self._right  = keys
-
-	def __str__(self):
-		return f"FOREIGN KEY ({self.sep.join(map(str, self._left))}) REFERENCES {self.table}({self.sep.join(map(str, self._right))})"
 
 class UNIQUE(EnclosedWord):
-	__name__ : str = "UNIQUE"
+	name : str = "UNIQUE"
 
 class SELECT(Word):
-	__name__ : str = "SELECT"
+	name : str = "SELECT"
 
 class FROM(Word):
-	__name__ : str = "FROM"
+	name : str = "FROM"
 
 class WHERE(Word):
-	__name__ : str = "WHERE"
 	sep : str = "AND"
 
-class ORDER_BY(Word):
-	__name__ : str = "ORDER BY"
+class ASC: pass
+class DESC: pass
+class ORDER: pass
 
-class LIMIT(Word):
-	__name__ : str = "LIMIT"
+ASC = Prefix("ASC", (), {})
+DESC = Prefix("DESC", (), {})
+ORDER = Prefix("ORDER", (), {})
 
-class TABLE(Word):
-	__name__ : str = "TABLE"
+class BY(Word): pass
 
-class Words: pass
-Words = PRIMARY_KEY | FOREIGN_KEY | UNIQUE | SELECT | FROM | WHERE | ORDER_BY | LIMIT | TABLE
+class LIMIT(Word): pass
+
+class CREATE: pass
+class ALTER: pass
+class RENAME: pass
+class DROP: pass
+
+CREATE = Prefix("CREATE", (), {})
+ALTER = Prefix("ALTER", (), {})
+RENAME = Prefix("RENAME", (Word), {})
+DROP = Prefix("DROP", (), {})
+
+class TO(Word): pass
+
+class INDEX: pass
+class TABLE: pass
+class TRIGGER: pass
+class VIEW: pass
+INDEX = Prefix("INDEX", (Word), {})
+TABLE = Prefix("TABLE", (Word), {})
+TRIGGER = Prefix("TRIGGER", (Word), {})
+VIEW = Prefix("VIEW", (Word), {})
+
+class IF: pass
+class PRIMARY: pass
+class FOREIGN: pass
+IF = Prefix("IF", (), {})
+PRIMARY = Prefix("PRIMARY", (), {})
+FOREIGN = Prefix("FOREIGN", (), {})
+class EXISTS(Word): pass
+
+
+class KEY(EnclosedWord): pass
+	
+class REFERENCES(Word):
+	def __str__(self):
+		match len(self.content):
+			case 1:
+				return f"{self.__class__.__name__} {self.content[0]}"
+			case 2:
+				return f"{self.__class__.__name__} {self.content[0]}({', '.join(map(str, self.content[1]))})"
+			case _:
+				return f"{self.__class__.__name__} {self.content[0]}({', '.join(map(str, self.content[1:]))})"

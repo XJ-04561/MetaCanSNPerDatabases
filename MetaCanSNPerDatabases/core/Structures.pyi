@@ -50,11 +50,22 @@ class Table(SQLObject):
 class Index(SQLObject):
 	def __init__(self, __name__ : str, name : str, table : Table, columns : Column|Iterable[Column]): ...
 
-class PrimaryKey(SQLObject):
-    def __init__(self, __name__ : str, name : str, columns : Iterable[Column]): ...
+class Query:
+	words : tuple[Word] = tuple()
+	def __init__(self, *words): ...
+
+class Word:
+	content : tuple
+	sep : str = ", "
+	def __init__(self, *args : tuple[Table|Column|Index|Comparison], **kwargs : dict[str,Any]): ...
+
+class EnclosedWord(Word):
+	def __str__(self):
+		return f"{self.__class__.__name__} ({self.sep.join(map(str, self.content))})"
 	
-class ForeignKey(SQLObject):
-	def __init__(self, __name__ : str, name : str, table : Table, columns : tuple[Column]): ...
-	
-class Unique(SQLObject):
-	def __init__(self, __name__ : str, name : str, columns : tuple[Column]): ...
+class Prefix(type):
+	def __str__(self):
+		return self.__name__
+	def __sub__(self, other):
+		return Query(self, other)
+

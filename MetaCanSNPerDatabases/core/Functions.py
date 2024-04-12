@@ -6,37 +6,27 @@ from MetaCanSNPerDatabases.core.Columns import *
 from MetaCanSNPerDatabases.core._Constants import *
 from MetaCanSNPerDatabases.core.Databases import DatabaseWriter
 from MetaCanSNPerDatabases.core.Tables import Table
-
-import inspect
-
-
-
-def interpretSQLtype(flag, val):
-	for typeLookup in Columns.TYPE_LOOKUP.values():
-		if flag in typeLookup:
-			match typeLookup[flag][0]:
-				case "INTEGER":
-					return int(val)
-				case _:
-					return val
+	
 
 whitespacePattern = re.compile(r"\s+")
-sqlite3TypePattern = re.compile(r"(?P<integer>INTEGER)|(?P<varchar>VARCHAR[(](?P<number>[0-9]*)[)])|(?P<date>DATE)|(?P<text>TEXT)")
+sqlite3TypePattern = re.compile(r"(?P<integer>INTEGER)|(?P<decimal>DECIMAL)|(?P<char>(VAR)?CHAR[(](?P<number>[0-9]*)[)])|(?P<date>DATE)|(?P<datetime>DATETIME)|(?P<text>TEXT)")
 
-def formatType(tps):
+def formatType(columns : tuple[Column]):
 
 	d = {"unknown" : True}
 	d.setdefault(False)
-	for tp in tps:
+	for tp in map(lambda col : col.type, columns):
 		d |= sqlite3TypePattern.fullmatch(tp).groupdict()
 		
-		match next(filter(d.get, ["integer", "varchar", "date", "text", "unknown"])):
+		match next(filter(d.get, ["integer", "decimal", "char", "date", "datetime", "text", "unknown"])):
 			case "integer":
 				yield "{:>7d}"
 			case "varchar":
 				yield "{:>" + str(int(d.get("number"))+2) + "s}"
 			case "date":
 				yield "{:>12s}"
+			case "datetime":
+				yield "{:>16s}"
 			case "text":
 				yield "{:>12s}"
 			case "unknown":

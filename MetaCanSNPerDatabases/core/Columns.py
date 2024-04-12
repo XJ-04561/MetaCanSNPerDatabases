@@ -2,7 +2,7 @@
 from MetaCanSNPerDatabases.core._Constants import *
 from MetaCanSNPerDatabases.Globals import *
 
-ALL				= Column("ALL",				"*",					"tuple")
+ALL				= Column("ALL",				"*",					"")
 Parent			= Column("Parent",			COLUMN_PARENT,			COLUMN_PARENT_TYPE)
 NodeID			= Column("NodeID",			COLUMN_NODE_ID,			COLUMN_GENOTYPE_TYPE)
 GenoType		= Column("GenoType",		COLUMN_GENOTYPE,		COLUMN_NODE_ID_TYPE)
