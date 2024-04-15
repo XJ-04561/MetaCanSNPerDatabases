@@ -154,10 +154,10 @@ def main():
 	downloadParser.set_defaults(func=download)
 
 	testParser : argparse.ArgumentParser = modeGroup.add_parser("test", help="Test out the features of MetaCanSNPerDatabases to see if your environment is suitable for using it.")
-	testParser.add_argument("database", nargs="+", type=os.path.realpath)
+	testParser.add_argument("database", nargs="+", type=os.path.realpath, default=["francisella_tularensis.db"])
 	testParser.add_argument("--refDir")
 	testParser.add_argument("--noCopy", action="store_true")
-	testParser.add_argument("--outDir", default=os.path.realpath("."))
+	testParser.add_argument("--outDir", default=os.path.realpath(".")) # CommonGroups.shared / "MetaCanSNPer-Data" / "Databases")
 	testParser.set_defaults(func=test)
 
 	parser.add_argument("--version", action="store_true")

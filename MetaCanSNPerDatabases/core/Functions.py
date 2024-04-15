@@ -121,35 +121,39 @@ def loadFromSNPFile(database : DatabaseWriter, file : TextIO):
 	else:
 		ValueError("File is not of accepted format.")
 
-def updateFromLegacy(database : DatabaseWriter, refDir : Path|PathGroup=None):
+def updateFromLegacy(database, refDir : Path|PathGroup=None):
 	"""Update from CanSNPer2 to MetaCanSNPer v.1 format."""
 
 	import textwrap, gzip
 	from urllib.request import urlretrieve
 	import ncbi.datasets as datasets # type: ignore
 
+	from MetaCanSNPerDatabases.core.Words import CREATE, BEGIN, TRANSACTION, ALTER, TABLE, RENAME, TO, INSERT, INTO, SELECT, FROM, DROP, COMMIT, VALUES, UPDATE, SET, WHERE, PRAGMA, ORDER, BY
+	from MetaCanSNPerDatabases.core.Structures import sql
+	from MetaCanSNPerDatabases.core.Tables import ReferencesTable, ChromosomesTable, SNPsTable, TreeTable
+	from MetaCanSNPerDatabases.core.Columns import Parent, GenomeID, GenbankID, Assembly
 	if refDir is None:
-		refDir = CommonGroups.shared / f"{SOFTWARE_NAME}-Data" / pName(database.filename)
+		refDir = CommonGroups.shared / f"{SOFTWARE_NAME}-Data" / "References" / pName(database.filename)
 
 	# References
 	LOGGER.info("Updating 'References'-table")
-	database._connection.execute("BEGIN TRANSACTION;")
-	database._connection.execute("ALTER TABLE snp_references RENAME TO snp_references_old;")
-	database.ReferencesTable.create()
-	database._connection.execute(f"INSERT INTO {TABLE_NAME_REFERENCES} SELECT * FROM snp_references_old;")
-	database._connection.execute("DROP TABLE snp_references_old;")
-	database._connection.execute("COMMIT;")
+	database(BEGIN - TRANSACTION)
+	database(ALTER - TABLE ("snp_references") - RENAME - TO - "snp_references_old")
+	database(CREATE - TABLE - sql(ReferencesTable))
+	database(INSERT - INTO - ReferencesTable - SELECT * FROM - "snp_references_old")
+	database(DROP - TABLE ("snp_references_old"))
+	database(COMMIT)
 
 	# Chromosomes
 	LOGGER.info("Updating 'Chromosomes'-table")
-	database._connection.execute("BEGIN TRANSACTION;")
-	database.ChromosomesTable.create()
+	database(BEGIN - TRANSACTION)
+	database(CREATE - TABLE - sql(ChromosomesTable) )
 	GenomeAPI = datasets.GenomeApi()
-	for i, genbankID, assembly in database.ReferencesTable.get(Columns.GenomeID, Columns.GenbankID, Columns.Assembly):
+	for i, genbankID, assembly in database[GenomeID, GenbankID, Assembly]:
 		try:
 			chromosome = GenomeAPI.assembly_descriptors_by_accessions([genbankID])["assemblies"][0]["assembly"]["biosample"]["sample_ids"][0]["value"]
 			assert len(chromosome) != 0, "No genbank entry found"
-			database._connection.execute(f"INSERT INTO {TABLE_NAME_CHROMOSOMES} VALUES (?, ?, ?);", [i, chromosome, i])
+			database(INSERT - INTO - ChromosomesTable - VALUES (i, chromosome, i))
 		except Exception as e:
 			LOGGER.exception(e)
 			try:
@@ -158,45 +162,45 @@ def updateFromLegacy(database : DatabaseWriter, refDir : Path|PathGroup=None):
 				LOGGER.warning(f"Couldn't find genome with {genbankID=} either online or in {refDir!r}.")
 				raise UnableToDefineChromosomes(f"Could not find naming for chromosomes in entry with {i=}, {genbankID=}, and {assembly=}.")
 		finally:
-			database._connection.execute(f"INSERT INTO {TABLE_NAME_CHROMOSOMES} VALUES (?, ?, ?);", [i, chromosome, i])
+			database(INSERT - INTO - ChromosomesTable - VALUES (i, chromosome, i))
 				
-	database._connection.execute("COMMIT;")
+	database(COMMIT)
 	
 	# SNPs
 	LOGGER.info("Updating 'SNP'-table")
-	database._connection.execute("BEGIN TRANSACTION;")
-	database._connection.execute("ALTER TABLE snp_annotation RENAME TO snp_annotation_old;")
-	database.SNPsTable.create()
-	database._connection.execute(f"INSERT INTO {TABLE_NAME_SNP_ANNOTATION} ({COLUMN_NODE_ID}, {COLUMN_POSITION}, {COLUMN_ANCESTRAL}, {COLUMN_DERIVED}, {COLUMN_REFERENCE}, {COLUMN_DATE}, {COLUMN_CHROMOSOME_ID}) SELECT node_id-1, position, ancestral_base, derived_base, reference, date, genome_i FROM snp_annotation_old;")
-	database._connection.execute("DROP TABLE snp_annotation_old;")
-	database._connection.execute("COMMIT;")
+	database(BEGIN - TRANSACTION)
+	database(ALTER - TABLE - "snp_annotation" - RENAME - TO - "snp_annotation_old")
+	database(CREATE - TABLE - sql(SNPsTable))
+	database(INSERT - INTO - SNPsTable - f"({COLUMN_NODE_ID}, {COLUMN_POSITION}, {COLUMN_ANCESTRAL}, {COLUMN_DERIVED}, {COLUMN_REFERENCE}, {COLUMN_DATE}, {COLUMN_CHROMOSOME_ID})" - SELECT ("node_id-1", "position", "ancestral_base", "derived_base", "reference", "date", "genome_i") - FROM - "snp_annotation_old")
+	database(DROP - TABLE - "snp_annotation_old")
+	database(COMMIT)
 	
 	# Tree
 	LOGGER.info("Updating 'Tree'-table")
-	database._connection.execute("BEGIN TRANSACTION;")
-	database._connection.execute("ALTER TABLE tree RENAME TO tree_old;")
-	database._connection.execute("COMMIT;")
-	database._connection.execute("BEGIN TRANSACTION;")
-	database.TreeTable.create()
-	database._connection.execute("COMMIT;")
-	database._connection.execute("BEGIN TRANSACTION;")
-	database._connection.execute(f"INSERT INTO {TABLE_NAME_TREE} ({COLUMN_PARENT}, {COLUMN_NODE_ID}, {COLUMN_GENOTYPE}) SELECT tree_old.parent-1, null, nodes.name FROM tree_old, nodes WHERE tree_old.child = nodes.id AND tree_old.child > 1 ORDER BY tree_old.child ASC;")
-	database._connection.execute("COMMIT;")
-	database._connection.execute("BEGIN TRANSACTION;")
-	database._connection.execute(f"UPDATE {TABLE_NAME_TREE} SET parent=0 WHERE child = 1;")
-	database._connection.execute("DROP TABLE nodes;")
-	database._connection.execute("DROP TABLE tree_old;")
+	database(BEGIN - TRANSACTION)
+	database(ALTER - TABLE - TreeTable - RENAME - TO - "tree_old")
+	database(COMMIT)
+	database(BEGIN - TRANSACTION)
+	database(CREATE - TABLE - sql(TreeTable))
+	database(COMMIT)
+	database(BEGIN - TRANSACTION)
+	database(INSERT - INTO - TreeTable - f"({COLUMN_PARENT}, {COLUMN_NODE_ID}, {COLUMN_GENOTYPE})" - SELECT ("tree_old.parent-1", "null", "nodes.name") - FROM ("tree_old", "nodes") - WHERE (Comparison("tree_old.child", "==", "nodes.id"), Comparison("tree_old.child", ">", 1)) - ORDER - BY - "tree_old.child ASC")
+	database(COMMIT)
+	database(BEGIN - TRANSACTION)
+	database(UPDATE - TreeTable - SET (Parent==0) - WHERE (NodeID == 1))
+	database(DROP - TABLE - "nodes")
+	database(DROP - TABLE - "tree_old")
 
 	LOGGER.info("Dropping 'genomes'- and 'rank'-tables")
 
-	database._connection.execute("DROP TABLE genomes;")
-	database._connection.execute("DROP TABLE rank;")
+	database(DROP - TABLE - "genomes")
+	database(DROP - TABLE - "rank")
 	
-	for table in database.Tables.values():
-		table.createIndex()
+	for index in database.indexes:
+		database.createIndex(index)
 
-	database._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION};")
-	database._connection.execute("COMMIT;")
+	database(PRAGMA (user_version = CURRENT_VERSION))
+	database(COMMIT)
 
 def downloadDatabase(databaseName : str, dst : str, reportHook=lambda block, blockSize, totalSize : None) -> str|None:
 	from urllib.request import urlretrieve

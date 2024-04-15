@@ -20,9 +20,24 @@ class PRAGMA(Word):
 		for variable, value in assignments.items():
 			content.append(Assignment(variable, value))
 		self.content = tuple(content)
+class VALUES(EnclosedWord):
+	def __init__(self, *args):
+		from MetaCanSNPerDatabases.core.Structures import SanitizedValue
+		self.content = tuple(map(SanitizedValue, args))
+class UPDATE(Word): pass
+class SET(Word):
+	def __init__(self, *comparisons, **assignments):
+		content = []
+		for comp in comparisons:
+			content.append(Assignment(comp.left, comp.right))
+		for variable, value in assignments.items():
+			content.append(Assignment(variable, value))
+		self.content = tuple(content)
 
 class UNIQUE(EnclosedWord): pass
-class SELECT(Word): pass
+class SELECT(Word):
+	def __mult__(self, right):
+		return Query(self(ALL), right)
 class FROM(Word): pass
 class WHERE(Word):
 	sep : str = "AND"

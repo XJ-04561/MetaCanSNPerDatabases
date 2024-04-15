@@ -47,8 +47,6 @@ class sql(str):
 	def __new__(cls, obj):
 		return super().__new__(cls, obj.__sql__())
 
-
-
 class this:
 	"""Class that can be used when map() needs a function that just needs to grab an attribute."""
 	@classmethod
@@ -226,6 +224,10 @@ class Query:
 	def __sub__(self, other : Query|Word):
 		return Query(self, other)
 
+	def __mult__(self, right):
+		self.words[-1] = self.words[-1](ALL)
+		return Query(self, right)
+	
 	def __getattr__(self, key):
 		if key in map(lambda obj : obj.__name__, Word.__subclasses__()):
 			return next(filter(lambda obj : obj.__name__ == key, Word.__subclasses__()))
