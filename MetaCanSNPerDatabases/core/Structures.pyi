@@ -46,6 +46,16 @@ from MetaCanSNPerDatabases.Globals import *
 class sql(str):
 	def __new__(cls, obj) -> str: ...
 
+class this:
+	"""Class that can be used when map() needs a function that just needs to grab an attribute."""
+	@classmethod
+	def __getattribute__(cls, attrName):
+		return object.__getattribute__(cls, "this")(attrName)
+	class this:
+		def __init__(self, attrName : str): ...
+		def __call__(self, obj : Any): ...
+		def __repr__(self): ...
+	
 class SQLObject(AutoObject):
 	
 	__name__ : str

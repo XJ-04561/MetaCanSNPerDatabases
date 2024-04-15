@@ -47,6 +47,22 @@ class sql(str):
 	def __new__(cls, obj):
 		return super().__new__(cls, obj.__sql__())
 
+
+
+class this:
+	"""Class that can be used when map() needs a function that just needs to grab an attribute."""
+	@classmethod
+	def __getattribute__(cls, attrName):
+		return object.__getattribute__(cls, "this")(attrName)
+	class this:
+		def __init__(self, attrName):
+			self.__name__ = attrName
+		def __call__(self, obj):
+			return getattr(obj, self.__name__)
+		def __repr__(self):
+			return f"<this.{self.__name__} object>"
+
+
 class SQLObject(AutoObject):
 	
 	__name__ : str
@@ -170,7 +186,7 @@ class Table(SQLObject):
 		return self.__sql__().__hash__()
 	
 	def __repr__(self):
-		return f"<{__name__}.{self.__class__.__name__} rows={len(self)} columns={[c.__name__ for c in self.columns]} at {hex(id(self))}>"
+		return f"<{__name__}.{self.__class__.__name__} columns={[c.__name__ for c in self.columns]} at {hex(id(self))}>"
 	
 	def __iter__(self):
 		for column in self.columns:

@@ -5,49 +5,24 @@ from MetaCanSNPerDatabases.Globals import *
 import argparse, sys
 
 
-
-def read(databasePath : str=None, TreeTable : bool=False, SNPsTable : bool=False, ChromosomesTable : bool=False, ReferencesTable : bool=False, **kwargs):
+#def read(databasePath : str=None, TreeTable : bool=False, SNPsTable : bool=False, ChromosomesTable : bool=False, ReferencesTable : bool=False, **kwargs):
+def read(databasePath : str=None, **kwargs):
 
 	LOGGER.debug(f"{databasePath=}")
-	database : DatabaseReader = openDatabase(databasePath, "r")
+	database : MetaCanSNPerDatabase = MetaCanSNPerDatabase(databasePath, "r")
 	
-	code = database.checkDatabase()
-
-	database.validateDatabase(code)
+	database.checkDatabase()
 	
 	print(database)
-	if not any([TreeTable, SNPsTable, ChromosomesTable, ReferencesTable]):
-		print(database.TreeTable)
-		print(database.SNPsTable)
-		print(database.ChromosomesTable)
-		print(database.ReferencesTable)
-	else:
-		for table, flag in {"TreeTable":TreeTable, "SNPsTable":SNPsTable, "ChromosomesTable":ChromosomesTable, "ReferencesTable":ReferencesTable}.items():
-			if flag:
-				print(f"{table}:")
-				rowFormat = " | ".join(formatType([tp for tp, *_ in database.Tables[table]._types]))
-				for row in database.Tables[table]:
-					print(rowFormat.format(*row))
+
+	database.close()
 
 def write(databasePath : str=None, rectify : bool=False, SNPFile : str=None, treeFile : str=None, referenceFile : str=None, **kwargs):
 
 	LOGGER.debug(f"{databasePath=}")
-	database : DatabaseWriter = openDatabase(databasePath, "w")
+	database : MetaCanSNPerDatabase = MetaCanSNPerDatabase(databasePath, "w")
 
-	code = database.checkDatabase()
-	if rectify:
-		n = 0
-		while code != 0 or n < 10:
-			database.rectifyDatabase(code)
-			if code == (code := database.checkDatabase()):
-				print("Rectified database but got the same error code again.")
-				database.validateDatabase(code)
-			n+=1
-		if n == 10 and code != 0:
-			print("Repeatedly attempted to rectify the database, but failed to. This exception was the last one caught.")
-			database.validateDatabase(code)
-	else:
-		database.validateDatabase(code)
+	database.checkDatabase()
 	
 	print(database)
 	
@@ -58,83 +33,85 @@ def write(databasePath : str=None, rectify : bool=False, SNPFile : str=None, tre
 	else:
 		LOGGER.warning("No files given to build database from. Created an empty database with the current MetaCanSNPer structure.")
 
-	database.commit()
 	database.close()
 
 def update(databasePaths : list[str]=None, refDir : str=".", noCopy=False, **kwargs):
 
 	LOGGER.debug(f"{databasePaths=}")
-	import os
-	for databaseName in databasePaths:
-		try:
-			database = openDatabase(databaseName, "w")
-			LOGGER.debug(f"Database {databaseName} is of version v.{database.__version__}")
-			code = database.checkDatabase()
-			database.validateDatabase(code, throwError=False)
+	for databasePath in databasePaths:
+		database : MetaCanSNPerDatabase = MetaCanSNPerDatabase(databasePath, "w")
 
-			oldCwd = os.path.realpath(os.curdir)
-			
-			database.rectifyDatabase(code, copy=not noCopy, refDir=refDir)
+		database.checkDatabase()
+		
+		print(f"Updated {databasePath} succesfully!")
+		print(database)
 
-			database.close()
-			print(f"Finished updating {databaseName!r}")
-		except Exception as e:
-			try:
-				database.close()
-			except:
-				pass
-			LOGGER.exception(e)
-			print(f"Failed in updating {databaseName!r} due to:\n{type(e).__name__}: {e}")
+		database.close()
 
 def download(databaseNames : list[str]=[], outDir : str=".", **kwargs):
 
 	LOGGER.debug(f"{databaseNames=}")
+	out = []
 	for databaseName in databaseNames:
 		try:
 			if downloadDatabase(databaseName, os.path.join(outDir, databaseName)) is None:
 				raise DownloadFailed(f"Failed to download {databaseName} to {os.path.join(outDir, databaseName)}.")
+			out.append(os.path.join(outDir, databaseName))
 			print(f"Finished downloading {databaseName!r}")
 		except Exception as e:
 			LOGGER.exception(e)
 			print(f"Failed in downloading {databaseName!r}")
+	return out
 
-def test(**kwargs):
+def test(database : list[Path]= [], refDir : Path=".", outDir : Path=".", noCopy : bool=False, **kwargs):
 
-	LOGGER.debug(f"{kwargs.database=}")
+	LOGGER.debug(f"{kwargs['database']=}")
 	print("Testing Download:")
-	download(kwargs)
+	databasePaths = download(databaseNames=kwargs['database'], outDir=outDir)
 
 	print("Testing Update:")
-	update(kwargs)
+	update(databasePaths=databasePaths, refDir=refDir, noCopy=noCopy)
+
+	from MetaCanSNPerDatabases.core.Columns import Position, Ancestral, Derived, ChromID, Chromosome, Genome
+	from MetaCanSNPerDatabases.core.Tables import ChromosomesTable, ReferencesTable
 
 	print("Testing Read:")
-	for databaseName in kwargs.database:
-		print(f"  {databaseName.replace(os.path.realpath('.'), '.').replace(os.path.expanduser('~'), '~')}")
-		LOGGER.debug(f"{databaseName.replace(os.path.realpath('.'), '.').replace(os.path.expanduser('~'), '~')}")
+	for databasePath in databasePaths:
+		print(f"  {databasePath.replace(os.path.realpath('.'), '.').replace(os.path.expanduser('~'), '~')}")
+		LOGGER.debug(f"{databasePath.replace(os.path.realpath('.'), '.').replace(os.path.expanduser('~'), '~')}")
 
-		database = openDatabase(databaseName, "r")
+		database = openDatabase(databasePath, "r")
 		LOGGER.debug(repr(database))
 
 		print(f"    Arbitrary `.get` from one table only.")
 		LOGGER.debug(f"Arbitrary `.get` from one table only.")
-		database.get(Columns.Position, Columns.Ancestral, Columns.Derived, ChromID=1)
-		LOGGER.debug("\n".join(database.get(Columns.Position, Columns.Ancestral, Columns.Derived, ChromID=1)))
+		string = []
+		for row in database[Position, Ancestral, Derived][ChromID == 1]:
+			string.append(",\t".join(map(str, row)))
+		LOGGER.debug("\n".join(string))
 
 		print(f"    Get one entry from a table.")
 		LOGGER.debug(f"Get one entry from a table.")
-		chromID, chromosome, genomeID = database.ChromosomesTable.first()
+		
+		chromID, chromosome, genomeID = next(iter(database[ChromosomesTable]))
 		LOGGER.debug(f"{chromID=}, {chromosome=}, {genomeID=}")
 
-		genomeID, genome, *rest = database.ChromosomesTable.first()
-		LOGGER.debug(f"{genomeID=}, {genome=}, {rest=}")
+		genomeID, genome, strain, genbank, refseq, assembly = next(iter(database[ReferencesTable]))
+		LOGGER.debug(f"{genomeID=}, {genome=}, {strain=}, {genbank=}, {refseq=}, {assembly=}")
 
 		print(f"    Arbitrary `.get` from one table referencing adjacent table.")
 		LOGGER.debug(f"Arbitrary `.get` from one table referencing adjacent table.")
-		LOGGER.debug("\n".join(database.get(Columns.Position, Columns.Ancestral, Columns.Derived, Chromosome=chromosome)))
+		string = []
+		for row in database[Position, Ancestral, Derived][Chromosome == chromosome]:
+			string.append(",\t".join(map(str, row)))
+		LOGGER.debug("\n".join(string))
 
 		print(f"    Arbitrary `.get` from one table referencing across more than one chained table.")
 		LOGGER.debug(f"Arbitrary `.get` from one table referencing across more than one chained table.")
-		LOGGER.debug("\n".join(database.get(Columns.Position, Columns.Ancestral, Columns.Derived, Genome=genome)))
+		string = []
+		for row in database[Position, Ancestral, Derived][Genome == genome]:
+			string.append(",\t".join(map(str, row)))
+		LOGGER.debug("\n".join(string))
 
 def main():
 

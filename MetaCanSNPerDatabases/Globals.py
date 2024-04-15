@@ -130,10 +130,13 @@ LOGGER_FILEHANDLER = logging.FileHandler("MetaCanSNPerDatabases.log")
 LOGGER_FILEHANDLER.setFormatter(logging.Formatter("[%(name)s] %(asctime)s - %(levelname)s: %(message)s"))
 LOGGER.addHandler(LOGGER_FILEHANDLER)
 
+LEGACY_HASH = "7630f33662e27489b7bb7b3b121ca4ff"
+
 DATABASE_VERSIONS : dict[str,int] = {
-	"7630f33662e27489b7bb7b3b121ca4ff" : 1, # Legacy CanSNPer
-	"175c47f1ad61ec81a7d11d8a8e1887ff" : 2  # MetaCanSNPer Alpha version
+	LEGACY_HASH							: 0, # Legacy CanSNPer
+	"175c47f1ad61ec81a7d11d8a8e1887ff"	: 2  # MetaCanSNPer Alpha version
 }
+
 LEGACY_VERSION = 0
 CURRENT_VERSION = 2
 CURRENT_TABLES_HASH = ""

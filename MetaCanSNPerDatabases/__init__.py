@@ -18,3 +18,4 @@ from MetaCanSNPerDatabases.core.Tables import SNPsTable, ReferencesTable, TreeTa
 from MetaCanSNPerDatabases.core.Tree import Branch
 import MetaCanSNPerDatabases.core.Test as Test
 from MetaCanSNPerDatabases import Commands
+from MetaCanSNPerDatabases.MetaCanSNPerDatabase import MetaCanSNPerDatabase
