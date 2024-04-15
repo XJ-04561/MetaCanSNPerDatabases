@@ -1,27 +1,11 @@
 
 from MetaCanSNPerDatabases.Globals import *
-import MetaCanSNPerDatabases.Globals as Globals
-import MetaCanSNPerDatabases.core.Columns as Columns
+from MetaCanSNPerDatabases.core.Structures import Table
 from MetaCanSNPerDatabases.core.Columns import *
-from MetaCanSNPerDatabases.core._Constants import *
-from MetaCanSNPerDatabases.core.Indexes import Index
+from MetaCanSNPerDatabases.core.Words import *
 
 
-
-TreeTable = Table(name = TABLE_NAME_TREE, column = [Parent, NodeID, GenoType], appendRows = TREE_APPEND)
-TreeTable.addIndex(Parent)
-
-SNPsTable = Table(TABLE_NAME_SNP_ANNOTATION, [NodeID, Position, Ancestral, Derived, SNPReference, Date, ChromID], SNP_APPEND)
-SNPsTable.addIndex(Position)
-SNPsTable.addIndex(ChromID)
-SNPsTable.addIndex(NodeID)
-
-ChromosomesTable = Table(TABLE_NAME_CHROMOSOMES, [ChromID, Chromosome, GenomeID], CHROMOSOMES_APPEND)
-
-ReferencesTable = Table(TABLE_NAME_REFERENCES, [GenomeID, Genome, Strain, GenbankID, RefseqID, Assembly], REFERENCE_APPEND)
-ReferencesTable.addIndex(Genome)
-ReferencesTable.addIndex(Assembly)
-
-
-class Tables: pass
-Tables = Literal[SNPsTable, ReferencesTable, TreeTable, ChromosomesTable] # type: ignore
+TreeTable = Table("TreeTable", TABLE_NAME_TREE, (Parent, NodeID, GenoType), (UNIQUE(Parent, Child), PRIMARY - KEY(Child)))
+ReferencesTable = Table("ReferencesTable", TABLE_NAME_REFERENCES, (GenomeID, Genome, Strain, GenbankID, RefseqID, Assembly), (PRIMARY - KEY(GenomeID)))
+ChromosomesTable = Table("ChromosomesTable", TABLE_NAME_CHROMOSOMES, (ChromID, Chromosome, GenomeID), (PRIMARY - KEY(ChromID), FOREIGN - KEY(GenomeID) - REFERENCES(ReferencesTable)))
+SNPsTable = Table("SNPsTable", TABLE_NAME_SNP_ANNOTATION, (NodeID, Position, Ancestral, Derived, SNPReference, Date, ChromID), (PRIMARY - KEY(Position), FOREIGN - KEY(ChromID) - REFERENCES(ChromosomesTable), FOREIGN - KEY(NodeID) - REFERENCES(TreeTable)))

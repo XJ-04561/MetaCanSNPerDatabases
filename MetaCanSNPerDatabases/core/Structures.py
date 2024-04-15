@@ -74,17 +74,51 @@ class SQLObject(AutoObject):
 		else:
 			return self.__str__().__format__(format_spec)
 
+class SanitizedValue(SQLObject):
+	value : Any
+	def __str__(self):
+		return "?"
+	def __sql__(self):
+		return self.value
+	@property
+	def params(self):
+		return [self.value]
+
 class Comparison(AutoObject):
 	
 	left : Any
 	operator : str
 	right : Any
 
+	def __init__(self, left, operator, right):
+		self.left = left
+		self.operator = operator
+		self.right = SanitizedValue(right) if not isinstance(right, SQLObject) else right
+
 	def __repr__(self):
 		return f"<Comparison {str(self)!r}>"
 
 	def __str__(self):
 		f"{self.left} {self.operator} {self.right}"
+	
+	@property
+	def params(self):
+		out = []
+		for item in self.content:
+			if hasattr(item, "params"):
+				out.extend(item.params)
+		return out
+
+class Assignment(AutoObject):
+	
+	variable : str|Column
+	value : Any
+
+	def __repr__(self):
+		return f"<Assignment {str(self)!r}>"
+
+	def __str__(self):
+		f"{self.variable} = {self.value}"
 
 class Column(SQLObject):
 	
@@ -109,10 +143,6 @@ class Column(SQLObject):
 	def __sql__(self):
 		return f"{self.name} {self.type}"
 	
-	def __neg__(self):
-		"""Only exists for 'ORDER BY'-usage. Will create a copy of the Column object with ' ASC' appended to the in-table name of the column."""
-		return Column(self.__name__, f"{self.name} ASC", self.type)
-	
 	def __lt__(self, right):
 		return Comparison(self, "<", right)
 	def __gt__(self, right):
@@ -131,74 +161,20 @@ class Column(SQLObject):
 class Table(SQLObject):
 
 	columns : tuple[Column] = tuple()
-	options : tuple[PrimaryKey|ForeignKey|Unique] = tuple()
-	_database : Database
+	options : tuple[Query|Word] = tuple()
 	
 	def __sql__(self):
 		return f"{self.name} ({',\n\t'.join(ChainMap(map(sql, self.options), map(sql, self.columns)))})"
 	
 	def __hash__(self):
 		return self.__sql__().__hash__()
-
-	def __len__(self) -> int:
-		from MetaCanSNPerDatabases.core.Aggregates import COUNT
-		from MetaCanSNPerDatabases.core.Columns import ALL
-		from MetaCanSNPerDatabases.core.Words import SELECT, FROM
-		return next(self._database.execute(*SELECT (COUNT(ALL)) - FROM(self)))[0]
 	
 	def __repr__(self):
 		return f"<{__name__}.{self.__class__.__name__} rows={len(self)} columns={[c.__name__ for c in self.columns]} at {hex(id(self))}>"
 	
 	def __iter__(self):
-		from MetaCanSNPerDatabases.core.Columns import ALL
-		from MetaCanSNPerDatabases.core.Words import SELECT, FROM
-		for row in self._database.execute(*SELECT(ALL) - FROM(self)):
-			yield row
-	
-	def create(self) -> bool:
-		try:
-			try:
-				self.clearIndexes()
-				self._database.execute(f"ALTER TABLE {self} RENAME TO {self:!sql}2;")
-			except:
-				# Table doesn't exist
-				pass
-			
-			self.create()
-			
-			try:
-				self._database.execute(f"INSERT INTO {self:!sql} SELECT * FROM {self:!sql}2;")
-			except:
-				pass
-
-			self.createIndex()
-			return True
-		except:
-			return False
-
-	@Overload
-	def createIndex(self : Self):
-		for indexName, *indexColumns in self._indexes:
-			for (indexName,) in self._conn.execute("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = ?", [self._tableName]):
-				self._conn.execute(f"DROP INDEX IF EXISTS {indexName};")
-			if indexName.isalnum() and all(map(str.isalnum, indexColumns)):
-				self._conn.execute(f"CREATE INDEX {indexName} ON {self._tableName}({', '.join(indexColumns)});")
-
-	@createIndex.add
-	def createIndex(self : Self, *cols : Column, name : str=None):
-		if name is None:
-			name = f"{self}By{''.join(map(str, cols))}"
-		from MetaCanSNPerDatabases.core.Columns import ALL
-		from MetaCanSNPerDatabases.core.Words import CREATE, INDEX, IF, NOT, EXISTS
-		from MetaCanSNPerDatabases.core.Tables import SQLITE_MASTER
-		self._database(*CREATE - INDEX - IF - NOT - EXISTS(name, ()))
-	
-	def clearIndexes(self):
-		from MetaCanSNPerDatabases.core.Columns import ALL
-		from MetaCanSNPerDatabases.core.Words import SELECT, FROM, WHERE, DROP, INDEX, IF ,EXISTS
-		from MetaCanSNPerDatabases.core.Tables import SQLITE_MASTER
-		for (indexName,) in self._database(*SELECT("name") - FROM(SQLITE_MASTER) - WHERE(type = "index", tbl_name = self)):
-			self._database(*DROP - INDEX - IF - EXISTS(indexName))
+		for column in self.columns:
+			yield column
 
 class Index(SQLObject):
 
@@ -258,7 +234,7 @@ class Word:
 		return f"<{pluralize(self.__class__.__base__.__name__)}.{self.__class__.__name__} content={self.content}>"
 		
 	def __str__(self) -> str:
-		return f"{self.__class__.__name__} {self.sep.join(self.content)}"
+		return f"{self.__class__.__name__} {self.sep.join(map(str, self.content))}" if len(self.content) else ""
 	
 	def __sql__(self):
 		return self.__str__()
@@ -278,7 +254,11 @@ class Word:
 	
 	@property
 	def params(self):
-		return [getattr(item, "params", None) or item for item in self.content if not isinstance(item, Column|Table|Index)]
+		out = []
+		for item in self.content:
+			if hasattr(item, "params"):
+				out.extend(item.params)
+		return out
 		
 class EnclosedWord(Word):
 	def __str__(self):
@@ -290,3 +270,7 @@ class Prefix(type):
 		return self.__name__
 	def __sub__(self, other):
 		return Query(self, other)
+
+
+ALL				= Column("ALL",				"*",					"")
+SQLITE_MASTER	= Table("SQLITE_MASTER", "sqlite_master", (Column("type"), Column("name"), Column("tbl_name"), Column("rootpage"), Column("sql")))

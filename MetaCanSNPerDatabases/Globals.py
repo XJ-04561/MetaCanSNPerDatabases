@@ -2,7 +2,10 @@
 
 from functools import cached_property, cache
 import sqlite3, hashlib, re, os, logging, shutil, sys
-from typing import Generator, Callable, Iterable, Self, Literal, LiteralString, Any, TextIO, BinaryIO, Never, Iterator, TypeVar, Type, get_args, get_origin, ChainMap, Union, Type
+from typing import (
+    Generator, Callable, Iterable, Self, Literal, LiteralString, Any, TextIO,
+	BinaryIO, Never, Iterator, TypeVar, Type, get_args, get_origin, ChainMap,
+	Union, Type, overload, final)
 import typing
 
 from PseudoPathy import Path, DirectoryPath, FilePath, PathGroup, PathLibrary, PathList

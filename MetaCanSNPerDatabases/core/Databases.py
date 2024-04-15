@@ -2,12 +2,92 @@
 from sqlite3 import Connection
 from MetaCanSNPerDatabases.Globals import *
 import MetaCanSNPerDatabases.Globals as Globals
-import MetaCanSNPerDatabases.core.Columns as Columns
-from MetaCanSNPerDatabases.core.Columns import Column
-from MetaCanSNPerDatabases.core._Constants import *
 from MetaCanSNPerDatabases.Exceptions import *
-from MetaCanSNPerDatabases.core.Tables import Table
+from MetaCanSNPerDatabases.core.Structures import *
+from MetaCanSNPerDatabases.core.Aggregates import *
+from MetaCanSNPerDatabases.core.Words import *
 from MetaCanSNPerDatabases.core.Tree import Branch
+
+if False:
+	from MetaCanSNPerDatabases.core.Columns import *
+	from MetaCanSNPerDatabases.core.Tables import *
+	from MetaCanSNPerDatabases.core.Indexes import *
+
+
+class Selector:
+	columns : tuple[Column]
+	tables : tuple[Table]
+	joinColumns : dict[tuple[Table,Table],Column]
+	wheres : tuple[Comparison]
+
+	appended : Query
+
+	_connection : Connection
+	databaseTables : set[Table]
+	def __init__(self, connection : Connection, tables : tuple[Table]):
+		self._connection = connection
+		self.databaseTables = set(tables)
+		self.appended = Query()
+	
+	def __iter__(self):
+		for row in self._connection.execute(*SELECT (*self.columns) - FROM (*self.tables) - WHERE(*self.wheres) - self.appended):
+			yield row
+		return
+
+	def __sub__(self, append : Word|Query):
+		self.appended -= append
+
+	@Overload
+	def __getitem__(self, columns : tuple[Column]):
+		from MetaCanSNPerDatabases.core.Functions import getSmallestFootprint
+		self.tables = tuple(getSmallestFootprint(set(columns), [[set(table.columns), table, 0] for table in self.databaseTables]))
+		return self
+	
+	@__getitem__.add
+	def __getitem__(self, tables : tuple[Table]):
+		if not hasattr(self, "columns"):
+			self.columns = (ALL, )
+		self.tables = tables
+		return self
+	
+	@__getitem__.add
+	def __getitem__(self, comparisons : tuple[Comparison]):
+		from MetaCanSNPerDatabases.core.Functions import getShortestPath
+		wheres = []
+		for comp in comparisons:
+			if isinstance(comp.left, Column) and all(comp.left not in table for table in self.tables):
+				targetTables = []
+				for table in self.databaseTables:
+					if comp.left in table.columns:
+						targetTables.append(table)
+				
+				path = getShortestPath(self.tables, targetTables)
+				subQuery = SELECT (path[-1][0]) - FROM (path[-1][1]) - WHERE(comp)
+				for col, table in path[-2::-1]:
+					subQuery = SELECT (col) - FROM (table) - WHERE(comp.left in subQuery)
+				wheres.append(path[0][0] in subQuery)
+			else:
+				wheres.append(comp)
+		self.wheres = tuple(wheres)
+		return self
+
+class Fetcher:
+	"""Fetches data from a cursor. Consumes the cursor object during iteration/indexation."""
+	_cursor : sqlite3.Cursor
+	def __init__(self, cursor):
+		self._cursor = cursor
+	
+	def __iter__(self):
+		for row in self._cursor:
+			yield row
+	
+	def __getitem__(self, rowNumber) -> Any|tuple[Any]:
+		for i in range(rowNumber):
+			next(self._cursor)
+		if len(row := next(self._cursor)) == 1:
+			return row[0]
+		else:
+			return row
 
 class Database:
 
@@ -35,10 +115,6 @@ class Database:
 			pass
 		del self
 	
-	@property
-	def __version__(self):
-		return int(self._connection.execute("PRAGMA user_version;").fetchone()[0])
-
 	def __del__(self):
 		try:
 			self._connection.close()
@@ -46,11 +122,30 @@ class Database:
 			pass
 	
 	def __repr__(self):
-		return object.__repr__(self)[:-1] + f" version={self.__version__} tablesHash={self.tablesHash!r} tables={[(name, len(self.Tables[name])) for name in self.Tables]}>"
+		return object.__repr__(self)[:-1] + f" version={self.__version__} tablesHash={self.tablesHash!r} tables={[(name, self(SELECT(COUNT(ALL)) - FROM(table))) for name, table in self.Tables.items()]}>"
+
+	@Overload
+	def __call__(self, query : Query) -> Generator[tuple[Any],None,None]:
+		return Fetcher(self._connection.execute(*query))
+	
+	@__call__.add
+	def __call__(self, query : str, params : list[Any]) -> Generator[tuple[Any],None,None]:
+		for row in self._connection.execute(query, params):
+			yield row
+	
+	def __getitem__(self, tuple):
+		out = Selector(self._connection, list(self.Tables.values()))
+		return out[tuple]
 	
 	@property
-	def Tables(self) -> dict[str,Table]:
-		return {name:self.__getattribute__(name) for name in sorted(filter(lambda s : s.endswith("Table"), self.__dict__))}
+	def __version__(self):
+		return int(self._connection.execute("PRAGMA user_version;").fetchone()[0])
+
+	def setTables(self, tables : tuple[Table]):
+		self.tables = set(tables)
+
+	def setIndexes(self, indexes : tuple[Index]):
+		self.indexes = set(indexes)
 
 	def checkDatabase(self) -> int:
 		if len(self._connection.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()) == 0:
@@ -97,65 +192,15 @@ class Database:
 	def rectifyDatabase(self, code : int):
 		raise NotImplementedError("Not implemented in the base class.")
 
-	@overload
-	def get(self, *columnsToGet : Column, orderBy : Column|tuple[Column]|None=None, Parent : int=None, NodeID : int=None, Genotype : str=None, Position : int=None, Ancestral : Nucleotides=None, Derived : Nucleotides=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> Generator[tuple[Any],None,None]|None:
-		pass
-
-	@final
-	def get(self, *select : Column, orderBy : Column|tuple[Column]|None=None, **where : Any) -> Generator[tuple[Any],None,None]|None:
-		
-		from MetaCanSNPerDatabases.core.Functions import generateQuery, interpretSQLtype
-		for row in self._connection.execute(*generateQuery(*select, orderBy=orderBy, **where)):
-			yield map(interpretSQLtype, row)
-	
-	@overload
-	def first(self, *columnsToGet : Column, orderBy : Column|tuple[Column]|None=None, Parent : int=None, NodeID : int=None, Genotype : str=None, Position : int=None, Ancestral : Nucleotides=None, Derived : Nucleotides=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> tuple[Any]:
-		pass
-	
-	@final
-	def first(self, *select : Column, orderBy : Column|tuple[Column]|None=None, **where : Any) -> tuple[Any]:
-		for row in self.get(*select, orderBy=orderBy, **where):
-			return row
-	
-	@overload
-	def all(self, *columnsToGet : Column, orderBy : Column|tuple[Column]|None=None, Parent : int=None, NodeID : int=None, Genotype : str=None, Position : int=None, Ancestral : Nucleotides=None, Derived : Nucleotides=None, SNPReference : str=None, Date : str=None, ChromID : int=None, Chromosome : str=None, GenomeID : int=None, Genome : str=None, Strain : str=None, GenbankID : str=None, RefseqID : str=None, Assembly : str=None) -> list[tuple[Any]]:
-		pass
-	
-	@final
-	def all(self, *select : Column, orderBy : Column|tuple[Column]|None=None, **where : Any) -> list[tuple[Any]]:
-		return list(self.get(*select, orderBy=orderBy, **where))
-
-	@property
-	def SNPs(self) -> Generator[tuple[str,int,str,str],None,None]:
-		return self.SNPsTable.get(Columns.ALL)
-
-	@property
-	def references(self) -> Generator[tuple[int,str,str,str,str],None,None]:
-		return self.ReferencesTable.get(Columns.ALL)
-	
-	@property
-	def chromosomes(self) -> Generator[tuple[int,str],None,None]:
-		return self.ChromosomesTable.get(Columns.ALL)
-
-	@cached_property
-	def tree(self) -> Branch:
-		
-		return Branch(self._connection, *self.TreeTable.first(Columns.NodeID, TreeParent=0))
-
-	@property
-	def indexes(self):
-		return [row[0] for row in self._connection.execute("SELECT sql FROM sqlite_master WHERE type = 'index' ORDER BY name DESC;")]
-
 	@property
 	def indexesHash(self):
 		from MetaCanSNPerDatabases.core.Functions import whitespacePattern
-		indices = [name for table in self.Tables.values() for name, *_ in table._indexes]
 		return hashlib.md5(
 			whitespacePattern.sub(
 				" ",
 				"; ".join([
 					x[0]
-					for x in self._connection.execute(f"SELECT sql FROM sqlite_schema WHERE type='index' AND name IN ({', '.join(['?']*len(indices))}) ORDER BY sql DESC;", indices)
+					for x in self._connection.execute(f"SELECT sql FROM sqlite_schema WHERE type='index' ORDER BY sql DESC;")
 					if type(x) is tuple and x[0] is not None
 				])
 			).encode("utf-8")
@@ -201,99 +246,93 @@ class DatabaseWriter(Database):
 			case 0: # We're good
 				pass
 			case -2: # Table is new
-				self._connection.execute("BEGIN TRANSACTION;")
-				for table in self.Tables.values():
-					table.create()
-				self._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION:d};")
-				self._connection.execute("COMMIT;")
+				self(BEGIN - TRANSACTION)
+				for table in self.tables:
+					self(CREATE - TABLE - sql(table))
+				self(PRAGMA (user_version = CURRENT_VERSION))
+				self(COMMIT)
 			case -3: # Legacy CanSNPer table
 				updateFromLegacy(self, refDir=refDir)
 			case -4:
-				self._connection.execute("BEGIN TRANSACTION;")
-				self._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION:d};")
-				self._connection.execute("COMMIT;")
+				self(BEGIN - TRANSACTION)
+				self(PRAGMA (user_version = CURRENT_VERSION))
+				self(COMMIT)
 			case -5: # Transfer data from old tables into new tables
-				self._connection.execute("BEGIN TRANSACTION;")
+				self(BEGIN - TRANSACTION)
 				self.clearIndexes()
-				for table in self.Tables.values():
-					table.recreate()
-					table.createIndex()
-				self._connection.execute("COMMIT;")
-				self._connection.execute("BEGIN TRANSACTION;")
+				for table in self.tables:
+					self(ALTER - TABLE - table - RENAME - TO - f"{table}2")
+					self(CREATE - TABLE - sql(table))
+					self(INSERT - INTO - table - (SELECT (ALL) - FROM(f"{table}2") ))
+					self(DROP - TABLE - f"{table}2")
+				for index in self.indexes:
+					self(CREATE - INDEX - sql(index))
+				self(COMMIT)
+				self(BEGIN - TRANSACTION)
 				for (table,) in self._connection.execute("SELECT name FROM sqlite_master WHERE type='table';"):
-					if table not in TABLES:
-						self._connection.execute(f"DROP TABLE {table};")
-				self._connection.execute(f"PRAGMA user_version = {CURRENT_VERSION:d};")
-				self._connection.execute("COMMIT;")
+					if not any(table == validTable.name for validTable in self.tables):
+						self(DROP - TABLE - table)
+				self(PRAGMA (user_version = CURRENT_VERSION))
+				self(COMMIT)
 			case -6:
-				self._connection.execute("BEGIN TRANSACTION;")
+				self(BEGIN - TRANSACTION)
 				self.clearIndexes()
-				for table in self.Tables.values():
-					table.createIndex()
-				self._connection.execute("COMMIT;")
+				for index in self.indexes:
+					self(CREATE - INDEX - sql(index))
+				self(COMMIT)
+
+	@Overload
+	def createIndex(self : Self, index : Index) -> bool:
+		"""Create a given Index-object inside the database"""
+		from MetaCanSNPerDatabases.core.Columns import ALL
+		from MetaCanSNPerDatabases.core.Words import CREATE, INDEX
+		try:
+			self(CREATE - INDEX - sql(index))
+			return True
+		except:
+			return False
+
+	@createIndex.add
+	def createIndex(self : Self, table : Table, *cols : Column, name : str=None) -> bool:
+		if name is None:
+			name = f"{table}By{''.join(map(str.capitalize, map(str, cols)))}"
+		from MetaCanSNPerDatabases.core.Columns import ALL
+		from MetaCanSNPerDatabases.core.Words import CREATE, INDEX
+		try:
+			self(CREATE - INDEX - Index(name, table, cols))
+			return True
+		except:
+			return False
 
 	def clearIndexes(self):
-		for (indexName, ) in self._connection.execute("SELECT name FROM sqlite_schema WHERE type='index';"):
-			self._connection.execute(f"DROP INDEX {indexName};")
+		for (indexName,) in self(SELECT("name") - FROM(SQLITE_MASTER) - WHERE(type = "index")):
+			self(DROP - INDEX - IF - EXISTS(indexName))
 
-	def addSNP(self, nodeID, snpID, position, ancestral, derived, reference, date, chromosomeID):
-		self._connection.execute(f"INSERT (?,?,?,?,?,?,?,?) INTO {TABLE_NAME_SNP_ANNOTATION};", [nodeID, snpID, position, ancestral, derived, reference, date, chromosomeID])
-	
-	def addReference(self, genome, strain, genbank, refseq, assemblyName):
-		self._connection.execute(f"INSERT (null,?,?,?,?,?) INTO {TABLE_NAME_REFERENCES};", [genome, strain, genbank, refseq, assemblyName])
-	
-	def addBranch(self, parent : int|str=None, name : str=None):
-		if type(parent) is int:
-			self._connection.execute(f"INSERT (?,null,?) INTO {TABLE_NAME_TREE};", [parent, name])
-		else:
-			self._connection.execute(f"INSERT ({TABLE_NAME_TREE}.child,null,?) INTO {TABLE_NAME_TREE} FROM {TABLE_NAME_TREE} WHERE {TABLE_NAME_TREE}.name = ?;", [name, parent])
-	
-	def addChromosome(self, chromosomeName : str=None, genomeID : int=None, genomeName : str=None):
-		if genomeID is not None:
-			self._connection.execute(f"INSERT (null,?,?) INTO {TABLE_NAME_CHROMOSOMES};", [chromosomeName, genomeID])
-		elif genomeName is not None:
-			self._connection.execute(f"INSERT (null,?,{TABLE_NAME_CHROMOSOMES}.id) INTO {TABLE_NAME_CHROMOSOMES} FROM {TABLE_NAME_CHROMOSOMES} WHERE {TABLE_NAME_CHROMOSOMES}.genome = ?;", [chromosomeName, genomeName])
-	
 	def commit(self):
 		self._connection.commit()
 
-@overload
-def openDatabase(database : str, mode : ReadMode) -> DatabaseReader: pass
+@Overload
+def openDatabase(database : str, mode : ReadMode) -> DatabaseReader:
+	if not os.path.exists(database):
+		raise FileNotFoundError(f"Database file {database} not found on the system.")
+	elif not os.path.isabs(database):
+		database = os.path.realpath(os.path.expanduser(database))
+			
+	# Convert to URI acceptable filename
+	cDatabase = "/".join(filter(lambda s : s != "", database.replace('?', '%3f').replace('#', '%23').split(os.path.sep)))
+	if not cDatabase.startswith("/"): # Path has to be absolute already, and windows paths need a prepended '/'
+		cDatabase = "/"+cDatabase
+	try:
+		return DatabaseReader(sqlite3.connect(f"file:{cDatabase}?immutable=1", uri=True))
+	except Exception as e:
+		LOGGER.error("Failed to connect to database using URI: "+f"file:{cDatabase}?immutable=1")
+		raise e
 
-@overload
-def openDatabase(database : str, mode : WriteMode) -> DatabaseWriter: pass
-
-@final
-def openDatabase(database : str, mode : Mode) -> DatabaseReader | DatabaseWriter | None:
-	match mode:
-		case "r":
-			if not os.path.exists(database):
-				raise FileNotFoundError(f"Database file {database} not found on the system.")
-			elif not os.path.isabs(database):
-				database = os.path.realpath(os.path.expanduser(database))
-					
-			# Convert to URI acceptable filename
-			cDatabase = "/".join(filter(lambda s : s != "", database.replace('?', '%3f').replace('#', '%23').split(os.path.sep)))
-			if not cDatabase.startswith("/"): # Path has to be absolute already, and windows paths need a prepended '/'
-				cDatabase = "/"+cDatabase
-			try:
-				return DatabaseReader(sqlite3.connect(f"file:{cDatabase}?immutable=1", uri=True))
-			except Exception as e:
-				LOGGER.error("Failed to connect to database using URI: "+f"file:{cDatabase}?immutable=1")
-				raise e
-		case "w":
-			if os.path.exists(database):
-				return DatabaseWriter(sqlite3.connect(database))
-			else:
-				conn = sqlite3.connect(database)
-				conn.execute(f"PRAGMA user_version = {CURRENT_VERSION};")
-				ret = DatabaseWriter(conn)
-
-				ret.ReferencesTable.create()
-				ret.ChromosomesTable.create()
-				ret.TreeTable.create()
-				ret.SNPsTable.create()
-
-				return ret
-		case _:
-			raise ValueError(f"Improper mode in which to open database. Can only be {'r'!r} (read) or {'w'!r} (write), not {mode!r}")
+@openDatabase.add
+def openDatabase(database : str, mode : WriteMode) -> DatabaseWriter:
+	if os.path.exists(database):
+		return DatabaseWriter(sqlite3.connect(database))
+	else:
+		ret = DatabaseWriter(sqlite3.connect(database))
+		ret.rectifyDatabase(-2, copy=False)
+		return ret

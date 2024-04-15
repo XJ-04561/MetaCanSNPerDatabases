@@ -32,6 +32,57 @@ def formatType(columns : tuple[Column]):
 			case "unknown":
 				yield "{:>12}"
 
+
+@cache
+def getSmallestFootprint(columns : set[Column], tables : list[list[set[Column],Table,int]]):
+
+	if len(columns) == 0:
+		return []
+	elif len(tables) == 0:
+		raise ColumnNotFoundError(f"Columns: {columns} could not be found in any of the given tables: ")
+	else:
+		for i, (cols, *_) in enumerate(tables):
+			tables[i][2] = len(cols.intersection(columns))
+		tables.sort(key=lambda x:x[2])
+		try:
+			return [tables[-1][1]] + getSmallestFootprint(columns.difference(tables[-1][0]), tables[:-1])
+		except ColumnNotFoundError as e:
+			e.add_note(tables[-1])
+			raise e
+
+@cache
+@Overload
+def getShortestPath(table1 : Table, table2 : Table, tables : set[Table]) -> tuple[tuple[Table,Column]]:
+
+	if table1 == table2:
+		return tuple()
+	elif len(tables) == 0:
+		return (None, )
+	else:
+		cols = set(table1.columns)
+		paths = {}
+		for table in tables:
+			if len(commonCols := cols.intersection(table)):
+				paths[tuple(commonCols)[0], table] = getShortestPath(table, table2, tables.difference({table}))
+		if len(paths) == 0:
+			return (None, )
+		
+		(commonCol, table), path = max(filter(lambda tupe : tupe[1][-1] is not None, paths.items()), key=lambda colPath : len(colPath[1]))
+		return ((commonCol, table),) + path
+
+@getShortestPath.add
+def getShortestPath(sources : tuple[Table], destinations : tuple[Table], tables : set[Table]) -> tuple[tuple[Table,Column]]:
+
+	shortestPath = range(len(tables)+1)
+	for source in sources:
+		for destination in destinations:
+			if len(path := getShortestPath(source, destination, tables)) < len(shortestPath):
+				shortestPath = path
+	if isinstance(shortestPath, range):
+		raise TablesNotRelated(f"Source tables {sources} are not connected to destination tables {destinations}")
+	else:
+		return shortestPath
+
 def loadFromReferenceFile(database : DatabaseWriter, file : TextIO, refDir : str="."):
 	file.seek(0)
 	if "genome	strain	genbank_id	refseq_id	assembly_name" == file.readline():
@@ -160,153 +211,153 @@ def downloadDatabase(databaseName : str, dst : str, reportHook=lambda block, blo
 	LOGGER.error(f"No database named {databaseName!r} found online. Sources tried: {SOURCES}")
 	return None
 
-@cache
-def generateTableQueryString(self : Table, select : tuple[Column], orderBy : tuple[Column]|None=None, where : tuple[str,bool]=tuple()) -> tuple[str,tuple[str]]:
-	"""All positional arguments should be `Column` objects and they are used to
-	determine what information to be gathered from the database.
+# @cache
+# def generateTableQueryString(self : Table, select : tuple[Column], orderBy : tuple[Column]|None=None, where : tuple[str,bool]=tuple()) -> tuple[str,tuple[str]]:
+# 	"""All positional arguments should be `Column` objects and they are used to
+# 	determine what information to be gathered from the database.
 	
-	All keyword arguments (except `orderBy`) are the conditions by which each row
-	is selected. For example, if you inted to get the row for a specific genbankID
-	then you would use the keyword argument as such: `genbankID="GCA_123123123.1"`.
+# 	All keyword arguments (except `orderBy`) are the conditions by which each row
+# 	is selected. For example, if you inted to get the row for a specific genbankID
+# 	then you would use the keyword argument as such: `genbankID="GCA_123123123.1"`.
 	
-	`orderBy` is used to sort the selected data according to `Column`.
-	Direction is indicated by negating the the flag. A positive flag is the default
-	of "DESC" and negative flags indicate "ASC"."""
-	if len(select) > 0:
-		query = f"SELECT {', '.join(map(str, select))} FROM {self._tableName}"
-	else:
-		query = f"SELECT * FROM {self._tableName}"
-	params = []
-	if len(where) == 0 and any(where):
-		_tmp = []
-		for col, val in where:
-			if val is False:
-				_tmp.append(f"{Columns.COLUMN_LOOKUP[col]} = ?")
-				params.append(col)
-			elif val is True:
-				_tmp.append(f"{Columns.COLUMN_LOOKUP[col]} IN " + "({"+col+"})")
-				params.append(col)
-		query += f" WHERE {' AND '.join(_tmp)}"
+# 	`orderBy` is used to sort the selected data according to `Column`.
+# 	Direction is indicated by negating the the flag. A positive flag is the default
+# 	of "DESC" and negative flags indicate "ASC"."""
+# 	if len(select) > 0:
+# 		query = f"SELECT {', '.join(map(str, select))} FROM {self._tableName}"
+# 	else:
+# 		query = f"SELECT * FROM {self._tableName}"
+# 	params = []
+# 	if len(where) == 0 and any(where):
+# 		_tmp = []
+# 		for col, val in where:
+# 			if val is False:
+# 				_tmp.append(f"{Columns.COLUMN_LOOKUP[col]} = ?")
+# 				params.append(col)
+# 			elif val is True:
+# 				_tmp.append(f"{Columns.COLUMN_LOOKUP[col]} IN " + "({"+col+"})")
+# 				params.append(col)
+# 		query += f" WHERE {' AND '.join(_tmp)}"
 	
-	if orderBy is not None and len(orderBy) > 0:
-		query += f" ORDER BY {', '.join(map(str, orderBy))}"
+# 	if orderBy is not None and len(orderBy) > 0:
+# 		query += f" ORDER BY {', '.join(map(str, orderBy))}"
 	
-	return f"{query};", params
+# 	return f"{query};", params
 
-@cache
-def generateTableQuery(self, *select : Column, orderBy : Column|tuple[Column]|None=None, **where : Any) -> tuple[str,list[Any]]:
-	"""All positional arguments should be `Column` objects and they are used to
-	determine what information to be gathered from the database.
+# @cache
+# def generateTableQuery(self, *select : Column, orderBy : Column|tuple[Column]|None=None, **where : Any) -> tuple[str,list[Any]]:
+# 	"""All positional arguments should be `Column` objects and they are used to
+# 	determine what information to be gathered from the database.
 	
-	All keyword arguments (except `orderBy`) are the conditions by which each row
-	is selected. For example, if you inted to get the row for a specific genbankID
-	then you would use the keyword argument as such: `genbankID="GCA_123123123.1"`.
+# 	All keyword arguments (except `orderBy`) are the conditions by which each row
+# 	is selected. For example, if you inted to get the row for a specific genbankID
+# 	then you would use the keyword argument as such: `genbankID="GCA_123123123.1"`.
 	
-	`orderBy` is used to sort the selected data according to `Column`.
-	Direction is indicated by negating the the flag. A positive flag is the default
-	of "DESC" and negative flags indicate "ASC"."""
+# 	`orderBy` is used to sort the selected data according to `Column`.
+# 	Direction is indicated by negating the the flag. A positive flag is the default
+# 	of "DESC" and negative flags indicate "ASC"."""
 	
-	if isinstance(orderBy, Column):
-		orderBy = (orderBy,)
+# 	if isinstance(orderBy, Column):
+# 		orderBy = (orderBy,)
 
-	boolWhere = tuple(sorted(map(lambda kv:(kv[0],isinstance(kv[1], list|tuple|set)), filter(lambda kv:kv[1] is not None, where.items()))))
+# 	boolWhere = tuple(sorted(map(lambda kv:(kv[0],isinstance(kv[1], list|tuple|set)), filter(lambda kv:kv[1] is not None, where.items()))))
 
-	query, params = generateTableQueryString(self, select, orderBy=orderBy, where=boolWhere)
-	params = list(params)
-	formatDict = {}
-	keys = formatPattern.findall(query)
-	for (i, (name, yn)), key in zip(enumerate(filter(lambda x:x[1], boolWhere)), keys):
-		params.pop(i)
-		for val in where[name]:
-			params.insert(i, val)
-		formatDict[key] = ", ".join(["?"]*len(where[name]))
+# 	query, params = generateTableQueryString(self, select, orderBy=orderBy, where=boolWhere)
+# 	params = list(params)
+# 	formatDict = {}
+# 	keys = formatPattern.findall(query)
+# 	for (i, (name, yn)), key in zip(enumerate(filter(lambda x:x[1], boolWhere)), keys):
+# 		params.pop(i)
+# 		for val in where[name]:
+# 			params.insert(i, val)
+# 		formatDict[key] = ", ".join(["?"]*len(where[name]))
 	
-	LOGGER.debug(out := (query.format(**formatDict), tuple(params)))
-	return out
+# 	LOGGER.debug(out := (query.format(**formatDict), tuple(params)))
+# 	return out
 
 
-@cache
-def generateQueryString(select : tuple[Column], orderBy : tuple[Column]|None=None, table:str|None=None, where : tuple[tuple[str,bool]]|None=tuple()) -> tuple[str,tuple[Any]]:
-	"""All positional arguments should be `Column` objects and they are used to
-	determine what information to be gathered from the database.
+# @cache
+# def generateQueryString(select : tuple[Column], orderBy : tuple[Column]|None=None, table:str|None=None, where : tuple[tuple[str,bool]]|None=tuple()) -> tuple[str,tuple[Any]]:
+# 	"""All positional arguments should be `Column` objects and they are used to
+# 	determine what information to be gathered from the database.
 	
-	All keyword arguments (except `orderBy`) are the conditions by which each row
-	is selected. For example, if you inted to get the row for a specific genbankID
-	then you would use the keyword argument as such: `genbankID="GCA_123123123.1"`.
+# 	All keyword arguments (except `orderBy`) are the conditions by which each row
+# 	is selected. For example, if you inted to get the row for a specific genbankID
+# 	then you would use the keyword argument as such: `genbankID="GCA_123123123.1"`.
 	
-	`orderBy` is used to sort the selected data according to `Column`.
-	Direction is indicated by negating the the flag. A positive flag is the default
-	of "DESC" and negative flags indicate "ASC"."""
+# 	`orderBy` is used to sort the selected data according to `Column`.
+# 	Direction is indicated by negating the the flag. A positive flag is the default
+# 	of "DESC" and negative flags indicate "ASC"."""
 
-	# If selecting all columns then change the selection string into "*", otherwise create a list of "WHERE" statements
-	if Columns.ALL in select or len(select) == 0:
-		selection = "*"
-		if table is None:
-			raise ValueError(f"To select all columns of a table, the table must be specified.")
-		source = table
-	else:
-		if table is None:
-			candidates = []
-			for table in Columns.LOOKUP:
-				if all(col in Columns.LOOKUP[table] for col in select):
-					candidates.append((", ".join([Columns.LOOKUP[table][col] for col in select]), table))
-			if len(candidates) == 0:
-				raise ValueError(f"No table for all of these selections: ({', '.join(map(Columns.NAMES_STRING, select))})")
-			for slct, table in candidates:
-				if all(col in Columns.LOOKUP[table] for col,val in where):
-					break
-			selection = slct
-			source = table
-		else:
-			selection = ", ".join([Columns.LOOKUP[table][col] for col in select])
-			source = table
+# 	# If selecting all columns then change the selection string into "*", otherwise create a list of "WHERE" statements
+# 	if Columns.ALL in select or len(select) == 0:
+# 		selection = "*"
+# 		if table is None:
+# 			raise ValueError(f"To select all columns of a table, the table must be specified.")
+# 		source = table
+# 	else:
+# 		if table is None:
+# 			candidates = []
+# 			for table in Columns.LOOKUP:
+# 				if all(col in Columns.LOOKUP[table] for col in select):
+# 					candidates.append((", ".join([Columns.LOOKUP[table][col] for col in select]), table))
+# 			if len(candidates) == 0:
+# 				raise ValueError(f"No table for all of these selections: ({', '.join(map(Columns.NAMES_STRING, select))})")
+# 			for slct, table in candidates:
+# 				if all(col in Columns.LOOKUP[table] for col,val in where):
+# 					break
+# 			selection = slct
+# 			source = table
+# 		else:
+# 			selection = ", ".join([Columns.LOOKUP[table][col] for col in select])
+# 			source = table
 	
-	# Create "WHERE"-statements that are meant to show how the tables are connected, like: table1.colA = table2.colB
-	conditions = []
-	params = []
-	for name, val in where:
-		if Columns.NAMES_DICT[name] in Columns.LOOKUP[source]:
-			if val is False:
-				conditions.append(f"{Columns.LOOKUP[source][Columns.NAMES_DICT[name]]} = ?")
-			elif val is True:
-				conditions.append(f"{Columns.LOOKUP[source][Columns.NAMES_DICT[name]]} IN " + "({" + f"{name}" + "})")
-		else:
-			otherTable = Columns.RELATIONSHIPS[source][Columns.NAMES_DICT[name]]
-			commonColumn = Columns.RELATIONS[source, otherTable]
-			subQuery, subParams = generateQueryString((commonColumn,), where=((name,val),))
-			conditions.append(f"{Columns.LOOKUP[source][commonColumn]} IN ({subQuery.rstrip(';')})")
-		params.append(val)
-	conditions = " AND ".join(conditions)
+# 	# Create "WHERE"-statements that are meant to show how the tables are connected, like: table1.colA = table2.colB
+# 	conditions = []
+# 	params = []
+# 	for name, val in where:
+# 		if Columns.NAMES_DICT[name] in Columns.LOOKUP[source]:
+# 			if val is False:
+# 				conditions.append(f"{Columns.LOOKUP[source][Columns.NAMES_DICT[name]]} = ?")
+# 			elif val is True:
+# 				conditions.append(f"{Columns.LOOKUP[source][Columns.NAMES_DICT[name]]} IN " + "({" + f"{name}" + "})")
+# 		else:
+# 			otherTable = Columns.RELATIONSHIPS[source][Columns.NAMES_DICT[name]]
+# 			commonColumn = Columns.RELATIONS[source, otherTable]
+# 			subQuery, subParams = generateQueryString((commonColumn,), where=((name,val),))
+# 			conditions.append(f"{Columns.LOOKUP[source][commonColumn]} IN ({subQuery.rstrip(';')})")
+# 		params.append(val)
+# 	conditions = " AND ".join(conditions)
 
-	if orderBy is not None and len(orderBy) > 0:
-		keyColumn = ", ".join([f"{Columns.LOOKUP[source][abs(flag)]} {'DESC' if flag > 0 else 'ASC'}" for flag in orderBy])
+# 	if orderBy is not None and len(orderBy) > 0:
+# 		keyColumn = ", ".join([f"{Columns.LOOKUP[source][abs(flag)]} {'DESC' if flag > 0 else 'ASC'}" for flag in orderBy])
 	
-		return f"SELECT {selection} FROM {source} WHERE {conditions} ORDER BY {keyColumn};", tuple(params)
-	else:
-		return f"SELECT {selection} FROM {source} WHERE {conditions};", tuple(params)
+# 		return f"SELECT {selection} FROM {source} WHERE {conditions} ORDER BY {keyColumn};", tuple(params)
+# 	else:
+# 		return f"SELECT {selection} FROM {source} WHERE {conditions};", tuple(params)
 
-@cache
-def generateQuery(*select : Column, orderBy : Column|tuple[Column]|None=None, table:str|None=None, **where : Any) -> tuple[str,tuple[Any]]:
+# @cache
+# def generateQuery(*select : Column, orderBy : Column|tuple[Column]|None=None, table:str|None=None, **where : Any) -> tuple[str,tuple[Any]]:
 
-	if isinstance(orderBy, Column):
-		orderBy = (orderBy,)
+# 	if isinstance(orderBy, Column):
+# 		orderBy = (orderBy,)
 
-	boolWhere = tuple(sorted(map(lambda kv:(kv[0],isinstance(kv[1], list|tuple|set)), filter(lambda kv:kv[1] is not None, where.items()))))
+# 	boolWhere = tuple(sorted(map(lambda kv:(kv[0],isinstance(kv[1], list|tuple|set)), filter(lambda kv:kv[1] is not None, where.items()))))
 	
-	query, params = generateQueryString(select, orderBy=orderBy, table=table, where=boolWhere)
-	params = list(params)
-	formatDict = {}
-	keys = formatPattern.findall(query)
-	for (i, (name, yn)), key in zip(enumerate(filter(lambda x:x[1], boolWhere)), keys):
-		params.pop(i)
-		for val in where[name]:
-			params.insert(i, val)
-		formatDict[key] = ", ".join(["?"]*len(where[name]))
+# 	query, params = generateQueryString(select, orderBy=orderBy, table=table, where=boolWhere)
+# 	params = list(params)
+# 	formatDict = {}
+# 	keys = formatPattern.findall(query)
+# 	for (i, (name, yn)), key in zip(enumerate(filter(lambda x:x[1], boolWhere)), keys):
+# 		params.pop(i)
+# 		for val in where[name]:
+# 			params.insert(i, val)
+# 		formatDict[key] = ", ".join(["?"]*len(where[name]))
 	
-	LOGGER.debug(out := (query.format(**formatDict), tuple(params)))
-	return out
+# 	LOGGER.debug(out := (query.format(**formatDict), tuple(params)))
+# 	return out
 
-Table.get.__doc__ = Table.first.__doc__ = Table.all.__doc__ = generateTableQuery.__doc__
+# Table.get.__doc__ = Table.first.__doc__ = Table.all.__doc__ = generateTableQuery.__doc__
 
 # @cache
 # def generateQuery(*select : Column, orderBy : Column|tuple[Column]|None=None, **where : Any) -> tuple[str,list[Any]]:

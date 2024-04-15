@@ -2,15 +2,28 @@
 from MetaCanSNPerDatabases.Globals import *
 from MetaCanSNPerDatabases.core.Structures import *
 
-class UNIQUE(EnclosedWord):
-	name : str = "UNIQUE"
+class BEGIN: pass
+class TRANSACTION: pass
+class COMMIT: pass
+BEGIN = Prefix("BEGIN", (), {})
+TRANSACTION = Prefix("TRANSACTION", (), {})
+COMMIT = Prefix("COMMIT", (), {})
 
-class SELECT(Word):
-	name : str = "SELECT"
+class PRAGMA(Word):
+	@Overload
+	def __init__(self, *columns):
+		self.content = columns
 
-class FROM(Word):
-	name : str = "FROM"
+	@__init__.add
+	def __init__(self, **assignments):
+		content = []
+		for variable, value in assignments.items():
+			content.append(Assignment(variable, value))
+		self.content = tuple(content)
 
+class UNIQUE(EnclosedWord): pass
+class SELECT(Word): pass
+class FROM(Word): pass
 class WHERE(Word):
 	sep : str = "AND"
 
@@ -48,13 +61,19 @@ TRIGGER = Prefix("TRIGGER", (Word), {})
 VIEW = Prefix("VIEW", (Word), {})
 
 class IF: pass
+class NOT: pass
 class PRIMARY: pass
 class FOREIGN: pass
 IF = Prefix("IF", (), {})
+NOT = Prefix("NOT", (), {})
 PRIMARY = Prefix("PRIMARY", (), {})
 FOREIGN = Prefix("FOREIGN", (), {})
 class EXISTS(Word): pass
 
+class INSERT: pass
+class INTO: pass
+INSERT = Prefix("INSERT", (), {})
+INTO = Prefix("INTO", (), {})
 
 class KEY(EnclosedWord): pass
 	
