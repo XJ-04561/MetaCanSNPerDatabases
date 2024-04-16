@@ -78,6 +78,7 @@ class Overload:
 	def __call__(self, *args : tuple[Any], **kwargs : dict[str,Any]):
 		from MetaCanSNPerDatabases._core.Functions import isType
 		for annotation, func, cache in self._funcs:
+			print(annotation, func.__code__.co_posonlyargcount, args, kwargs)
 			if func.__code__.co_posonlyargcount != len(args):
 				continue
 			elif any(not isType(arg, annotation[name]) for name, arg in zip(func.__code__.co_varnames, args)):
@@ -89,10 +90,10 @@ class Overload:
 					cache[cacheHash] = func(*args, **kwargs)
 				return cache[cacheHash]
 		msg = f"No definition satisfies {self.__name__}("
-		msg += ", ".join(map(str,args))
+		msg += ", ".join(map(repr,args))
 		if not msg.endswith("("):
 			msg += ", "
-		msg += ", ".join(map("{0[0]}={0[1]}".format, kwargs.items()))
+		msg += ", ".join(map("{0[0]}={0[1]!r}".format, kwargs.items()))
 		raise NotImplementedError(msg + ")")
 	
 	def __repr__(self):
