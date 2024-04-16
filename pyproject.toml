@@ -33,8 +33,8 @@ classifiers = [
     "Operating System :: OS Independent"
 ]
 dependencies = [
-    "ncbi-datasets-pylib",
-    "git+https://github.com/XJ-04561/PseudoPathy"
+    "ncbi-datasets-pylib"
+    # "git+https://github.com/XJ-04561/PseudoPathy"
 ]
 
 [project.urls]
