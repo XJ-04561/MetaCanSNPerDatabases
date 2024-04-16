@@ -17,12 +17,12 @@ def read(databasePath : str=None, **kwargs):
 
 	database.close()
 
-def write(databasePath : str=None, rectify : bool=False, SNPFile : str=None, treeFile : str=None, referenceFile : str=None, **kwargs):
+def write(databasePath : str=None, SNPFile : str=None, treeFile : str=None, referenceFile : str=None, **kwargs):
 
 	LOGGER.debug(f"{databasePath=}")
 	database : MetaCanSNPerDatabase = MetaCanSNPerDatabase(databasePath, "w")
 
-	database.checkDatabase()
+	database.checkDatabase(mode = "r")
 	
 	print(database)
 	
@@ -67,20 +67,19 @@ def test(database : list[Path]= [], refDir : Path=".", outDir : Path=".", noCopy
 
 	LOGGER.debug(f"{kwargs['database']=}")
 	print("Testing Download:")
-	databasePaths = download(databaseNames=kwargs['database'], outDir=outDir)
+	databasePaths : list[str] = download(databaseNames=kwargs['database'], outDir=outDir)
 
 	print("Testing Update:")
 	update(databasePaths=databasePaths, refDir=refDir, noCopy=noCopy)
 
-	from MetaCanSNPerDatabases.core.Columns import Position, Ancestral, Derived, ChromID, Chromosome, Genome
-	from MetaCanSNPerDatabases.core.Tables import ChromosomesTable, ReferencesTable
+	from MetaCanSNPerDatabases.MetaCanSNPerDatabase import Position, Ancestral, Derived, ChromID, Chromosome, Genome, ChromosomesTable, ReferencesTable, MetaCanSNPerDatabase
 
 	print("Testing Read:")
 	for databasePath in databasePaths:
 		print(f"  {databasePath.replace(os.path.realpath('.'), '.').replace(os.path.expanduser('~'), '~')}")
 		LOGGER.debug(f"{databasePath.replace(os.path.realpath('.'), '.').replace(os.path.expanduser('~'), '~')}")
 
-		database = openDatabase(databasePath, "r")
+		database = MetaCanSNPerDatabase(databasePath, "r")
 		LOGGER.debug(repr(database))
 
 		print(f"    Arbitrary `.get` from one table only.")

@@ -2,16 +2,52 @@
 from sqlite3 import Connection
 from MetaCanSNPerDatabases.Globals import *
 import MetaCanSNPerDatabases.Globals as Globals
-from MetaCanSNPerDatabases.Exceptions import *
-from MetaCanSNPerDatabases.core.Structures import *
-from MetaCanSNPerDatabases.core.Aggregates import *
-from MetaCanSNPerDatabases.core.Words import *
-from MetaCanSNPerDatabases.core.Tree import Branch
+from MetaCanSNPerDatabases.core import *
 
-if False:
-	from MetaCanSNPerDatabases.core.Columns import *
-	from MetaCanSNPerDatabases.core.Tables import *
-	from MetaCanSNPerDatabases.core.Indexes import *
+class Fetcher:
+	"""Fetches data from a cursor. Consumes the cursor object during iteration/indexation."""
+	query : Query
+	_connection : sqlite3.Connection
+	cols : int
+	resultsLength : int
+
+	def __init__(self, connection : sqlite3.Connection, query : Query):
+		self._connection = connection
+		self._cursor = self._connection(*query)
+		self.query = query
+		self.position = 0
+	
+	def __next__(self):
+		match self.cols:
+			case None:
+				raise StopIteration()
+			case 1:
+				return next(self._cursor)[0]
+			case _:
+				return next(self._cursor)
+	
+	def __getitem__(self, rowNumber) -> Any|tuple[Any]:
+		if not rowNumber < self.resultsLength:
+			q = iter(self.query)
+			raise ResultsShorterThanLookup(f"When looking for row number {rowNumber} in query: '{next(q)}', {next(q)}")
+		elif self.cols is None:
+			q = iter(self.query)
+			raise NoResultsFromQuery(f"When looking for row number {rowNumber} in query: '{next(q)}', {next(q)}")
+		
+		if self.cols == 1:
+			return self._connection(self.query - LIMIT(rowNumber,rowNumber))[0]
+		else:
+			return self._connection(self.query - LIMIT(rowNumber,rowNumber))
+	
+	@cached_property
+	def cols(self):
+		if not isinstance(self.query.words[0], SELECT):
+			return None
+		return len(self.query.words[0].content)
+	
+	@cached_property
+	def resultsLength(self):
+		return self._connection(Query(SELECT(COUNT(ALL)), self.query.words[1:])).fetchone()[0]
 
 
 class Selector:
@@ -31,16 +67,13 @@ class Selector:
 		self.appended = Query()
 	
 	def __iter__(self):
-		for row in self._connection.execute(*SELECT (*self.columns) - FROM (*self.tables) - WHERE(*self.wheres) - self.appended):
-			yield row
-		return
+		return Fetcher(self._connection, SELECT (*self.columns) - FROM (*self.tables) - WHERE(*self.wheres) - self.appended)
 
 	def __sub__(self, append : Word|Query):
 		self.appended -= append
 
 	@Overload
 	def __getitem__(self, columns : tuple[Column]):
-		from MetaCanSNPerDatabases.core.Functions import getSmallestFootprint
 		self.tables = tuple(getSmallestFootprint(set(columns), [[set(table.columns), table, 0] for table in self.databaseTables]))
 		return self
 	
@@ -53,7 +86,6 @@ class Selector:
 	
 	@__getitem__.add
 	def __getitem__(self, comparisons : tuple[Comparison]):
-		from MetaCanSNPerDatabases.core.Functions import getShortestPath
 		wheres = []
 		for comp in comparisons:
 			if isinstance(comp.left, Column) and all(comp.left not in table for table in self.tables):
@@ -72,24 +104,6 @@ class Selector:
 		self.wheres = tuple(wheres)
 		return self
 
-class Fetcher:
-	"""Fetches data from a cursor. Consumes the cursor object during iteration/indexation."""
-	_cursor : sqlite3.Cursor
-	def __init__(self, cursor):
-		self._cursor = cursor
-	
-	def __iter__(self):
-		for row in self._cursor:
-			yield row
-	
-	def __getitem__(self, rowNumber) -> Any|tuple[Any]:
-		for i in range(rowNumber):
-			next(self._cursor)
-		if len(row := next(self._cursor)) == 1:
-			return row[0]
-		else:
-			return row
-
 class Database:
 
 	_connection : sqlite3.Connection
@@ -98,7 +112,7 @@ class Database:
 	tables : set[Table]
 	columns : set[Column]
 	indexes : set[Index]
-	assertions : list[Assertion] = baseAssertions
+	assertions : list[Assertion] = Globals.ASSERTIONS
 	"""A look-up list of assertions and the exceptions to be raised should the assertion fail. Assertions are checked last to first."""
 
 	def __init__(self, filename : str, mode : Mode):
@@ -145,7 +159,16 @@ class Database:
 
 	@Overload
 	def __call__(self, query : Query) -> Generator[tuple[Any],None,None]:
-		return Fetcher(self._connection.execute(*query))
+		if isinstance(query.words[0], SELECT):
+			if len(query.words[0].content) == 1:
+				for row in self._connection.execute(*query):
+					yield row[0]
+			else:
+				for row in self._connection.execute(*query):
+					yield row
+		else:
+			self._connection.execute(*query)
+			return None
 	
 	@__call__.add
 	def __call__(self, query : str, params : list[Any]) -> Generator[tuple[Any],None,None]:
@@ -164,55 +187,27 @@ class Database:
 	def columns(self):
 		return set().union(map(column for table in self.tables for column in table.columns))
 
-	def setTables(self, tables : tuple[Table]):
-		self.tables = set(tables)
-
-	def setIndexes(self, indexes : tuple[Index]):
-		self.indexes = set(indexes)
-
-	def checkDatabase(self):
+	def checkDatabase(self, mode=None):
 		"""Will raise appropriate exceptions when in read-mode. Will attempt to fix the database if in write mode."""
+		mode = mode or self.mode
 		for assertion in self.assertions:
 			if assertion.condition(database=self):
-				if self.mode == "r": # Raise exception
+				if mode == "r": # Raise exception
 					assertion.exception(self)
-				elif self.mode == "w": # Try to rectify
+				elif mode == "w": # Try to rectify
 					assertion.rectify(self)
-
 
 	@property
 	def indexesHash(self):
-		from MetaCanSNPerDatabases.core.Functions import whitespacePattern
-		return hashlib.md5(
-			whitespacePattern.sub(
-				" ",
-				"; ".join([
-					x[0]
-					for x in self._connection.execute(f"SELECT sql FROM sqlite_schema WHERE type='index' ORDER BY sql DESC;")
-					if type(x) is tuple and x[0] is not None
-				])
-			).encode("utf-8")
-		).hexdigest()
+		return hashQuery(self, SELECT("sql") - FROM - SQLITE_MASTER - WHERE(type='index') - ORDER - BY("sql DESC"))
 
 	@property
 	def tablesHash(self):
-		from MetaCanSNPerDatabases.core.Functions import whitespacePattern
-		return hashlib.md5(
-			whitespacePattern.sub(
-				" ",
-				"; ".join([
-					x[0]
-					for x in self._connection.execute(f"SELECT sql FROM sqlite_schema WHERE type='table' ORDER BY sql DESC;")
-					if type(x) is tuple and x[0] is not None
-				])
-			).encode("utf-8")
-		).hexdigest()
+		return hashQuery(self, SELECT("sql") - FROM - SQLITE_MASTER - WHERE(type='table') - ORDER - BY("sql DESC"))
 
 	@Overload
 	def createIndex(self : Self, index : Index) -> bool:
 		"""Create a given Index-object inside the database"""
-		from MetaCanSNPerDatabases.core.Columns import ALL
-		from MetaCanSNPerDatabases.core.Words import CREATE, INDEX
 		try:
 			self(CREATE - INDEX - sql(index))
 			return True
@@ -223,8 +218,6 @@ class Database:
 	def createIndex(self : Self, table : Table, *cols : Column, name : str=None) -> bool:
 		if name is None:
 			name = f"{table}By{''.join(map(str.capitalize, map(str, cols)))}"
-		from MetaCanSNPerDatabases.core.Columns import ALL
-		from MetaCanSNPerDatabases.core.Words import CREATE, INDEX
 		try:
 			self(CREATE - INDEX - Index(name, table, cols))
 			return True

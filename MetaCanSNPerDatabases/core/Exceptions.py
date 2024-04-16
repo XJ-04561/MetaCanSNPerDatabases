@@ -1,8 +1,6 @@
 
-from typing import Callable
 from sqlite3 import DatabaseError
 class DatabaseNotConnected(DatabaseError): pass
-class DatabaseWrongPRAGMAversion(DatabaseError): pass
 class MissingArgument(DatabaseError): pass
 class MissingReferenceFile(DatabaseError): pass
 class UnableToDefineChromosomes(DatabaseError): pass
@@ -10,7 +8,8 @@ class DownloadFailed(DatabaseError): pass
 class TableDefinitionMissmatch(DatabaseError): pass
 class ColumnNotFoundError(DatabaseError): pass
 class TablesNotRelated(DatabaseError): pass
-
+class ResultsShorterThanLookup(DatabaseError): pass
+class NoResultsFromQuery(DatabaseError): pass
 
 class DatabaseSchemaEmpty(DatabaseError): pass
 class SchemaTablesMismatch(DatabaseError): pass
@@ -89,9 +88,3 @@ class ValidIndexesSchema(Assertion):
 			database(CREATE - INDEX - sql(index))
 		database(PRAGMA (user_version = CURRENT_VERSION))
 		database(COMMIT)
-
-baseAssertions = [
-	SchemaNotEmpty,
-	ValidTablesSchema,
-	ValidIndexesSchema
-]

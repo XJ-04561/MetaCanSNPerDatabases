@@ -2,20 +2,12 @@
 
 import MetaCanSNPerDatabases.Globals as Globals
 
-from MetaCanSNPerDatabases.core.Databases import openDatabase, DatabaseReader, DatabaseWriter
-from MetaCanSNPerDatabases.Exceptions import (
-    DatabaseError, CanSNPDatabaseError, DatabaseNotConnected,
-    MissingArgument, MissingReferenceFile, UnableToDefineChromosomes,
-    DownloadFailed, TableDefinitionMissmatch
-)
-
-from MetaCanSNPerDatabases.core.Columns import Column
-import MetaCanSNPerDatabases.core.Columns as Columns
-
-from MetaCanSNPerDatabases.core.Functions import downloadDatabase, updateFromLegacy
-
-from MetaCanSNPerDatabases.core.Tables import SNPsTable, ReferencesTable, TreeTable
+from MetaCanSNPerDatabases.core.Databases import Database, Selector, Fetcher
+from MetaCanSNPerDatabases.core.Exceptions import *
+from MetaCanSNPerDatabases.core.Functions import downloadDatabase
 from MetaCanSNPerDatabases.core.Tree import Branch
-import MetaCanSNPerDatabases.core.Test as Test
-from MetaCanSNPerDatabases import Commands
-from MetaCanSNPerDatabases.MetaCanSNPerDatabase import MetaCanSNPerDatabase
+try:
+    from MetaCanSNPerDatabases import Commands
+except ImportError:
+    pass
+from MetaCanSNPerDatabases.MetaCanSNPerDatabase import MetaCanSNPerDatabase, CanSNPNode

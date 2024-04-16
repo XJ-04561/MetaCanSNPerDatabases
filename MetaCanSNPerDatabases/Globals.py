@@ -2,17 +2,23 @@
 
 from functools import cached_property, cache
 import sqlite3, hashlib, re, os, logging, shutil, sys
+
 from typing import (
     Generator, Callable, Iterable, Self, Literal, LiteralString, Any, TextIO,
 	BinaryIO, Never, Iterator, TypeVar, Type, get_args, get_origin, ChainMap,
 	Union, Type, overload, final)
-import typing
 
 from PseudoPathy import Path, DirectoryPath, FilePath, PathGroup, PathLibrary, PathList
 from PseudoPathy.Library import CommonGroups
 from PseudoPathy.PathShortHands import *
 
-from MetaCanSNPerDatabases.Exceptions import *
+from MetaCanSNPerDatabases.core.Exceptions import *
+
+ASSERTIONS = [
+	SchemaNotEmpty,
+	ValidTablesSchema,
+	ValidIndexesSchema
+]
 
 pluralPattern = re.compile(r"s$|x$|z$|sh$|ch$")
 hiddenPattern = re.compile(r"^_[^_].*")
@@ -108,8 +114,6 @@ class Nucleotides: pass
 Mode        = Literal["r", "w"]
 ReadMode    = Literal["r"]
 WriteMode   = Literal["w"]
-Direction   = Literal["DESC","ASC"]
-Nucleotides = Literal["A", "T", "C", "G", "N"]
 
 SQL_TYPES = {
 	"INTEGER" : int,
@@ -124,34 +128,15 @@ SQL_TYPES = {
 
 formatPattern = re.compile(r"[{](.*?)[}]")
 
-LOGGER = logging.Logger("MetaCanSNPerDatabases", level=logging.WARNING)
+LOGGER = logging.Logger("SQLOOP", level=100)
 
-LOGGER_FILEHANDLER = logging.FileHandler("MetaCanSNPerDatabases.log")
-LOGGER_FILEHANDLER.setFormatter(logging.Formatter("[%(name)s] %(asctime)s - %(levelname)s: %(message)s"))
-LOGGER.addHandler(LOGGER_FILEHANDLER)
+DATABASE_VERSIONS : dict[str,int] = {}
 
-LEGACY_HASH = "7630f33662e27489b7bb7b3b121ca4ff"
-
-DATABASE_VERSIONS : dict[str,int] = {
-	LEGACY_HASH							: 0, # Legacy CanSNPer
-	"175c47f1ad61ec81a7d11d8a8e1887ff"	: 2  # MetaCanSNPer Alpha version
-}
-
-LEGACY_VERSION = 0
 CURRENT_VERSION = 2
 CURRENT_TABLES_HASH = ""
 CURRENT_INDEXES_HASH = ""
-STRICT : bool = False
-SOFTWARE_NAME = "MetaCanSNPer"
 
-SOURCES = [
-	"https://github.com/XJ-04561/MetaCanSNPer-data/raw/master/database/{databaseName}", # MetaCanSNPer
-	"https://github.com/FOI-Bioinformatics/CanSNPer2-data/raw/master/database/{databaseName}" # Legacy CanSNPer
-]
-
-SOURCED = {"refseq":"F", "genbank": "A"}
-NCBI_FTP_LINK = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GC{source}/{n1}/{n2}/{n3}/{genome_id}_{assembly}/{genome_id}_{assembly}_genomic.fna.gz"
-
+SOURCES = []
 
 class Query: pass
 class Comparison: pass
