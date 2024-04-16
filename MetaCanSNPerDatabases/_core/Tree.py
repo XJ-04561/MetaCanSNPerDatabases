@@ -1,9 +1,9 @@
 
 from MetaCanSNPerDatabases.Globals import *
 import MetaCanSNPerDatabases.Globals as Globals
-from MetaCanSNPerDatabases.core.Structures import *
-from MetaCanSNPerDatabases.core.Words import *
-from MetaCanSNPerDatabases.core.Databases import *
+from MetaCanSNPerDatabases._core.Structures import *
+from MetaCanSNPerDatabases._core.Words import *
+from MetaCanSNPerDatabases._core.Databases import *
 
 class Branch:
 

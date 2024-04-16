@@ -43,6 +43,68 @@ EnclosedWord
 
 from MetaCanSNPerDatabases.Globals import *
 
+class AutoObject:
+	"""Automatically assigns values passed to the constructor to the annotations
+	of the object class. Skips 'hidden' attributes starting with only one
+	underscore. Meaning, _name would not be assigned a value from the
+	construction call, but __name__ would, as it starts with one, and not two
+	underscores."""
+	def __init__(self, *args, **kwargs):
+		from MetaCanSNPerDatabases._core.Functions import hiddenPattern
+		i = 0
+		for name, typeHint in self.__annotations__.items():
+			if hiddenPattern.fullmatch(name) is None:
+				continue
+			elif name in kwargs:
+				self.__setattr__(name, kwargs[name])
+			elif len(args) > i:
+				self.__setattr__(name, args[i])
+				i += 1
+			else:
+				if not hasattr(self, name):
+					raise MissingArgument(f"Missing required argument {name} for {self.__class__.__name__}.__init__")
+
+class Overload:
+
+	_funcs : list[tuple[dict[int|str,Type],Callable]]
+	__name__ : str
+
+	def __init__(self, func : Callable):
+		self._funcs = []
+		self.__name__ = func.__code__.co_name
+		self.add(func)
+
+	def __call__(self, *args : tuple[Any], **kwargs : dict[str,Any]):
+		from MetaCanSNPerDatabases._core.Functions import isType
+		for annotation, func in self._funcs:
+			if func.__code__.co_posonlyargcount != len(args):
+				continue
+			elif any(not isType(arg, annotation[name]) for name, arg in zip(func.__code__.co_varnames, args)):
+				continue
+			elif any(not isType(kwargs[name], annotation[name]) for name in kwargs):
+				continue
+			else:
+				return func(*args, **kwargs)
+		raise NotImplemented(f"No definition satisfies {self.__name__}({', '.join([', '.join(map(str,args)), ', '.join(map('='.join, args.items()))])})")
+	
+	def __repr__(self):
+		return f"<Overloaded function '{self.__name__}'>"
+	
+	def add(self, func : Callable):
+		try:
+			assert isinstance(func, Callable)
+			self._funcs.append((func.__annotations__, func))
+		except AssertionError:
+			raise TypeError(f"Only `Callable` objects are overloadable. {func!r} is not an instance of `Callable`")
+		return self
+
+class Mode: pass
+class ReadMode: pass
+class WriteMode: pass
+Mode        = Literal["r", "w"]
+ReadMode    = Literal["r"]
+WriteMode   = Literal["w"]
+
 class sql(str):
 	def __new__(cls, obj):
 		return super().__new__(cls, obj.__sql__())
@@ -67,6 +129,7 @@ class SQLObject(AutoObject):
 	name : str
 	
 	def __repr__(self):
+		from MetaCanSNPerDatabases._core.Functions import pluralize
 		return f"<{pluralize(self.__class__.__name__)}.{self.__name__} {' '.join(map(lambda keyVal : '{}={:!r}'.format(*keyVal), vars(self).items()))} at {hex(id(self))}>"
 		
 	def __str__(self):
@@ -250,6 +313,7 @@ class Word:
 		return Query(self, other)
 
 	def __repr__(self):
+		from MetaCanSNPerDatabases._core.Functions import pluralize
 		return f"<{pluralize(self.__class__.__base__.__name__)}.{self.__class__.__name__} content={self.content}>"
 		
 	def __str__(self) -> str:

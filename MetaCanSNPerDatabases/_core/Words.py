@@ -1,6 +1,6 @@
 
 from MetaCanSNPerDatabases.Globals import *
-from MetaCanSNPerDatabases.core.Structures import *
+from MetaCanSNPerDatabases._core.Structures import *
 
 
 class BEGIN: pass
