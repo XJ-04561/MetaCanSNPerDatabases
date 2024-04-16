@@ -34,7 +34,7 @@ classifiers = [
 ]
 dependencies = [
     "ncbi-datasets-pylib",
-    "multipledispatch"
+    "git+https://GitHub.com/XJ-04561/PseudoPathy"
 ]
 
 [project.urls]
