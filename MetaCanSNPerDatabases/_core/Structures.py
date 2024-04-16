@@ -67,7 +67,7 @@ class AutoObject:
 
 class Overload:
 
-	_funcs : list[tuple[dict[int|str,Type],Callable]]
+	_funcs : list[tuple[dict[int|str,Type],Callable,dict]]
 	__name__ : str
 
 	def __init__(self, func : Callable):
@@ -77,7 +77,7 @@ class Overload:
 
 	def __call__(self, *args : tuple[Any], **kwargs : dict[str,Any]):
 		from MetaCanSNPerDatabases._core.Functions import isType
-		for annotation, func in self._funcs:
+		for annotation, func, cache in self._funcs:
 			if func.__code__.co_posonlyargcount != len(args):
 				continue
 			elif any(not isType(arg, annotation[name]) for name, arg in zip(func.__code__.co_varnames, args)):
@@ -85,7 +85,9 @@ class Overload:
 			elif any(not isType(kwargs[name], annotation[name]) for name in kwargs):
 				continue
 			else:
-				return func(*args, **kwargs)
+				if (cacheHash := hash(args) + hash(kwargs)) not in cache:
+					cache[cacheHash] = func(*args, **kwargs)
+				return cache[cacheHash]
 		raise NotImplemented(f"No definition satisfies {self.__name__}({', '.join([', '.join(map(str,args)), ', '.join(map('='.join, args.items()))])})")
 	
 	def __repr__(self):
@@ -94,7 +96,7 @@ class Overload:
 	def add(self, func : Callable):
 		try:
 			assert isinstance(func, Callable)
-			self._funcs.append((func.__annotations__, func))
+			self._funcs.append((func.__annotations__, func, {}))
 		except AssertionError:
 			raise TypeError(f"Only `Callable` objects are overloadable. {func!r} is not an instance of `Callable`")
 		return self

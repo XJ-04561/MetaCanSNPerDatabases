@@ -88,7 +88,6 @@ def getSmallestFootprint(columns : set[Column], tables : list[list[set[Column],T
 			raise e
 
 @Overload
-@cache
 def getShortestPath(table1 : Table, table2 : Table, tables : set[Table]) -> tuple[tuple[Table,Column]]:
 
 	if table1 == table2:
