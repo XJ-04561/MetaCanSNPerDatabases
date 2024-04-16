@@ -2,6 +2,7 @@
 from MetaCanSNPerDatabases.Globals import *
 import MetaCanSNPerDatabases.Globals as Globals
 from MetaCanSNPerDatabases._core.Structures import Overload
+from MetaCanSNPerDatabases._core.Words import *
 
 pluralPattern = re.compile(r"s$|x$|z$|sh$|ch$")
 hiddenPattern = re.compile(r"^_[^_].*")
@@ -58,8 +59,6 @@ def formatType(columns : tuple[Column]):
 				yield "{:>12}"
 
 def hashQuery(database : Database, query : Query):
-	from MetaCanSNPerDatabases.core.Words import CREATE, BEGIN, TRANSACTION, ALTER, TABLE, RENAME, TO, INSERT, INTO, SELECT, FROM, DROP, COMMIT, VALUES, UPDATE, SET, WHERE, PRAGMA, ORDER, BY, SQLITE_MASTER
-	from MetaCanSNPerDatabases.core.Structures import sql
 	return hashlib.md5(
 			whitespacePattern.sub(
 				" ",
@@ -110,7 +109,7 @@ def getShortestPath(table1 : Table, table2 : Table, tables : set[Table]) -> tupl
 
 @getShortestPath.add
 def getShortestPath(sources : tuple[Table], destinations : tuple[Table], tables : set[Table]) -> tuple[tuple[Table,Column]]:
-
+	
 	shortestPath = range(len(tables)+1)
 	for source in sources:
 		for destination in destinations:
@@ -120,44 +119,6 @@ def getShortestPath(sources : tuple[Table], destinations : tuple[Table], tables 
 		raise TablesNotRelated(f"Source tables {sources} are not connected to destination tables {destinations}")
 	else:
 		return shortestPath
-
-def loadFromReferenceFile(database : Database, file : TextIO, refDir : str="."):
-	file.seek(0)
-	if "genome	strain	genbank_id	refseq_id	assembly_name" == file.readline():
-		for row in file:
-			genome, strain, genbank_id, refseq_id, assembly_name = row.strip().split("\t")
-			database.addReference(genome, strain, genbank_id, refseq_id, assembly_name)
-			try:
-				chrom = open(os.path.join(refDir, f"{assembly_name}.fna"), "r").readline()[1:].split()[0]
-				database.addChromosome(chromosomeName=chrom, genomeName=genome)
-			except FileNotFoundError as e:
-				raise MissingReferenceFile(f"Could not find reference file {os.path.join(refDir, f'{assembly_name}.fna')!r}. The file {file.__name__!r} does not specify chromosomes, and so the reference fasta file is required. To set the directory in which to look for .fna references, use the flag '--refDir'")
-
-	elif "chromosomes	genome	strain	genbank_id	refseq_id	assembly_name" == file.readline():
-		for row in file:
-			chromosomes, genome, strain, genbank_id, refseq_id, assembly_name = row.strip().split("\t")
-			database.addReference(genome, strain, genbank_id, refseq_id, assembly_name)
-			for chrom in chromosomes.split(";"):
-				database.addChromosome(chromosomeName=chrom, genomeName=genome)
-	else:
-		ValueError("File is not of accepted format.")
-
-def loadFromTreeFile(database : Database, file : TextIO):
-	file.seek(0)
-	database.addBranch(parent=0, name=file.readline().strip())
-	for row in file:
-		*_, parent, child = row.rstrip(file.newlines).rsplit("\t", 2)
-		database.addBranch(parent=parent, name=child)
-		
-
-def loadFromSNPFile(database : Database, file : TextIO):
-	file.seek(0)
-	if "snp_id	strain	reference	genome	position	derived_base	ancestral_base" == file.readline().strip():
-		for row in file:
-			nodeName, strain, reference, genome, position, ancestral, derived = row.rstrip(file.newlines).split("\t")
-			database.addSNP(nodeName=nodeName, strain=strain, reference=reference, genome=genome, position=int(position), ancestral=ancestral, derived=derived)
-	else:
-		ValueError("File is not of accepted format.")
 
 def downloadDatabase(databaseName : str, dst : str, reportHook=lambda block, blockSize, totalSize : None) -> str|None:
 	from urllib.request import urlretrieve

@@ -130,11 +130,9 @@ class NotLegacyCanSNPer2(Assertion):
 		return IsLegacyCanSNPer2("Database is Legacy CanSNPer2 schema.")
 	@classmethod
 	def condition(self, database : Database) -> bool:
-		from MetaCanSNPerDatabases.Globals import LEGACY_HASH
 		return database.tablesHash == LEGACY_HASH
 	@classmethod
 	def rectify(self, database : Database) -> None:
-		from MetaCanSNPerDatabases.core.Functions import updateFromLegacy
 		import ncbi.datasets as datasets # type: ignore
 		
 		if database.refDir is None:
@@ -227,3 +225,43 @@ class MetaCanSNPerDatabase(Database):
 			return CanSNPNode(self, next(self()))
 		except StopIteration:
 			raise NoTreeConnectedToRoot(f"In database {self.filename!r}")
+
+
+def loadFromReferenceFile(database : Database, file : TextIO, refDir : str="."):
+	file.seek(0)
+	if "genome	strain	genbank_id	refseq_id	assembly_name" == file.readline():
+		for row in file:
+			genome, strain, genbank_id, refseq_id, assembly_name = row.strip().split("\t")
+			database(INSERT - INTO - ReferencesTable - VALUES (genome, strain, genbank_id, refseq_id, assembly_name))
+			genomeID = next(database(SELECT (GenomeID) - FROM (ReferencesTable) - WHERE (Genome == genome)))
+			try:
+				chrom = open(os.path.join(refDir, f"{assembly_name}.fna"), "r").readline()[1:].split()[0]
+				database(INSERT - INTO - ChromosomesTable - VALUES (None, chrom, genomeID))
+			except FileNotFoundError as e:
+				raise MissingReferenceFile(f"Could not find reference file {os.path.join(refDir, f'{assembly_name}.fna')!r}. The file {file.__name__!r} does not specify chromosomes, and so the reference fasta file is required. To set the directory in which to look for .fna references, use the flag '--refDir'")
+
+	elif "chromosomes	genome	strain	genbank_id	refseq_id	assembly_name" == file.readline():
+		for row in file:
+			chromosomes, genome, strain, genbank_id, refseq_id, assembly_name = row.strip().split("\t")
+			database(INSERT - INTO - ReferencesTable - VALUES (genome, strain, genbank_id, refseq_id, assembly_name))
+			genomeID = next(database(SELECT (GenomeID) - FROM (ReferencesTable) - WHERE (Genome == genome)))
+			for chrom in chromosomes.split(";"):
+				database(INSERT - INTO - ChromosomesTable - VALUES (None, chrom, genomeID))
+	else:
+		ValueError("File is not of accepted format.")
+
+def loadFromTreeFile(database : Database, file : TextIO):
+	file.seek(0)
+	database(INSERT - INTO - TreeTable - VALUES (0, None, file.readline().strip()))
+	for row in file:
+		*_, parent, child = row.rstrip(file.newlines).rsplit("\t", 2)
+		database(INSERT - INTO - TreeTable - VALUES (SELECT (Child) - FROM (TreeTable) - WHERE (GenoType == parent), None, child))
+
+def loadFromSNPFile(database : Database, file : TextIO):
+	file.seek(0)
+	if "snp_id	strain	reference	genome	position	derived_base	ancestral_base" == file.readline().strip():
+		for row in file:
+			nodeName, strain, reference, genome, position, ancestral, derived = row.rstrip(file.newlines).split("\t")
+			database(INSERT - INTO - SNPsTable - VALUES (SELECT (Child) - FROM (TreeTable) - WHERE (GenoType == nodeName), position, ancestral, derived, reference, None, SELECT (ChromID) - FROM (ChromosomesTable) - WHERE (Genome == genome)))
+	else:
+		ValueError("File is not of accepted format.")

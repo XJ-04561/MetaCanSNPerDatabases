@@ -62,6 +62,7 @@ class AutoObject:
 				i += 1
 			else:
 				if not hasattr(self, name):
+					from MetaCanSNPerDatabases._core.Exceptions import MissingArgument
 					raise MissingArgument(f"Missing required argument {name} for {self.__class__.__name__}.__init__")
 
 class Overload:
@@ -154,7 +155,7 @@ class SQLObject(AutoObject):
 class SanitizedValue(SQLObject):
 	value : Any
 	def __str__(self):
-		return "?"
+		return "?" if self.value is not None else "null"
 	def __sql__(self):
 		return self.value
 	@property

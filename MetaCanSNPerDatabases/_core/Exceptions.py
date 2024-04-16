@@ -1,5 +1,6 @@
 
 from sqlite3 import DatabaseError
+
 class DatabaseNotConnected(DatabaseError): pass
 class MissingArgument(DatabaseError): pass
 class MissingReferenceFile(DatabaseError): pass
@@ -31,7 +32,8 @@ class SchemaNotEmpty(Assertion):
 		return database._connection(f"SELECT COUNT(*) FROM sqlite_master;").fetchone()[0] == 0
 	@classmethod
 	def rectify(self, database) -> None:
-		from MetaCanSNPerDatabases.core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, sql
+		from MetaCanSNPerDatabases._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT
+		from MetaCanSNPerDatabases._core.Structures import sql
 		from MetaCanSNPerDatabases.Globals import CURRENT_VERSION
 		database(BEGIN - TRANSACTION)
 		for table in database.tables:
@@ -50,7 +52,8 @@ class ValidTablesSchema(Assertion):
 		return database.tablesSchema != CURRENT_TABLES_HASH
 	@classmethod
 	def rectify(cls, database) -> None:
-		from MetaCanSNPerDatabases.core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, DROP, INSERT, INTO ,RENAME, TO, SELECT, ALL, FROM, ALTER, INDEX, sql
+		from MetaCanSNPerDatabases._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, ALL, FROM, DROP, INDEX
+		from MetaCanSNPerDatabases._core.Structures import sql
 		from MetaCanSNPerDatabases.Globals import CURRENT_VERSION
 		database(BEGIN - TRANSACTION)
 		database.clearIndexes()
@@ -80,7 +83,8 @@ class ValidIndexesSchema(Assertion):
 		return database.indexesSchema != CURRENT_INDEXES_HASH
 	@classmethod
 	def rectify(cls, database) -> None:
-		from MetaCanSNPerDatabases.core.Words import BEGIN, TRANSACTION, CREATE, PRAGMA, COMMIT, INDEX, sql
+		from MetaCanSNPerDatabases._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, ALL, FROM, DROP, INDEX
+		from MetaCanSNPerDatabases._core.Structures import sql
 		from MetaCanSNPerDatabases.Globals import CURRENT_VERSION
 		database(BEGIN - TRANSACTION)
 		database.clearIndexes()

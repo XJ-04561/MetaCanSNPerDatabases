@@ -1,5 +1,4 @@
 
-from MetaCanSNPerDatabases.Globals import *
 from MetaCanSNPerDatabases._core.Structures import *
 
 
@@ -19,7 +18,6 @@ class PRAGMA:
 		self.content = tuple(content)
 class VALUES:
 	def __init__(self, *args):
-		from MetaCanSNPerDatabases.core.Structures import SanitizedValue
 		self.content = tuple(map(SanitizedValue, args))
 class UPDATE: pass
 class SET:
