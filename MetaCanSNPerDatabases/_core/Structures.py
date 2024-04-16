@@ -88,7 +88,12 @@ class Overload:
 				if (cacheHash := hash(args) + hash(kwargs)) not in cache:
 					cache[cacheHash] = func(*args, **kwargs)
 				return cache[cacheHash]
-		raise NotImplemented(f"No definition satisfies {self.__name__}({', '.join([', '.join(map(str,args)), ', '.join(map('{0[0]}={0[1]}'.format, kwargs.items()))])})")
+		msg = f"No definition satisfies {self.__name__}("
+		msg += ", ".join(map(str,args))
+		if not msg.endswith("("):
+			msg += ", "
+		msg += ", ".join(map("{0[0]}={0[1]}".format, kwargs.items()))
+		raise NotImplementedError(msg + ")")
 	
 	def __repr__(self):
 		return f"<Overloaded function '{self.__name__}'>"
