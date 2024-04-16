@@ -77,6 +77,7 @@ class Overload:
 
 	def __call__(self, *args : tuple[Any], **kwargs : dict[str,Any]):
 		from MetaCanSNPerDatabases._core.Functions import isType
+		print(repr(self))
 		for annotation, func, cache in self._funcs:
 			print(annotation, func.__code__.co_posonlyargcount, args, kwargs)
 			if func.__code__.co_posonlyargcount != len(args):
