@@ -178,7 +178,8 @@ class Table(SQLObject):
 	options : tuple[Query|Word] = tuple()
 	
 	def __sql__(self):
-		return f"{self.name} ({',\n\t'.join(ChainMap(map(sql, self.options), map(sql, self.columns)))})"
+		sep = ",\n\t"
+		return f"{self.name} ({sep.join(ChainMap(map(sql, self.options), map(sql, self.columns)))})"
 	
 	def __hash__(self):
 		return self.__sql__().__hash__()
