@@ -14,26 +14,6 @@ def pluralize(string : str) -> str:
 		case _:
 			return f"{string}es"
 
-def isType(value, typed):
-	try:
-		return isinstance(value, typed)
-	except TypeError:
-		try:
-			assert isinstance(value, get_origin(typed))
-			subTypes = get_args(typed)
-			if len(subTypes) == 0:
-				return True
-			elif len(subTypes) == 1:
-				return all(isType(v, subTypes[0]) for v in value)
-			elif isinstance(subTypes[0], int) and len(value) == subTypes[0]:
-				return all(isType(v, t) for v,t in zip(value, subTypes[1:]))
-			elif len(subTypes) == len(value):
-				return all(isType(v, subTyped) for v, subTyped in zip(value, subTypes))
-		except:
-			pass
-	finally:
-		return False
-
 whitespacePattern = re.compile(r"\s+")
 sqlite3TypePattern = re.compile(r"(?P<integer>INTEGER)|(?P<decimal>DECIMAL)|(?P<char>(VAR)?CHAR[(](?P<number>[0-9]*)[)])|(?P<date>DATE)|(?P<datetime>DATETIME)|(?P<text>TEXT)")
 
