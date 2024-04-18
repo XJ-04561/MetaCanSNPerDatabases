@@ -33,6 +33,8 @@ SQL_TYPES = {
 	"NULL" : None
 }
 
+whitespacePattern = re.compile(r"\s+")
+sqlite3TypePattern = re.compile(r"^(?P<integer>INTEGER)|(?P<decimal>DECIMAL)|(?P<char>(VAR)?CHAR[(](?P<number>[0-9]*)[)])|(?P<date>DATE)|(?P<datetime>DATETIME)|(?P<text>TEXT)$", re.IGNORECASE)
 namePattern = re.compile(r"^[a-zA-Z0-9_\-*]*$")
 formatPattern = re.compile(r"[{](.*?)[}]")
 
