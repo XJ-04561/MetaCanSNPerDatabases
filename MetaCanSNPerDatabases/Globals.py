@@ -13,6 +13,7 @@ from PseudoPathy.Library import CommonGroups
 from PseudoPathy.PathShortHands import *
 
 from MetaCanSNPerDatabases._core.Exceptions import *
+from MetaCanSNPerDatabases._core.This import this
 class Rest(Iterator): pass
 class All(Iterator): pass
 
