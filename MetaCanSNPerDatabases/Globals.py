@@ -33,7 +33,7 @@ SQL_TYPES = {
 	"NULL" : None
 }
 
-namePattern = re.compile(r"^[a-zA-Z0-9_-\*]*$")
+namePattern = re.compile(r"^[a-zA-Z0-9_\-*]*$")
 formatPattern = re.compile(r"[{](.*?)[}]")
 
 LOGGER = logging.Logger("SQLOOP", level=100)
