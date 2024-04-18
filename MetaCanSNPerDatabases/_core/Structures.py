@@ -196,12 +196,9 @@ class Column(SQLObject):
 				self.type = args[2]
 			case _:
 				raise NoMatchingDefinition(self.__qualname__, args)
-		try:
-			assert isinstance(self.name, str)
-			assert namePattern.fullmatch(self.name) is not None
-			assert self.type is None or (isinstance(self.type, str) and namePattern.fullmatch(self.type) is not None)
-		except AssertionError:
-			raise TypeError(f"Names and types of columns must be alphanumeric [a-zA-Z0-9_\-*]")
+		assert isinstance(self.name, str)
+		assert namePattern.fullmatch(self.name) is not None, f"Name of column must be alphanumeric [a-zA-Z0-9_\-*], and {self.name} is not."
+		assert self.type is None or (isinstance(self.type, str) and namePattern.fullmatch(self.type) is not None), f"Type of column must be alphanumeric [a-zA-Z0-9_\-*], and {self.type} is not."
 	
 	def __sql__(self):
 		return f"{self.name} {self.type}"
