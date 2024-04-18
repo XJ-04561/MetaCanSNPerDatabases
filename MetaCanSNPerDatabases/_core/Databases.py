@@ -60,10 +60,12 @@ class Selector:
 
 	_connection : Connection
 	databaseTables : set[Table]
+	databaseColumns : set[Column]
 
 	def __init__(self, connection : Connection, tables : tuple[Table]):
 		self._connection = connection
 		self.databaseTables = set(tables)
+		self.databaseColumns = set().union(map(this.columns, self.databaseTables))
 		self.appended = Query()
 	
 	def __iter__(self):
@@ -72,36 +74,43 @@ class Selector:
 	def __sub__(self, append : Word|Query):
 		self.appended -= append
 
-	@Overload
-	def __getitem__(self, columns : tuple[Column]):
-		self.tables = tuple(getSmallestFootprint(set(columns), [[set(table.columns), table, 0] for table in self.databaseTables]))
-		return self
-	
-	@__getitem__.add
-	def __getitem__(self, tables : tuple[Table]):
-		if not hasattr(self, "columns"):
-			self.columns = (ALL, )
-		self.tables = tables
-		return self
-	
-	@__getitem__.add
-	def __getitem__(self, comparisons : tuple[Comparison]):
-		wheres = []
-		for comp in comparisons:
-			if isinstance(comp.left, Column) and all(comp.left not in table for table in self.tables):
-				targetTables = []
-				for table in self.databaseTables:
-					if comp.left in table.columns:
-						targetTables.append(table)
-				
-				path = getShortestPath(self.tables, targetTables)
-				subQuery = SELECT (path[-1][0]) - FROM (path[-1][1]) - WHERE(comp)
-				for col, table in path[-2::-1]:
-					subQuery = SELECT (col) - FROM (table) - WHERE(comp.left in subQuery)
-				wheres.append(path[0][0] in subQuery)
-			else:
-				wheres.append(comp)
-		self.wheres = tuple(wheres)
+	@overload
+	def __getitem__(self, columns : tuple[Column]): ...
+	@overload
+	def __getitem__(self, tables : tuple[Table]): ...
+	@overload
+	def __getitem__(self, comparisons : tuple[Comparison]): ...
+	@final
+	def __getitem__(self, items : tuple[Column|Table|Comparison]):
+		if isinstance(items[0], Column):
+			assert len(set(items).difference(self.databaseColumns)) == 0, f"Given columns don't exist in the database: {set(items).difference(self.databaseColumns)}"
+			self.columns = items
+			self.tables = tuple(getSmallestFootprint(set(items), [[set(table.columns), table, 0] for table in self.databaseTables]))
+		elif isinstance(items[0], Table):
+			assert len(set(items).difference(self.databaseTables)) == 0, f"Given tables don't exist in the database: {set(items).difference(self.databaseTables)}"
+			if not hasattr(self, "columns"):
+				self.columns = (ALL, )
+			self.tables = items
+		elif isinstance(items[0], Comparison):
+			assert all(col in self.databaseColumns for comp in items for col in [comp.left, comp.right] if isinstance(col, Column)), f"Columns in comparisons are not found in the database: {set(col for comp in items for col in [comp.left, comp.right] if isinstance(col, Column) and col not in self.databaseColumns)}"
+			wheres = []
+			for comp in items:
+				if isinstance(comp.left, Column) and all(comp.left not in table for table in self.tables):
+					targetTables = []
+					for table in self.databaseTables:
+						if comp.left in table.columns:
+							targetTables.append(table)
+					
+					path = getShortestPath(self.tables, targetTables)
+					subQuery = SELECT (path[-1][0]) - FROM (path[-1][1]) - WHERE(comp)
+					for col, table in path[-2::-1]:
+						subQuery = SELECT (col) - FROM (table) - WHERE(comp.left in subQuery)
+					wheres.append(path[0][0] in subQuery)
+				else:
+					wheres.append(comp)
+			self.wheres = tuple(wheres)
+		else:
+			raise NoMatchingDefinition(self.__qualname__+".__getitem__", items)
 		return self
 
 class Database:
@@ -157,24 +166,28 @@ class Database:
 		string.append(f"</{self.__class__.__name__}>")
 		return "\n".join(string)
 
-	@Overload
-	def __call__(self, query : Query) -> Generator[tuple[Any],None,None]:
-		if isinstance(query.words[0], SELECT):
-			if len(query.words[0].content) == 1:
-				for row in self._connection.execute(*query):
-					yield row[0]
+	@overload
+	def __call__(self, query : Query) -> Generator[tuple[Any],None,None]: ...
+	@overload
+	def __call__(self, query : str, params : list[Any]) -> Generator[tuple[Any],None,None]: ...
+	@final
+	def __call__(self, query : str|Query, params : list[Any]=None) -> Generator[tuple[Any],None,None]:
+		if isinstance(query, str) and isinstance(params, list[Any]):
+			for row in self._connection.execute(query, params):
+				yield row
+		elif isinstance(query, Query) and params is None:
+			if isinstance(query.words[0], SELECT):
+				if len(query.words[0].content) == 1:
+					for row in self._connection.execute(*query):
+						yield row[0]
+				else:
+					for row in self._connection.execute(*query):
+						yield row
 			else:
-				for row in self._connection.execute(*query):
-					yield row
-		else:
-			self._connection.execute(*query)
-			return None
-	
-	@__call__.add
-	def __call__(self, query : str, params : list[Any]) -> Generator[tuple[Any],None,None]:
-		for row in self._connection.execute(query, params):
-			yield row
-	
+				self._connection.execute(*query)
+				return None
+
+
 	def __getitem__(self, tuple):
 		out = Selector(self._connection, list(self.Tables.values()))
 		return out[tuple]
@@ -205,21 +218,10 @@ class Database:
 	def tablesHash(self):
 		return hashQuery(self, SELECT("sql") - FROM - SQLITE_MASTER - WHERE(type='table') - ORDER - BY("sql DESC"))
 
-	@Overload
 	def createIndex(self : Self, index : Index) -> bool:
 		"""Create a given Index-object inside the database"""
 		try:
 			self(CREATE - INDEX - sql(index))
-			return True
-		except:
-			return False
-
-	@createIndex.add
-	def createIndex(self : Self, table : Table, *cols : Column, name : str=None) -> bool:
-		if name is None:
-			name = f"{table}By{''.join(map(str.capitalize, map(str, cols)))}"
-		try:
-			self(CREATE - INDEX - Index(name, table, cols))
 			return True
 		except:
 			return False

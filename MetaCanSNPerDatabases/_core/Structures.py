@@ -43,6 +43,10 @@ EnclosedWord
 
 from MetaCanSNPerDatabases.Globals import *
 
+class NoMatchingDefinition(TypeError):
+	def __init__(self, name, args=(), kwargs={}):
+		self.args = (f"No definition of {name!r} fits args={args}, kwargs={kwargs}")
+
 class AutoObject:
 	"""Automatically assigns values passed to the constructor to the annotations
 	of the object class. Skips 'hidden' attributes starting with only one
@@ -64,279 +68,6 @@ class AutoObject:
 				if not hasattr(self, name):
 					from MetaCanSNPerDatabases._core.Exceptions import MissingArgument
 					raise MissingArgument(f"Missing required argument {name} for {self.__class__.__name__}.__init__")
-"""
-
-from typing import Callable, Any, Type, overload, get_args, get_origin, Self, final
-from types import FunctionType, MethodType
-
-class Overload:
-	OVERLOADS_DICT : dict[str,Self] = {}
-	from types import FunctionType, MethodType
-	class TypingError(Exception): pass
-	class UntypedArgument(TypingError):
-		def __init__(self, funcName, *names, **kwargs):
-			super().__init__(f"Function {funcName!r} parameter(s) {', '.join(map(repr, names))} is untyped (Lacks annotation through type-hinting). You can type a parameter by adding the type-object after a colon in the parameter list.\nExample:\ndef f(x : int) -> float:\n\treturn x / 2", **kwargs)
-
-	class Signature:
-
-		name : str
-		names : tuple[str]
-		requiredNames : set[str]
-		requireds : tuple[type]
-		optionalNames : set[str]
-		optionals : dict[str,type]
-		allNames : set[str]
-		args : type|None = None
-		kwargs : type|None = None
-
-		def __init__(self, func : Callable):
-			if not isinstance(func, Overload.FunctionType|Overload.MethodType):
-				raise ValueError(f"Can only overload using functions or methods, not {type(func)}")
-			self.name = func.__qualname__
-			if "." in func.__qualname__: # isinstance(func, Overload.MethodType):
-				self.names = func.__code__.co_varnames[1:]
-			else:
-				self.names = func.__code__.co_varnames
-			if set(self.names).difference(func.__annotations__):
-				raise Overload.UntypedArgument(func.__name__, *set(func.__code__.co_varnames).difference(func.__annotations__))
-			self.requireds = {name : func.__annotations__.get(name, Any) for name in self.names[:func.__code__.co_argcount]}
-			self.optionals = {} if func.__kwdefaults__ is None else {name : func.__annotations__.get(name, Any) for name in func.__kwdefaults__}
-			self.requiredNames = set(self.requireds)
-			self.optionalNames = set(self.optionals)
-			self.allNames = self.requiredNames | self.optionalNames
-
-			match func.__code__.co_flags & (8+4):
-				case 8:
-					self.kwargs = func.__annotations__[self.names[-1]]
-				case 4:
-					self.args = func.__annotations__[self.names[-1]]
-				case 12:
-					self.kwargs, self.args = func.__annotations__[self.names[-1]], func.__annotations__[self.names[-2]]
-
-		def match(self, args : tuple[Any], kwargs : dict[str,Any]):
-			"""NAIVE : Only accepts positional arguments that end up in 'args', do not positional arguments by name."""
-			if self.requiredNames.difference(self.names[:len(args)], kwargs):
-				return False
-			if not self.allNames.issuperset(kwargs):
-				return False
-			for name, value in zip(self.name, args):
-				if not Overload.isType(value, self.requireds[name]):
-					return False
-			if not name == self.names[-1]:
-				for name in self.requiredNames.intersection(kwargs):
-					if not Overload.isType(kwargs[name], self.requireds[name]):
-						return False
-			
-			for name, sigType in self.optionals.items():
-				if not Overload.isType(kwargs[name], sigType):
-					return False
-
-			return True
-
-	_funcs : list[tuple[dict[int|str,Type],Callable,dict]]
-	__name__ : str
-	overloadDummy : Callable
-	
-	
-	def __new__(cls, func : Callable):
-		
-		if func.__qualname__ not in Overload.OVERLOADS_DICT:
-			Overload.OVERLOADS_DICT[func.__qualname__] = self = super().__new__(cls)
-			self._funcs = []
-		else:
-			self = Overload.OVERLOADS_DICT[func.__qualname__]
-
-		self._funcs.append((Overload.Signature(func), func))
-		
-		self.overloadDummy = overload(func)
-		import copy
-		fOut = copy.deepcopy(func)
-		fOut.__code__ = self.__call__.__code__
-		return fOut
-	
-	def __hash__(self):
-		return self.overloadDummy.__hash__()
-
-	def __call__(self, *args : tuple[Any], **kwargs : dict[str,Any]):
-		for signature, func in self._funcs:
-			if signature(args, kwargs):
-				return func(*args, **kwargs)
-		msg = f"No definition satisfies {self.__name__}("
-		msg += ", ".join(map(repr,args))
-		if not msg.endswith("("):
-			msg += ", "
-		msg += ", ".join(map("{0[0]}={0[1]!r}".format, kwargs.items()))
-		raise NotImplementedError(msg + ")")
-	
-	def __repr__(self):
-		return f"<Overloaded function '{self.__name__}'>"
-	
-	def add(self, func : Callable):
-		self._funcs.append((Overload.Signature(func), func))
-		self.dummy = overload(func)
-		self.dummy.__code__ = self.dummy.__code__.__code__.replace(co_code=self.__call__.__code__.co_code)
-	
-	@staticmethod
-	def isType(value, typed):
-		try:
-			return isinstance(value, typed)
-		except TypeError:
-			try:
-				assert isinstance(value, get_origin(typed))
-				subTypes = get_args(typed)
-				if len(subTypes) == 0:
-					return True
-				elif len(subTypes) == 1:
-					return all(Overload.isType(v, subTypes[0]) for v in value)
-				elif isinstance(subTypes[0], int) and len(value) == subTypes[0]:
-					return all(Overload.isType(v, t) for v,t in zip(value, subTypes[1:]))
-				elif len(subTypes) == len(value):
-					return all(Overload.isType(v, subTyped) for v, subTyped in zip(value, subTypes))
-			except:
-				pass
-		finally:
-			return False
-
-
-class Test:
-	
-	@Overload
-	def f(self, a : int): pass
-	
-	@Overload
-	def f(self, a : float): pass
-
-class Test2:
-
-	@overload
-	def f(self, a : int): pass
-	
-	@overload
-	def f(self, a : float): pass
-
-	def f(self, a): pass
-
-t1 = Test()
-t1.f(2)
-t2 = Test2()
-print(repr(t2.f))
-"""
-class Overload:
-	from types import FunctionType, MethodType
-	class TypingError(Exception): pass
-	class UntypedArgument(TypingError):
-		def __init__(self, funcName, *names, **kwargs):
-			super().__init__(f"Function {funcName!r} parameter(s) {', '.join(names)} is untyped (Lacks annotation through type-hinting). You can type a parameter by adding the type-object after a colon in the parameter list.\nExample:\ndef f(x : int) -> float:\n\treturn x / 2", **kwargs)
-
-	class Signature:
-
-		name : str
-		names : tuple[str]
-		requiredNames : set[str]
-		requireds : tuple[type]
-		optionalNames : set[str]
-		optionals : dict[str,type]
-		allNames : set[str]
-		args : type|None = None
-		kwargs : type|None = None
-
-		def __init__(self, func : Callable):
-			if not isinstance(func, Overload.FunctionType|Overload.MethodType):
-				raise ValueError(f"Can only overload using functions or methods, not {type(func)}")
-			if set(func.__code__.co_varnames).difference(func.__annotations__):
-				raise Overload.UntypedArgument(func.__name__, *set(func.__code__.co_varnames).difference(func.__annotations__))
-			self.name = func.__qualname__
-			if isinstance(func, Overload.MethodType):
-				self.names = func.__func__.__code__.co_varnames[1:]
-			else:
-				self.names = func.__code__.co_varnames
-			self.requireds = {name : func.__annotations__.get(name, Any) for name in self.names[:func.__code__.co_argcount]}
-			self.optionals = {name : func.__annotations__.get(name, Any) for name in func.__code__.__kwdefaults__}
-			self.requiredNames = set(self.requireds)
-			self.optionalNames = set(self.optionals)
-			self.allNames = self.requiredNames | self.optionalNames
-
-			match func.__code__.co_flags & (8+4):
-				case 8:
-					self.kwargs = func.__annotations__[self.names[-1]]
-				case 4:
-					self.args = func.__annotations__[self.names[-1]]
-				case 12:
-					self.kwargs, self.args = func.__annotations__[self.names[-1]], func.__annotations__[self.names[-2]]
-
-		def match(self, args : tuple[Any], kwargs : dict[str,Any]):
-			"""NAIVE : Only accepts positional arguments that end up in 'args', do not positional arguments by name."""
-			if self.requiredNames.difference(self.names[:len(args)], kwargs):
-				return False
-			if not self.allNames.issuperset(kwargs):
-				return False
-			for name, value in zip(self.name, args):
-				if not Overload.isType(value, self.requireds[name]):
-					return False
-			if not name == self.names[-1]:
-				for name in self.requiredNames.intersection(kwargs):
-					if not Overload.isType(kwargs[name], self.requireds[name]):
-						return False
-			
-			for name, sigType in self.optionals.items():
-				if not Overload.isType(kwargs[name], sigType):
-					return False
-
-			return True
-
-	_funcs : list[tuple[dict[int|str,Type],Callable,dict]]
-	__name__ : str
-
-	def __init__(self, func : Callable):
-		self._funcs = []
-		# self.__func__ = self.__call__
-		self.add(func)
-	
-	def __new__(cls, func : Callable):
-		obj = super().__init__(cls, func)
-		type(Overload.__new__)(obj.__call__)
-		return obj
-
-	def __call__(self, *args : tuple[Any], **kwargs : dict[str,Any]):
-		for signature, func in self._funcs:
-			if signature(args, kwargs):
-				return func(*args, **kwargs)
-		msg = f"No definition satisfies {self.__name__}("
-		msg += ", ".join(map(repr,args))
-		if not msg.endswith("("):
-			msg += ", "
-		msg += ", ".join(map("{0[0]}={0[1]!r}".format, kwargs.items()))
-		raise NotImplementedError(msg + ")")
-	
-	def __repr__(self):
-		return f"<Overloaded function '{self.__name__}'>"
-	
-	def add(self, func : Callable):
-		self._funcs.append((Overload.Signature(func), func))
-		overload(func)
-		self.__func__ = func
-		return self
-	
-	@staticmethod
-	def isType(value, typed):
-		try:
-			return isinstance(value, typed)
-		except TypeError:
-			try:
-				assert isinstance(value, get_origin(typed))
-				subTypes = get_args(typed)
-				if len(subTypes) == 0:
-					return True
-				elif len(subTypes) == 1:
-					return all(Overload.isType(v, subTypes[0]) for v in value)
-				elif isinstance(subTypes[0], int) and len(value) == subTypes[0]:
-					return all(Overload.isType(v, t) for v,t in zip(value, subTypes[1:]))
-				elif len(subTypes) == len(value):
-					return all(Overload.isType(v, subTyped) for v, subTyped in zip(value, subTypes))
-			except:
-				pass
-		finally:
-			return False
 
 class Mode: pass
 class ReadMode: pass
@@ -439,24 +170,39 @@ class Assignment(AutoObject):
 
 class Column(SQLObject):
 	
+	__name__ : str
+	name : str
 	type : str
 	
-	@Overload
-	def __init__(self, name : str):
-		self.__name__ = self.name = name
-		self.type = None
+	@overload
+	def __init__(self, name : str): ...
+	@overload
+	def __init__(self, name : str, type : str): ...
+	@overload
+	def __init__(self, __name__ : str, name : str, type : str): ...
 	
-	@__init__.add
-	def _(self, name : str, type : str):
-		self.__name__ = self.name = name
-		self.type = type
+	@final
+	def __init__(self, *args):
+		match len(args):
+			case 1:
+				self.__name__ = self.name = args[0]
+				self.type = None
+			case 2:
+				self.__name__ = self.name = args[0]
+				self.type = args[1]
+			case 3:
+				self.__name__ = args[0]
+				self.name = args[1]
+				self.type = args[2]
+			case _:
+				raise NoMatchingDefinition(self.__qualname__, args)
+		try:
+			assert isinstance(self.name, str)
+			assert namePattern.fullmatch(self.name) is not None
+			assert self.type is None or (isinstance(self.type, str) and self.type.isalnum())
+		except AssertionError:
+			raise TypeError(f"Names and types of columns must be alphanumeric [a-zA-Z0-9_]")
 	
-	@__init__.add
-	def _(self, __name__ : str, name : str, type : str):
-		self.__name__ = __name__
-		self.name = name
-		self.type = type
-
 	def __sql__(self):
 		return f"{self.name} {self.type}"
 	
@@ -506,7 +252,7 @@ class Query:
 
 	words : tuple[Word] = tuple()
 
-	def __init__(self, *words):
+	def __init__(self, *words : tuple[Word]):
 		self.words = []
 		for word in words:
 			if not isinstance(word, Query):
@@ -559,6 +305,10 @@ class Word:
 	def __str__(self) -> str:
 		return f"{self.__class__.__name__} {self.sep.join(map(str, self.content))}" if len(self.content) else ""
 	
+	def __iter__(self):
+		for item in self.content:
+			yield item
+
 	def __sql__(self):
 		return self.__str__()
 	

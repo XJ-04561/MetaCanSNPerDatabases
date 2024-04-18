@@ -1,8 +1,38 @@
 
 from MetaCanSNPerDatabases.Globals import *
 import MetaCanSNPerDatabases.Globals as Globals
-from MetaCanSNPerDatabases._core.Structures import Overload
 from MetaCanSNPerDatabases._core.Words import *
+
+def isType(value, typed):
+	if get_origin(typed) in [Dict, dict]:
+		value = value.items()
+		typed = Iterable[All[tuple[get_args(typed)]]]
+	if get_origin(typed) in [None,Union]:
+		return isinstance(value, typed)
+	elif isinstance(value, get_origin(typed)):
+		subTypes = get_args(typed)
+		if get_origin(subTypes[0]) is All:
+			tp = Union[get_args(subTypes[0])]
+			for v in value:
+				if not isType(v, tp):
+					return False
+		elif subTypes[-1] is Rest:
+			for v, subType in zip(value, ChainMap(itertools.repeat(Any), subTypes[:-1])):
+				if not isType(v, tp):
+					return False
+		elif get_origin(subTypes[-1]) is Rest:
+			rest = Union[get_args(subTypes[-1])]
+			for v, subType in zip(value, ChainMap(itertools.repeat(rest), subTypes[:-1])):
+				if not isType(v, subType):
+					return False
+		else:
+			if len(value) != (subTypes):
+				return False
+			for v, subType in zip(value, subTypes):
+				if not isType(v, subType):
+					return False
+		return True
+	return False
 
 pluralPattern = re.compile(r"s$|x$|z$|sh$|ch$")
 hiddenPattern = re.compile(r"^_[^_].*")
@@ -67,37 +97,47 @@ def getSmallestFootprint(columns : set[Column], tables : list[list[set[Column],T
 			e.add_note(tables[-1])
 			raise e
 
-@Overload
+@overload
 def getShortestPath(table1 : Table, table2 : Table, tables : set[Table]) -> tuple[tuple[Table,Column]]:
-
-	if table1 == table2:
-		return tuple()
-	elif len(tables) == 0:
-		return (None, )
-	else:
-		cols = set(table1.columns)
-		paths = {}
-		for table in tables:
-			if len(commonCols := cols.intersection(table)):
-				paths[tuple(commonCols)[0], table] = getShortestPath(table, table2, tables.difference({table}))
-		if len(paths) == 0:
-			return (None, )
-		
-		(commonCol, table), path = max(filter(lambda tupe : tupe[1][-1] is not None, paths.items()), key=lambda colPath : len(colPath[1]))
-		return ((commonCol, table),) + path
-
-@getShortestPath.add
+	...
+@overload
 def getShortestPath(sources : tuple[Table], destinations : tuple[Table], tables : set[Table]) -> tuple[tuple[Table,Column]]:
-	
-	shortestPath = range(len(tables)+1)
-	for source in sources:
-		for destination in destinations:
-			if len(path := getShortestPath(source, destination, tables)) < len(shortestPath):
-				shortestPath = path
-	if isinstance(shortestPath, range):
-		raise TablesNotRelated(f"Source tables {sources} are not connected to destination tables {destinations}")
-	else:
-		return shortestPath
+	...
+@cache
+def getShortestPath(*args) -> tuple[tuple[Table,Column]]:
+	if isType(args, tuple[tuple[Table],tuple[Table], set[Table]]):
+		sources : tuple[Table] = args[0]
+		destinations : tuple[Table] = args[1]
+		tables : set[Table] = args[2]
+
+		shortestPath = range(len(tables)+1)
+		for source in sources:
+			for destination in destinations:
+				if len(path := getShortestPath(source, destination, tables)) < len(shortestPath):
+					shortestPath = path
+		if isinstance(shortestPath, range):
+			raise TablesNotRelated(f"Source tables {sources} are not connected to destination tables {destinations}")
+		else:
+			return shortestPath
+	elif isType(args, tuple[Table,Table,set[Table]]):
+		table1 : Table = args[0]
+		table2 : Table = args[1]
+		tables : set[Table] = args[2]
+		if table1 == table2:
+			return tuple()
+		elif len(tables) == 0:
+			return (None, )
+		else:
+			cols = set(table1.columns)
+			paths = {}
+			for table in tables:
+				if len(commonCols := cols.intersection(table)):
+					paths[tuple(commonCols)[0], table] = getShortestPath(table, table2, tables.difference({table}))
+			if len(paths) == 0:
+				return (None, )
+			
+			(commonCol, table), path = max(filter(lambda tupe : tupe[1][-1] is not None, paths.items()), key=lambda colPath : len(colPath[1]))
+			return ((commonCol, table),) + path
 
 def downloadDatabase(databaseName : str, dst : str, reportHook=lambda block, blockSize, totalSize : None) -> str|None:
 	from urllib.request import urlretrieve

@@ -6,14 +6,15 @@ import sqlite3, hashlib, re, os, logging, shutil, sys, itertools
 from typing import (
     Generator, Callable, Iterable, Self, Literal, LiteralString, Any, TextIO,
 	BinaryIO, Never, Iterator, TypeVar, Type, get_args, get_origin, ChainMap,
-	Union, Type, overload, final)
-from collections import OrderedDict
+	Union, Type, overload, final, Generic, Dict)
 
 from PseudoPathy import Path, DirectoryPath, FilePath, PathGroup, PathLibrary, PathList
 from PseudoPathy.Library import CommonGroups
 from PseudoPathy.PathShortHands import *
 
 from MetaCanSNPerDatabases._core.Exceptions import *
+class Rest(Iterator): pass
+class All(Iterator): pass
 
 ASSERTIONS = [
 	SchemaNotEmpty,
@@ -32,6 +33,7 @@ SQL_TYPES = {
 	"NULL" : None
 }
 
+namePattern = re.compile(r"^[a-zA-Z0-9_-]*$")
 formatPattern = re.compile(r"[{](.*?)[}]")
 
 LOGGER = logging.Logger("SQLOOP", level=100)

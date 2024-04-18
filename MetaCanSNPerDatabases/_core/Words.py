@@ -6,16 +6,24 @@ class BEGIN: pass
 class TRANSACTION: pass
 class COMMIT: pass
 class PRAGMA:
-	@Overload
-	def __init__(self, *columns):
-		self.content = columns
-
-	@__init__.add
-	def __init__(self, **assignments):
-		content = []
-		for variable, value in assignments.items():
-			content.append(Assignment(variable, value))
-		self.content = tuple(content)
+	@overload
+	def __init__(self, *columns : tuple[Column]):
+		...
+	@overload
+	def __init__(self, **assignments : dict[str,Any]):
+		...
+	@final
+	def __init__(self, *columns, **assignments):
+		if len(columns) > 0:
+			assert all(isinstance(col, Column) for col in columns), f"Only columns are allowed for a PRAGMA-statement not: {set(col for col in columns if not isinstance(col, Column))}"
+			self.content = columns
+		elif len(assignments) > 0:
+			content = []
+			for variable, value in assignments.items():
+				content.append(Assignment(variable, value))
+			self.content = tuple(content)
+		else:
+			raise ValueError("PRAGMA what? Nothing provided to PRAGMA.")
 class VALUES:
 	def __init__(self, *args):
 		self.content = tuple(map(SanitizedValue, args))
