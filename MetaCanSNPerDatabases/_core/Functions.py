@@ -78,15 +78,16 @@ def hashQuery(database : Database, query : Query):
 		).hexdigest()
 
 @cache
-def getSmallestFootprint(columns : set[Column], tables : list[list[set[Column],Table,int]]):
+def getSmallestFootprint(columns : set[Column], tables : tuple[tuple[set[Column],Table]]):
 
 	if len(columns) == 0:
 		return []
 	elif len(tables) == 0:
 		raise ColumnNotFoundError(f"Columns: {columns} could not be found in any of the given tables: ")
 	else:
-		for i, (cols, *_) in enumerate(tables):
-			tables[i][2] = len(cols.intersection(columns))
+
+		map(this.__getitem__(0).intersection(columns), tables)
+			len(cols.intersection(columns))
 		tables.sort(key=lambda x:x[2])
 		try:
 			return [tables[-1][1]] + getSmallestFootprint(columns.difference(tables[-1][0]), tables[:-1])

@@ -43,6 +43,9 @@ EnclosedWord
 
 from MetaCanSNPerDatabases.Globals import *
 
+def fformat(a : tuple, d : dict, sep : str=", "):
+	return sep.join(itertools.chain(map(str, a), map("{0[0]}={0[1]}".format, d.items())))
+
 class NoMatchingDefinition(TypeError):
 	def __init__(self, name, args=(), kwargs={}):
 		self.args = (f"No definition of {name!r} fits args={args}, kwargs={kwargs}")
@@ -80,19 +83,45 @@ class sql(str):
 	def __new__(cls, obj):
 		return super().__new__(cls, obj.__sql__())
 
+def callMethods(self, obj):
+	if self.args is None:
+		out = getattr(obj, self.__name__)
+	else:
+		out = getattr(obj, self.__name__)(*self.args, **self.kwargs)
+	for link in self.chain:
+		if link.args is None:
+			out = getattr(out, link.__name__)
+		else:
+			out = getattr(out, link.__name__)(*link.args, **link.kwargs)
+	return out
+
+def _extendThis(self, attrName):
+	self.chain.append(self.__class__(attrName))
+	return self
+
 class this:
-	"""Class that can be used when map() needs a function that just needs to grab an attribute."""
+	"""Class that can be used when map() needs a function that just needs to grab an attribute or execute a method."""
+	__name__ : str
+	args : tuple[All[Any]] = None
+	kwargs : dict[str,Any] = None
+	chain : list
+
 	@classmethod
 	def __getattribute__(cls, attrName):
-		return object.__getattribute__(cls, "this")(attrName)
-	class this:
-		def __init__(self, attrName):
-			self.__name__ = attrName
-		def __call__(self, obj):
-			return getattr(obj, self.__name__)
-		def __repr__(self):
-			return f"<this.{self.__name__} object>"
-
+		return cls(attrName)
+	def __init__(self, attrName):
+		self.__name__ = attrName
+		self.chain = []
+		self.__getattribute__ = _extendThis.__get__(self, object.__getattribute__(self, "__class__"))
+	def __iter__(self):
+		return callMethods.__get__(self, self.__class__)
+	def __call__(self, *args, **kwargs):
+		self.args, self.kwargs = args, kwargs
+		return self
+	def __str__(self):
+		if objec.treturn object.__getattribute__(self, '__name__')
+	def __repr__(self):
+		return f"<this.{self}>"
 
 class SQLObject(AutoObject):
 	
@@ -149,6 +178,9 @@ class Comparison(AutoObject):
 	def __str__(self):
 		f"{self.left} {self.operator} {self.right}"
 	
+	def __bool__(self):
+		return hash(self.left) == hash(self.right)
+	
 	@property
 	def params(self):
 		out = []
@@ -202,6 +234,8 @@ class Column(SQLObject):
 	
 	def __sql__(self):
 		return f"{self.name} {self.type}"
+	def __hash__(self):
+		return hash(self.__class__) + hash(self.__name__)
 	
 	def __lt__(self, right):
 		return Comparison(self, "<", right)
@@ -218,11 +252,12 @@ class Column(SQLObject):
 	def __contains__(self, right):
 		return Comparison(self, "IN", right)
 
+
 class Table(SQLObject):
 
 	columns : tuple[Column] = tuple()
 	options : tuple[Query|Word] = tuple()
-	
+
 	def __sql__(self):
 		sep = ",\n\t"
 		return f"{self.name} ({sep.join(ChainMap(map(sql, self.options), map(sql, self.columns)))})"
@@ -342,5 +377,15 @@ class Prefix(type):
 		return Query(self, other)
 
 
-ALL				= Column("ALL",				"*",					"")
-SQLITE_MASTER	= Table("SQLITE_MASTER", "sqlite_master", (Column("type"), Column("name"), Column("tbl_name"), Column("rootpage"), Column("sql")))
+ALL				= Column("ALL", "*")
+SQL				= Column("SQL", "sql")
+NAME			= Column("NAME", "name")
+TYPE			= Column("TYPE", "type")
+ROW_ID			= Column("ROW_ID", "rowid")
+TABLE			= Column("TABLE", "tbl_name")
+ROOT_PAGE		= Column("rootpage", "rootpage")
+SQLITE_MASTER	= Table("SQLITE_MASTER", "sqlite_master", (TYPE, NAME, TABLE, ROOT_PAGE, SQL))
+class TempTable(Table):
+	def __init__(self):
+		self.__name__ = f"TempTable_{random.randint(0, 1<<32)}"
+		self.name = f"TempTable_{random.randint(0, 1<<32)}"

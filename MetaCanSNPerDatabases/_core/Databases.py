@@ -3,6 +3,7 @@ from sqlite3 import Connection
 from MetaCanSNPerDatabases.Globals import *
 import MetaCanSNPerDatabases.Globals as Globals
 from MetaCanSNPerDatabases.core import *
+from MetaCanSNPerDatabases._core.Structures import *
 
 class Fetcher:
 	"""Fetches data from a cursor. Consumes the cursor object during iteration/indexation."""
@@ -65,11 +66,12 @@ class Selector:
 	def __init__(self, connection : Connection, tables : tuple[Table]):
 		self._connection = connection
 		self.databaseTables = set(tables)
-		self.databaseColumns = set().union(map(this.columns, self.databaseTables))
+		self.databaseColumns = set().union(map(*this.columns, self.databaseTables))
 		self.appended = Query()
+		self.wheres = tuple()
 	
 	def __iter__(self):
-		return Fetcher(self._connection, SELECT (*self.columns) - FROM (*self.tables) - WHERE(*self.wheres) - self.appended)
+		return Fetcher(self._connection, SELECT (*self.columns) - FROM (*self.tables) - WHERE (*self.wheres) - self.appended)
 
 	def __sub__(self, append : Word|Query):
 		self.appended -= append
@@ -91,9 +93,10 @@ class Selector:
 			if not hasattr(self, "columns"):
 				self.columns = (ALL, )
 			self.tables = items
+			self.wheres = self.wheres + tuple()
 		elif isinstance(items[0], Comparison):
 			assert all(col in self.databaseColumns for comp in items for col in [comp.left, comp.right] if isinstance(col, Column)), f"Columns in comparisons are not found in the database: {set(col for comp in items for col in [comp.left, comp.right] if isinstance(col, Column) and col not in self.databaseColumns)}"
-			wheres = []
+			wheres = list(self.wheres)
 			for comp in items:
 				if isinstance(comp.left, Column) and all(comp.left not in table for table in self.tables):
 					targetTables = []

@@ -41,8 +41,8 @@ TABLE_NAME_CHROMOSOMES		= "chromosomes"
 TABLES = [TABLE_NAME_SNP_ANNOTATION, TABLE_NAME_REFERENCES, TABLE_NAME_TREE, TABLE_NAME_CHROMOSOMES]
 
 COLUMN_PARENT,			COLUMN_PARENT_TYPE			= "parent",			"INTEGER"
-COLUMN_GENOTYPE,		COLUMN_GENOTYPE_TYPE		= "name",			"INTEGER"
-COLUMN_NODE_ID,			COLUMN_NODE_ID_TYPE			= "node_id",		"TEXT"
+COLUMN_GENOTYPE,		COLUMN_GENOTYPE_TYPE		= "name",			"TEXT"
+COLUMN_NODE_ID,			COLUMN_NODE_ID_TYPE			= "node_id",		"INTEGER"
 COLUMN_POSITION,		COLUMN_POSITION_TYPE		= "position",		"INTEGER"
 COLUMN_ANCESTRAL,		COLUMN_ANCESTRAL_TYPE		= "ancestral_base", "VARCHAR(1)"
 COLUMN_DERIVED,			COLUMN_DERIVED_TYPE			= "derived_base",	"VARCHAR(1)"
@@ -124,7 +124,36 @@ class CanSNPDatabaseError(DatabaseError): pass
 class IsLegacyCanSNPer2(CanSNPDatabaseError): pass
 class NoTreeConnectedToRoot(CanSNPDatabaseError): pass
 
+class LegacyObjects:
+	
+	Parent			= Column("Parent",			"parent")
+	Child			= Column("Child",			"child")
+	NodeID_Nod		= Column("NodeID",			"id")
+	NodeID_SNP		= Column("NodeID",			"node_id")
+	Name			= Column("Name",			"name")
+	SNPID			= Column("SNPID",			"snp_id")
+	Position		= Column("Position",		"position")
+	Ancestral		= Column("Ancestral",		"ancestral_base")
+	Derived			= Column("Derived",			"derived_base")
+	SNPReference	= Column("SNPReference",	"reference")
+	Date			= Column("Date",			"date")
+	GenomeID_SNP	= Column("GenomeID",		"genome_i")
+	GenomeID_Ref	= Column("GenomeID",		"id")
+	Genome			= Column("Genome",			"genome")
+	Strain			= Column("Strain",			"strain")
+	GenbankID		= Column("GenbankID",		"genbank_id")
+	RefseqID		= Column("RefseqID",		"refseq_id")
+	Assembly		= Column("Assembly",		"assembly_name")
+
+	GenomesTable	= Table("GenomesTable",		"genomes", )
+	NodesTable		= Table("Nodes",			"nodes")
+	RankTable		= Table("Rank",				"rank")
+	ReferencesTable	= Table("ReferencesTable",	"snp_references")
+	SNPsTable		= Table("SNPsTable",		"snp_annotation")
+	TreeTable		= Table("TreeTable",		"tree")
+
 class NotLegacyCanSNPer2(Assertion):
+	legacyObjects = {}
 	@classmethod
 	def exception(self, database : Database) -> Exception:
 		return IsLegacyCanSNPer2("Database is Legacy CanSNPer2 schema.")
@@ -140,13 +169,16 @@ class NotLegacyCanSNPer2(Assertion):
 		else:
 			refDir = Path(database.refDir)
 
+		tempTable = TempTable()
+		LO = LegacyObjects
+		
 		# References
 		LOGGER.info("Updating 'References'-table")
 		database(BEGIN - TRANSACTION)
-		database(ALTER - TABLE ("snp_references") - RENAME - TO - "snp_references_old")
+		database(ALTER - TABLE (LO.ReferencesTable) - RENAME - TO - Table(tempTable))
 		database(CREATE - TABLE - sql(ReferencesTable))
-		database(INSERT - INTO - ReferencesTable - SELECT * FROM - "snp_references_old")
-		database(DROP - TABLE ("snp_references_old"))
+		database(INSERT - INTO - ReferencesTable - SELECT * FROM (tempTable))
+		database(DROP - TABLE (tempTable))
 		database(COMMIT)
 
 		# Chromosomes
@@ -154,7 +186,7 @@ class NotLegacyCanSNPer2(Assertion):
 		database(BEGIN - TRANSACTION)
 		database(CREATE - TABLE - sql(ChromosomesTable) )
 		GenomeAPI = datasets.GenomeApi()
-		for i, genbankID, assembly in database[GenomeID, GenbankID, Assembly]:
+		for i, genbankID, assembly in database(SELECT (LO.GenomeID)):
 			try:
 				chromosome = GenomeAPI.assembly_descriptors_by_accessions([genbankID])["assemblies"][0]["assembly"]["biosample"]["sample_ids"][0]["value"]
 				assert len(chromosome) != 0, "No genbank entry found"
