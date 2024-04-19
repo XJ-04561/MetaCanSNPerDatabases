@@ -97,7 +97,7 @@ class SQLObject(AutoObject):
 		return self.name
 	
 	def __hash__(self):
-		return self.__sql__().__hash__()
+		return hash(self.__class__) + hash(self.__name__)
 	
 	def __format__(self, format_spec : str):
 		if format_spec.endswith("!sql"):
@@ -192,8 +192,6 @@ class Column(SQLObject):
 	
 	def __sql__(self):
 		return f"{self.name} {self.type}"
-	def __hash__(self):
-		return hash(self.__class__) + hash(self.__name__)
 	
 	def __lt__(self, right):
 		return Comparison(self, "<", right)
@@ -215,6 +213,7 @@ class Table(SQLObject):
 
 	columns : tuple[Column] = tuple()
 	options : tuple[Query|Word] = tuple()
+	columnLookup : dict[Column,Column]
 
 	def __sql__(self):
 		sep = ",\n\t"
@@ -229,6 +228,10 @@ class Table(SQLObject):
 	def __iter__(self):
 		for column in self.columns:
 			yield column
+	
+	@cached_property
+	def columnLookup(self):
+		return {col:col for col in self.columns}
 
 class Index(SQLObject):
 
@@ -237,7 +240,19 @@ class Index(SQLObject):
 
 	def __sql__(self):
 		return f"{self} ON {self.table}({', '.join(map(str, self.columns))})"
-
+T = TypeVar("T")
+def first(iterator : Iterable[T]|Iterator[T]) -> T|None:
+	try:
+		return next(iterator)
+	except TypeError:
+		try:
+			return next(iter(iterator))
+		except:
+			pass
+	finally:
+		return None
+_NO_KEY_VALUE = object()
+QUERY_CACHE = {}
 class Query:
 
 	words : tuple[Word] = tuple()
@@ -250,25 +265,29 @@ class Query:
 			else:
 				self.words.extend(word.words)
 		self.words = tuple(self.words)
-
+	
+	@cache
 	def __iter__(self):
-		yield f"{' '.join(map(str, self.words))};"
+		yield sql(self)
 		yield self.params
 	
+	def __hash__(self):
+		return hash(self.words)
+
+	def __sql__(self):
+		return str(self)+";"
+
 	def __str__(self):
-		return ' '.join(map(str, self.words))
+		if (ret := QUERY_CACHE.get(hash(self), _NO_KEY_VALUE)) is _NO_KEY_VALUE:
+			ret = QUERY_CACHE[hash(self)] = " ".join(map(format, self.words))
+		return ret
 	
 	def __format__(self, format_spec):
-		return f"({' '.join(map(str, self.words))})".__format__(format_spec)
+		return f"({format(str(self), format_spec)})"
 
 	def __sub__(self, other : Query|Word):
 		from MetaCanSNPerDatabases._core.Words import FROM
-		if isinstance(other, FROM):
-			out = Query(self, other)
-			out.words[-2]
-			out.words[-1]
-		else:
-			return Query(self, other)
+		return Query(self, other)
 
 	def __mult__(self, right):
 		self.words[-1] = self.words[-1](ALL)
@@ -281,7 +300,7 @@ class Query:
 	
 	@property
 	def params(self):
-		return [word.params for word in self.words if hasattr(word, "params")]
+		return list(map(*this.params, filter(*this.__hasattr__("params"), self.words)))
 
 class Word:
 	
@@ -309,7 +328,7 @@ class Word:
 		return self.__str__()
 	
 	def __hash__(self):
-		return self.__sql__().__hash__()
+		return sql(self).__hash__()
 	
 	def __format__(self, format_spec : str):
 		if format_spec.endswith("!sql"):
@@ -346,9 +365,9 @@ SQL				= Column("SQL", "sql")
 NAME			= Column("NAME", "name")
 TYPE			= Column("TYPE", "type")
 ROW_ID			= Column("ROW_ID", "rowid")
-TABLE			= Column("TABLE", "tbl_name")
+TABLE_NAME		= Column("TABLE_NAME", "tbl_name")
 ROOT_PAGE		= Column("rootpage", "rootpage")
-SQLITE_MASTER	= Table("SQLITE_MASTER", "sqlite_master", (TYPE, NAME, TABLE, ROOT_PAGE, SQL))
+SQLITE_MASTER	= Table("SQLITE_MASTER", "sqlite_master", (TYPE, NAME, TABLE_NAME, ROOT_PAGE, SQL))
 class TempTable(Table):
 	def __init__(self):
 		self.__name__ = f"TempTable_{random.randint(0, 1<<32)}"

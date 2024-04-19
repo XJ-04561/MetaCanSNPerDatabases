@@ -186,7 +186,7 @@ class NotLegacyCanSNPer2(Assertion):
 		database(BEGIN - TRANSACTION)
 		database(CREATE - TABLE - sql(ChromosomesTable) )
 		GenomeAPI = datasets.GenomeApi()
-		for i, genbankID, assembly in database(SELECT (LO.GenomeID)):
+		for i, genbankID, assembly in database(SELECT (LO.GenomeID_Ref, LO.GenbankID, LO.Assembly) - FROM (LO.ReferencesTable)):
 			try:
 				chromosome = GenomeAPI.assembly_descriptors_by_accessions([genbankID])["assemblies"][0]["assembly"]["biosample"]["sample_ids"][0]["value"]
 				assert len(chromosome) != 0, "No genbank entry found"
