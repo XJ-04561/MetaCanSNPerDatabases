@@ -138,7 +138,7 @@ class Database:
 					raise FileNotFoundError(f"Database file {filename} not found on the system.")
 				
 				# Convert to URI acceptable filename
-				cDatabase = "/".join(filter(lambda s : s != "", filename.replace('?', '%3f').replace('#', '%23').split(os.path.sep)))
+				cDatabase = "/".join(filter(this != "", filename.replace('?', '%3f').replace('#', '%23').split(os.path.sep)))
 				if not cDatabase.startswith("/"): # Path has to be absolute already, and windows paths need a prepended '/'
 					cDatabase = "/"+cDatabase
 				

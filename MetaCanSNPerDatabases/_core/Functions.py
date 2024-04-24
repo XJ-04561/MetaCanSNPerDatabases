@@ -48,7 +48,7 @@ def formatType(columns : tuple[Column]):
 
 	d = {"unknown" : True}
 	d.setdefault(False)
-	for tp in map(lambda col : col.type, columns):
+	for tp in map(this.type, columns):
 		d |= sqlite3TypePattern.fullmatch(tp).groupdict()
 		
 		match next(filter(d.get, ["integer", "decimal", "char", "date", "datetime", "text", "unknown"])):
@@ -131,7 +131,7 @@ def getShortestPath(*args) -> tuple[tuple[Table,Column]]:
 			if len(paths) == 0:
 				return (None, )
 			
-			(commonCol, table), path = max(filter(lambda tupe : tupe[1][-1] is not None, paths.items()), key=lambda colPath : len(colPath[1]))
+			(commonCol, table), path = max(filter(*this[1][-1] != None, paths.items()), key=next(this[1].__len__()))
 			return ((commonCol, table),) + path
 
 def downloadDatabase(databaseName : str, dst : str, reportHook=lambda block, blockSize, totalSize : None) -> str|None:

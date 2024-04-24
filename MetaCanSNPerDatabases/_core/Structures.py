@@ -294,8 +294,8 @@ class Query:
 		return Query(self, right)
 	
 	def __getattr__(self, key):
-		if key in map(lambda obj : obj.__name__, Word.__subclasses__()):
-			return next(filter(lambda obj : obj.__name__ == key, Word.__subclasses__()))
+		if key in map(*this.__name__, Word.__subclasses__()):
+			return next(filter(*this.__name__ == key, Word.__subclasses__()))
 		return self.__getattribute__(key)
 	
 	@property
