@@ -1,9 +1,9 @@
 
 
 
-from MetaCanSNPerDatabases.Globals import *
-from MetaCanSNPerDatabases._core.Structures import *
-from MetaCanSNPerDatabases._core.Words import *
+from SQLOOP.Globals import *
+from SQLOOP._core.Structures import *
+from SQLOOP._core.Words import *
 
 class Aggregate:
 	
@@ -13,7 +13,7 @@ class Aggregate:
 		self.X = X
 
 	def __repr__(self):
-		from MetaCanSNPerDatabases._core.Functions import pluralize
+		from SQLOOP._core.Functions import pluralize
 		return f"<{pluralize(self.__class__.__base__.__name__)}.{self.__class__.__name__} {', '.join(map(lambda name: f'{name}={self.__dict__.get(name)}'.format, self.__annotations__))}>"
 		
 	def __str__(self) -> str:

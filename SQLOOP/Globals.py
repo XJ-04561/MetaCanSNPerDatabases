@@ -12,8 +12,9 @@ from PseudoPathy import Path, DirectoryPath, FilePath, PathGroup, PathLibrary, P
 from PseudoPathy.Library import CommonGroups
 from PseudoPathy.PathShortHands import *
 
-from MetaCanSNPerDatabases._core.Exceptions import *
+from SQLOOP._core.Exceptions import *
 from This import this
+
 class Rest(Iterator): pass
 class All(Iterator): pass
 
@@ -39,7 +40,7 @@ sqlite3TypePattern = re.compile(r"^(?P<integer>INTEGER)|(?P<decimal>DECIMAL)|(?P
 namePattern = re.compile(r"^[a-zA-Z0-9_\-*]*$")
 formatPattern = re.compile(r"[{](.*?)[}]")
 
-LOGGER = logging.Logger("SQLOOP", level=100)
+LOGGER = logging.Logger(__package__, level=100)
 
 DATABASE_VERSIONS : dict[str,int] = {}
 
@@ -54,9 +55,6 @@ class Comparison: pass
 class Column: pass
 class Table: pass
 class Index: pass
-class PrimaryKey: pass
-class ForeignKey: pass
-class Unique: pass
 class Database: pass
 class Word: pass
 class Aggregate: pass

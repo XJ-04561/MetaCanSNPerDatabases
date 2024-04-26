@@ -1,5 +1,5 @@
 
-from MetaCanSNPerDatabases._core.Structures import *
+from SQLOOP._core.Structures import *
 
 
 class BEGIN: pass

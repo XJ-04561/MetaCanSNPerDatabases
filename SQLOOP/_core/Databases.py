@@ -1,9 +1,9 @@
 
 from sqlite3 import Connection
-from MetaCanSNPerDatabases.Globals import *
-import MetaCanSNPerDatabases.Globals as Globals
-from MetaCanSNPerDatabases.core import *
-from MetaCanSNPerDatabases._core.Structures import *
+from SQLOOP.Globals import *
+import SQLOOP.Globals as Globals
+from SQLOOP.core import *
+from SQLOOP._core.Structures import *
 
 class Fetcher:
 	"""Fetches data from a cursor. Consumes the cursor object during iteration/indexation."""
@@ -138,7 +138,7 @@ class Database:
 					raise FileNotFoundError(f"Database file {filename} not found on the system.")
 				
 				# Convert to URI acceptable filename
-				cDatabase = "/".join(filter(this != "", filename.replace('?', '%3f').replace('#', '%23').split(os.path.sep)))
+				cDatabase = "/".join(filter(*this != "", filename.replace('?', '%3f').replace('#', '%23').split(os.path.sep)))
 				if not cDatabase.startswith("/"): # Path has to be absolute already, and windows paths need a prepended '/'
 					cDatabase = "/"+cDatabase
 				

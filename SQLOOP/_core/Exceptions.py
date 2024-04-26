@@ -32,9 +32,9 @@ class SchemaNotEmpty(Assertion):
 		return database._connection(f"SELECT COUNT(*) FROM sqlite_master;").fetchone()[0] == 0
 	@classmethod
 	def rectify(self, database) -> None:
-		from MetaCanSNPerDatabases._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT
-		from MetaCanSNPerDatabases._core.Structures import sql
-		from MetaCanSNPerDatabases.Globals import CURRENT_VERSION
+		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT
+		from SQLOOP._core.Structures import sql
+		from SQLOOP.Globals import CURRENT_VERSION
 		database(BEGIN - TRANSACTION)
 		for table in database.tables:
 			database(CREATE - TABLE - sql(table))
@@ -44,17 +44,17 @@ class SchemaNotEmpty(Assertion):
 class ValidTablesSchema(Assertion):
 	@classmethod
 	def exception(cls, database) -> Exception:
-		from MetaCanSNPerDatabases.Globals import CURRENT_TABLES_HASH
+		from SQLOOP.Globals import CURRENT_TABLES_HASH
 		return SchemaTablesMismatch(f"Tables are constructed differently to the current version (Database table schema hash:{database.tablesSchema!r} | Current version hash: {CURRENT_TABLES_HASH!r}).")
 	@classmethod
 	def condition(cls, database) -> bool:
-		from MetaCanSNPerDatabases.Globals import CURRENT_TABLES_HASH
+		from SQLOOP.Globals import CURRENT_TABLES_HASH
 		return database.tablesSchema != CURRENT_TABLES_HASH
 	@classmethod
 	def rectify(cls, database) -> None:
-		from MetaCanSNPerDatabases._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, ALL, FROM, DROP, INDEX
-		from MetaCanSNPerDatabases._core.Structures import sql
-		from MetaCanSNPerDatabases.Globals import CURRENT_VERSION
+		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, ALL, FROM, DROP, INDEX
+		from SQLOOP._core.Structures import sql
+		from SQLOOP.Globals import CURRENT_VERSION
 		database(BEGIN - TRANSACTION)
 		database.clearIndexes()
 		for table in database.tables:
@@ -75,17 +75,17 @@ class ValidTablesSchema(Assertion):
 class ValidIndexesSchema(Assertion):
 	@classmethod
 	def exception(cls, database) -> Exception:
-		from MetaCanSNPerDatabases.Globals import CURRENT_INDEXES_HASH
+		from SQLOOP.Globals import CURRENT_INDEXES_HASH
 		return SchemaIndexesMismatch(f"Indexes are constructed differently to the current version (Database index schema hash:{database.indexesSchema!r} | Current version hash: {CURRENT_INDEXES_HASH!r}).")
 	@classmethod
 	def condition(cls, database) -> bool:
-		from MetaCanSNPerDatabases.Globals import CURRENT_INDEXES_HASH
+		from SQLOOP.Globals import CURRENT_INDEXES_HASH
 		return database.indexesSchema != CURRENT_INDEXES_HASH
 	@classmethod
 	def rectify(cls, database) -> None:
-		from MetaCanSNPerDatabases._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, ALL, FROM, DROP, INDEX
-		from MetaCanSNPerDatabases._core.Structures import sql
-		from MetaCanSNPerDatabases.Globals import CURRENT_VERSION
+		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, ALL, FROM, DROP, INDEX
+		from SQLOOP._core.Structures import sql
+		from SQLOOP.Globals import CURRENT_VERSION
 		database(BEGIN - TRANSACTION)
 		database.clearIndexes()
 		for index in database.indexes:

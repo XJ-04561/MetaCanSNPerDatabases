@@ -1,9 +1,9 @@
 
-from MetaCanSNPerDatabases.Globals import *
-import MetaCanSNPerDatabases.Globals as Globals
-from MetaCanSNPerDatabases._core.Structures import *
-from MetaCanSNPerDatabases._core.Words import *
-from MetaCanSNPerDatabases._core.Databases import *
+from SQLOOP.Globals import *
+import SQLOOP.Globals as Globals
+from SQLOOP._core.Structures import *
+from SQLOOP._core.Words import *
+from SQLOOP._core.Databases import *
 
 class Branch:
 

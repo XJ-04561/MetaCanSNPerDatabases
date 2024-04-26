@@ -3,16 +3,15 @@ requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "MetaCanSNPerDatabases"
+name = "SQLOOP"
 readme = "README.md"
-description = "MetaCanSNPerDatabases: A Package to create and interact with MetaCanSNPer databases."
-version = "0.1"
+description = "SQLOOP: A Package to create and interact with SQLITE3 databases."
+version = "0.2"
 requires-python = ">= 3.8"
 license = { file = "LICENSE"}
-keywords = ["Bioinformatics", "SNP-typing"]
+keywords = ["SQL", "SQLOOP"]
 authors = [
-    {name = "Fredrik Sörensen", email = "fredrik.sorensen@foi.se"},
-    {name = "David Sundell", email = "david.sundell@foi.se"}
+    {name = "Fredrik Sörensen", email = "fredrik.sorensen@foi.se"}
 ]
 maintainers = [
     {name = "Fredrik Sörensen", email = "fredrik.sorensen@foi.se"}
@@ -20,8 +19,8 @@ maintainers = [
 classifiers = [
     "Development Status :: 3 - Alpha",
 
-    "Intended Audience :: Anyone",
-    "Topic :: Bioinformatics :: Variant Calling",
+    "Intended Audience :: Developers",
+    "Topic :: SQL :: Development",
 
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
 
@@ -40,7 +39,4 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/XJ-04561/MetaCanSNPerDatabases.git"
-
-[project.scripts]
-MetaCanSNPerDatabases = "MetaCanSNPerDatabases.Commands:main"
+Repository = "https://github.com/XJ-04561/SQLOOP.git"

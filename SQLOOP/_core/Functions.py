@@ -1,7 +1,7 @@
 
-from MetaCanSNPerDatabases.Globals import *
-import MetaCanSNPerDatabases.Globals as Globals
-from MetaCanSNPerDatabases._core.Words import *
+from SQLOOP.Globals import *
+import SQLOOP.Globals as Globals
+from SQLOOP._core.Words import *
 
 def isType(value, typed):
 	if get_origin(typed) in [Dict, dict]:
@@ -48,7 +48,7 @@ def formatType(columns : tuple[Column]):
 
 	d = {"unknown" : True}
 	d.setdefault(False)
-	for tp in map(this.type, columns):
+	for tp in map(*this.type, columns):
 		d |= sqlite3TypePattern.fullmatch(tp).groupdict()
 		
 		match next(filter(d.get, ["integer", "decimal", "char", "date", "datetime", "text", "unknown"])):
@@ -79,7 +79,7 @@ def hashQuery(database : Database, query : Query):
 
 @cache
 def getSmallestFootprint(columns : set[Column], tables : set[tuple[set[Column],Table]]):
-
+	
 	if len(columns) == 0:
 		return []
 	elif len(tables) == 0:

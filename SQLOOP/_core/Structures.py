@@ -42,7 +42,7 @@ EnclosedWord
 """
 
 from typing import Any
-from MetaCanSNPerDatabases.Globals import *
+from SQLOOP.Globals import *
 
 class NoMatchingDefinition(TypeError):
 	def __init__(self, name, args=(), kwargs={}):
@@ -55,7 +55,7 @@ class AutoObject:
 	construction call, but __name__ would, as it starts with one, and not two
 	underscores."""
 	def __init__(self, *args, **kwargs):
-		from MetaCanSNPerDatabases._core.Functions import hiddenPattern
+		from SQLOOP._core.Functions import hiddenPattern
 		i = 0
 		for name, typeHint in self.__annotations__.items():
 			if hiddenPattern.fullmatch(name) is None:
@@ -67,7 +67,7 @@ class AutoObject:
 				i += 1
 			else:
 				if not hasattr(self, name):
-					from MetaCanSNPerDatabases._core.Exceptions import MissingArgument
+					from SQLOOP._core.Exceptions import MissingArgument
 					raise MissingArgument(f"Missing required argument {name} for {self.__class__.__name__}.__init__")
 
 class Mode: pass
@@ -87,8 +87,8 @@ class SQLObject(AutoObject):
 	name : str
 	
 	def __repr__(self):
-		from MetaCanSNPerDatabases._core.Functions import pluralize
-		return f"<{pluralize(self.__class__.__name__)}.{self.__name__} {' '.join(map(lambda keyVal : '{}={:!r}'.format(*keyVal), vars(self).items()))} at {hex(id(self))}>"
+		from SQLOOP._core.Functions import pluralize
+		return f"<{pluralize(self.__class__.__name__)}.{self.__name__} {' '.join(map(lambda pair : '{}={:!r}'.format(*pair), vars(self).items()))} at {hex(id(self))}>"
 		
 	def __str__(self):
 		return self.name
@@ -286,7 +286,7 @@ class Query:
 		return f"({format(str(self), format_spec)})"
 
 	def __sub__(self, other : Query|Word):
-		from MetaCanSNPerDatabases._core.Words import FROM
+		from SQLOOP._core.Words import FROM
 		return Query(self, other)
 
 	def __mult__(self, right):
@@ -314,7 +314,7 @@ class Word:
 		return Query(self, other)
 
 	def __repr__(self):
-		from MetaCanSNPerDatabases._core.Functions import pluralize
+		from SQLOOP._core.Functions import pluralize
 		return f"<{pluralize(self.__class__.__base__.__name__)}.{self.__class__.__name__} content={self.content}>"
 		
 	def __str__(self) -> str:
