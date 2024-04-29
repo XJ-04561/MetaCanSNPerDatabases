@@ -2,6 +2,7 @@
 
 from functools import cached_property, cache
 import sqlite3, hashlib, re, os, logging, shutil, sys, itertools, random
+from time import sleep
 
 from typing import (
     Generator, Callable, Iterable, Self, Literal, LiteralString, Any, TextIO,
@@ -39,6 +40,8 @@ whitespacePattern = re.compile(r"\s+")
 sqlite3TypePattern = re.compile(r"^(?P<integer>INTEGER)|(?P<decimal>DECIMAL)|(?P<char>(VAR)?CHAR[(](?P<number>[0-9]*)[)])|(?P<date>DATE)|(?P<datetime>DATETIME)|(?P<text>TEXT)$", re.IGNORECASE)
 namePattern = re.compile(r"^[a-zA-Z0-9_\-*]*$")
 formatPattern = re.compile(r"[{](.*?)[}]")
+fileNamePattern = re.compile(r"[a-zA-Z0-9_\-]*")
+antiFileNamePattern = re.compile(r"[^a-zA-Z0-9_\-]")
 
 LOGGER = logging.Logger(__package__, level=100)
 
@@ -47,6 +50,7 @@ DATABASE_VERSIONS : dict[str,int] = {}
 CURRENT_VERSION = 2
 CURRENT_TABLES_HASH = ""
 CURRENT_INDEXES_HASH = ""
+SOFTWARE_NAME = "SQLOOP"
 
 SOURCES = []
 

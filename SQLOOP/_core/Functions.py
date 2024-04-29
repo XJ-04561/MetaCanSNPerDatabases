@@ -134,15 +134,3 @@ def getShortestPath(*args) -> tuple[tuple[Table,Column]]:
 			(commonCol, table), path = max(filter(*this[1][-1] != None, paths.items()), key=next(this[1].__len__()))
 			return ((commonCol, table),) + path
 
-def downloadDatabase(databaseName : str, dst : str, reportHook=lambda block, blockSize, totalSize : None) -> str|None:
-	from urllib.request import urlretrieve
-	
-	for source in SOURCES:
-		try:
-			(filename, msg) = urlretrieve(source.format(databaseName=databaseName), filename=dst, reporthook=reportHook) # Throws error if 404
-			return filename
-		except Exception as e:
-			LOGGER.info(f"Database {databaseName!r} not found/accessible on {source!r}.")
-			LOGGER.info(e)
-	LOGGER.error(f"No database named {databaseName!r} found online. Sources tried: {SOURCES}")
-	return None
