@@ -171,7 +171,7 @@ class Column(SQLObject):
 	@overload
 	def __init__(self, __name__ : str, name : str, type : str): ...
 	
-	def __init__(self, __name__ : str, *, name : str=None, type : str=None):
+	def __init__(self, __name__ : str, /, name : str=None, type : str=None):
 		self.__name__ = __name__
 		self.name = name or __name__
 		self.type = type
