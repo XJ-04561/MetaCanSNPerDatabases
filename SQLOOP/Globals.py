@@ -8,6 +8,7 @@ from typing import (
     Generator, Callable, Iterable, Self, Literal, LiteralString, Any, TextIO,
 	BinaryIO, Never, Iterator, TypeVar, Type, get_args, get_origin, ChainMap,
 	Union, Type, overload, final, Generic, Dict)
+from types import FunctionType, MethodType
 
 from PseudoPathy import Path, DirectoryPath, FilePath, PathGroup, PathLibrary, PathList
 from PseudoPathy.Library import CommonGroups

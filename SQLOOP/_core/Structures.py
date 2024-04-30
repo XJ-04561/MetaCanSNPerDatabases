@@ -171,21 +171,10 @@ class Column(SQLObject):
 	@overload
 	def __init__(self, __name__ : str, name : str, type : str): ...
 	
-	@final
-	def __init__(self, *args):
-		match len(args):
-			case 1:
-				self.__name__ = self.name = args[0]
-				self.type = None
-			case 2:
-				self.__name__ = self.name = args[0]
-				self.type = args[1]
-			case 3:
-				self.__name__ = args[0]
-				self.name = args[1]
-				self.type = args[2]
-			case _:
-				raise NoMatchingDefinition(self.__qualname__, args)
+	def __init__(self, __name__ : str, *, name : str=None, type : str=None):
+		self.__name__ = __name__
+		self.name = name or __name__
+		self.type = type
 		assert isinstance(self.name, str)
 		assert namePattern.fullmatch(self.name) is not None, f"Name of column must be alphanumeric [a-zA-Z0-9_\-*], and {self.name} is not."
 		assert self.type is None or (isinstance(self.type, str) and sqlite3TypePattern.fullmatch(self.type) is not None), f"Type of column must be valid sqlite3 type, and {self.type} is not."
