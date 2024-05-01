@@ -5,7 +5,6 @@ class DatabaseNotConnected(DatabaseError): pass
 class MissingArgument(DatabaseError): pass
 class MissingReferenceFile(DatabaseError): pass
 class UnableToDefineChromosomes(DatabaseError): pass
-class DownloadFailed(DatabaseError): pass
 class TableDefinitionMissmatch(DatabaseError): pass
 class ColumnNotFoundError(DatabaseError): pass
 class TablesNotRelated(DatabaseError): pass

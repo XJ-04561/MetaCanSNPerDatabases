@@ -1,8 +1,16 @@
 
-from SQLOOP.Globals import *
-import SQLOOP.Globals as Globals
+import sqlite3, logging
+from types import FunctionType, MethodType
 from collections import defaultdict
 from threading import Thread, _DummyThread
+from typing import Callable
+from time import sleep
+
+from This import this
+from PseudoPathy import Path, DirectoryPath
+from PseudoPathy.PathShortHands import *
+
+NULL_LOGGER = logging.Logger("NULL_LOGGER", 100)
 
 class ThreadDescriptor:
 
@@ -40,13 +48,14 @@ class ThreadFunction(ThreadDescriptor):
 		self.func.__set_name__(self, instance, name)
 
 def threadDescriptor(func):
-	"""The actual descriptor to use."""
+	"""The actual decorator to use."""
 	return ThreadFunction(func)
 
 class ReportHook:
+
+	totalBlocks : int = None
 	def __init__(self, reportHook):
 		self.reportHook = reportHook
-		self.totalBlocks = None
 	
 	def __call__(self, block, blockSize, totalSize):
 		if self.totalBlocks is None:
@@ -60,11 +69,13 @@ class Job:
 	out : Path
 	reportHook : Callable = lambda block, blockSize, totalSize : None
 	_queueConnection : sqlite3.Connection
-	def __init__(self, filename, reportHook=None, out=Path("."), conn=None):
+	LOGGER : logging.Logger = NULL_LOGGER
+	def __init__(self, filename, reportHook=None, out=Path("."), conn=None, *, logger=LOGGER):
 		self.filename = filename
 		self.reportHook = reportHook or self.reportHook
 		self.out = out
 		self._queueConnection = conn
+		self.LOGGER = logger
 	
 	def reserveQueue(self):
 		try:
@@ -118,9 +129,9 @@ class Job:
 				(outFile, msg) = urlretrieve(sourceLink.format(filename=self.filename), filename=outFile, reporthook=reportHook) # Throws error if 404
 				return outFile, sourceName
 			except Exception as e:
-				LOGGER.info(f"Couldn't download from source={sourceName}, url: {sourceLink.format(filename=self.filename)!r}")
-				LOGGER.exception(e, stacklevel=logging.DEBUG)
-		LOGGER.error(f"No database named {self.filename!r} found online. Sources tried: {', '.join(map(*this[0] + ': ' + this[1], sources))}")
+				self.LOGGER.info(f"Couldn't download from source={sourceName}, url: {sourceLink.format(filename=self.filename)!r}")
+				self.LOGGER.exception(e, stacklevel=logging.DEBUG)
+		self.LOGGER.error(f"No database named {self.filename!r} found online. Sources tried: {', '.join(map(*this[0] + ': ' + this[1], sources))}")
 		return None, None
 
 
@@ -136,8 +147,9 @@ class Downloader:
 
 	_queueConnection : sqlite3.Connection
 	_threads : list[Thread]= []
+	LOGGER : logging.Logger = NULL_LOGGER
 
-	def __init__(self, directory=directory):
+	def __init__(self, directory=directory, *, logger=LOGGER):
 
 		if pAccess(directory, "rw"):
 			self.directory = directory
@@ -150,6 +162,7 @@ class Downloader:
 		
 		self._queueConnection = sqlite3.connect(self.directory / self.database)
 		self._queueConnection.execute("CREATE TABLE IF NOT EXISTS queueTable (name TEXT UNIQUE, progress DECIMAL default -1.0, modified INTEGER DEFAULT julianday(CURRENT_TIMESTAMP));")
+		self.LOGGER = logger
 
 	def addSources(self, *sources : str):
 		self.SOURCES = self.SOURCES + sources
@@ -165,9 +178,9 @@ class Downloader:
 				pass
 	
 	@threadDescriptor
-	def download(self, filename : str, reportHook=reportHook) -> None:
+	def download(self, filename : str, reportHook=reportHook, *, logger=None) -> None:
 		
-		job = Job(filename, reportHook=reportHook, out=self.directory, conn=self._queueConnection)
+		job = Job(filename, reportHook=reportHook, out=self.directory, conn=self._queueConnection, logger=logger or self.LOGGER)
 		if job.reserveQueue():
 			job.run()
 		elif job.isDone():

@@ -3,36 +3,26 @@ from SQLOOP.Globals import *
 import SQLOOP.Globals as Globals
 from SQLOOP._core.Words import *
 
-def isType(value, typed):
-	if get_origin(typed) in [Dict, dict]:
-		value = value.items()
-		typed = Iterable[All[tuple[get_args(typed)]]]
-	if get_origin(typed) in [None,Union]:
-		return isinstance(value, typed)
-	elif isinstance(value, get_origin(typed)):
-		subTypes = get_args(typed)
-		if get_origin(subTypes[0]) is All:
-			tp = Union[get_args(subTypes[0])]
-			for v in value:
-				if not isType(v, tp):
-					return False
-		elif subTypes[-1] is Rest:
-			for v, subType in zip(value, ChainMap(itertools.repeat(Any), subTypes[:-1])):
-				if not isType(v, tp):
-					return False
-		elif get_origin(subTypes[-1]) is Rest:
-			rest = Union[get_args(subTypes[-1])]
-			for v, subType in zip(value, ChainMap(itertools.repeat(rest), subTypes[:-1])):
-				if not isType(v, subType):
-					return False
-		else:
-			if len(value) != (subTypes):
+def isType(instance, cls):
+	if isinstance(cls, Generic|GenericAlias):
+		if not isType(instance, get_origin(cls)):
+			return False
+		if isType(instance, dict):
+			keys, values = get_args(cls)
+			return all(isinstance(key, keys) for key in instance) and all(isinstance(value, values) for value in instance.values())
+		
+		args = get_args(cls)
+		if get_origin(args[0]) is All:
+			args = itertools.repeat(Union[get_args(args[0])])
+		elif get_origin(args[-1]) is Rest:
+			args = itertools.chain(args[:-1], itertools.repeat(Union[get_args(args[-1])]))
+		
+		for v, tp in zip(instance, args):
+			if not isType(v, tp):
 				return False
-			for v, subType in zip(value, subTypes):
-				if not isType(v, subType):
-					return False
 		return True
-	return False
+	else:
+		return isinstance(instance, cls)
 
 pluralPattern = re.compile(r"s$|x$|z$|sh$|ch$")
 hiddenPattern = re.compile(r"^_[^_].*")

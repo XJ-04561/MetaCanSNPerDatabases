@@ -4,10 +4,11 @@ from functools import cached_property, cache
 import sqlite3, hashlib, re, os, logging, shutil, sys, itertools, random
 from time import sleep
 
+
 from typing import (
     Generator, Callable, Iterable, Self, Literal, LiteralString, Any, TextIO,
-	BinaryIO, Never, Iterator, TypeVar, Type, get_args, get_origin, ChainMap,
-	Union, Type, overload, final, Generic, Dict)
+	BinaryIO, Never, Iterator, TypeVar, Type, get_args, get_origin,
+	Union, Type, overload, final, Generic, Dict, GenericAlias)
 from types import FunctionType, MethodType
 
 from PseudoPathy import Path, DirectoryPath, FilePath, PathGroup, PathLibrary, PathList

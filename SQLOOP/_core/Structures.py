@@ -206,7 +206,7 @@ class Table(SQLObject):
 
 	def __sql__(self):
 		sep = ",\n\t"
-		return f"{self.name} ({sep.join(ChainMap(map(sql, self.options), map(sql, self.columns)))})"
+		return f"{self.name} ({sep.join(itertools.chain(map(sql, self.columns), map(sql, self.options)))})"
 	
 	def __hash__(self):
 		return self.__sql__().__hash__()
