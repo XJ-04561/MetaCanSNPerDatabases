@@ -116,7 +116,18 @@ class Selector:
 			raise NoMatchingDefinition(self.__qualname__+".__getitem__", items)
 		return self
 
-class Database:
+class MetaDatabase(type):
+	def checkDatabase(cls, filepath):
+		database = cls(filepath, "w")
+				
+		for _ in range(10):
+			if not database.checkDatabase():
+				break
+		else:
+			database.checkDatabase("r")
+			# Will raise exception, since database was still faulty after 10 attempts at fixing it.
+
+class Database(metaclass=MetaDatabase):
 	"""Usage:
 	```python
 	database = Database("database.db", "w")
@@ -217,12 +228,15 @@ class Database:
 	def checkDatabase(self, mode=None):
 		"""Will raise appropriate exceptions when in read-mode. Will attempt to fix the database if in write mode."""
 		mode = mode or self.mode
+		tripped = False
 		for assertion in self.assertions:
 			if assertion.condition(database=self):
+				tripped = True
 				if mode == "r": # Raise exception
 					assertion.exception(self)
 				elif mode == "w": # Try to rectify
 					assertion.rectify(self)
+		return tripped
 
 	@property
 	def indexesHash(self):
