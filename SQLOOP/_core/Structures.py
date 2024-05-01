@@ -290,8 +290,15 @@ class Query:
 	@property
 	def params(self):
 		return list(map(*this.params, filter(*this.__hasattr__("params"), self.words)))
+	
+class Prefix(type):
 
-class Word:
+	def __str__(self):
+		return self.__name__
+	def __sub__(self, other):
+		return Query(self, other)
+
+class Word(metaclass=Prefix):
 	
 	content : tuple
 	sep : str = ", "
@@ -340,13 +347,6 @@ class Word:
 class EnclosedWord(Word):
 	def __str__(self):
 		return f"{self.__class__.__name__} ({self.sep.join(map(str, self.content))})"
-	
-class Prefix(type):
-
-	def __str__(self):
-		return self.__name__
-	def __sub__(self, other):
-		return Query(self, other)
 
 
 ALL				= Column("ALL", "*")

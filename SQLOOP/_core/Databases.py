@@ -117,6 +117,17 @@ class Selector:
 		return self
 
 class Database:
+	"""Usage:
+	```python
+	database = Database("database.db", "w")
+
+	database.checkDatabase() # Will try to fix issues with the database
+
+	otherDatabase = Database("otherDatabase.db", "r")
+
+	otherDatabase.checkDatabase() # Will raise exception if there are issues with the database
+	```
+	"""
 
 	_connection : sqlite3.Connection
 	mode : str
