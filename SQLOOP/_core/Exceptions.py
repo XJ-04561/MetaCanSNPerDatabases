@@ -33,27 +33,23 @@ class SchemaNotEmpty(Assertion):
 	def rectify(self, database) -> None:
 		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT
 		from SQLOOP._core.Structures import sql
-		from SQLOOP.Globals import CURRENT_VERSION
 		database(BEGIN - TRANSACTION)
 		for table in database.tables:
 			database(CREATE - TABLE - sql(table))
-		database(PRAGMA (user_version = CURRENT_VERSION))
+		database(PRAGMA (user_version = database.CURRENT_VERSION))
 		database(COMMIT)
 
 class ValidTablesSchema(Assertion):
 	@classmethod
 	def exception(cls, database) -> Exception:
-		from SQLOOP.Globals import CURRENT_TABLES_HASH
-		return SchemaTablesMismatch(f"Tables are constructed differently to the current version (Database table schema hash:{database.tablesSchema!r} | Current version hash: {CURRENT_TABLES_HASH!r}).")
+		return SchemaTablesMismatch(f"Tables are constructed differently to the current version (Database table schema hash:{database.tablesSchema!r} | Current version hash: {database.CURRENT_TABLES_HASH!r}).")
 	@classmethod
 	def condition(cls, database) -> bool:
-		from SQLOOP.Globals import CURRENT_TABLES_HASH
-		return database.tablesSchema != CURRENT_TABLES_HASH
+		return database.tablesSchema != database.CURRENT_TABLES_HASH
 	@classmethod
 	def rectify(cls, database) -> None:
 		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, ALL, FROM, DROP, INDEX
 		from SQLOOP._core.Structures import sql
-		from SQLOOP.Globals import CURRENT_VERSION
 		database(BEGIN - TRANSACTION)
 		database.clearIndexes()
 		for table in database.tables:
@@ -68,26 +64,23 @@ class ValidTablesSchema(Assertion):
 		for (table,) in database._connection.execute("SELECT name FROM sqlite_master WHERE type='table';"):
 			if not any(table == validTable.name for validTable in database.tables):
 				database(DROP - TABLE - table)
-		database(PRAGMA (user_version = CURRENT_VERSION))
+		database(PRAGMA (user_version = database.CURRENT_VERSION))
 		database(COMMIT)
 
 class ValidIndexesSchema(Assertion):
 	@classmethod
 	def exception(cls, database) -> Exception:
-		from SQLOOP.Globals import CURRENT_INDEXES_HASH
-		return SchemaIndexesMismatch(f"Indexes are constructed differently to the current version (Database index schema hash:{database.indexesSchema!r} | Current version hash: {CURRENT_INDEXES_HASH!r}).")
+		return SchemaIndexesMismatch(f"Indexes are constructed differently to the current version (Database index schema hash:{database.indexesSchema!r} | Current version hash: {database.CURRENT_INDEXES_HASH!r}).")
 	@classmethod
 	def condition(cls, database) -> bool:
-		from SQLOOP.Globals import CURRENT_INDEXES_HASH
-		return database.indexesSchema != CURRENT_INDEXES_HASH
+		return database.indexesSchema != database.CURRENT_INDEXES_HASH
 	@classmethod
 	def rectify(cls, database) -> None:
 		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, ALL, FROM, DROP, INDEX
 		from SQLOOP._core.Structures import sql
-		from SQLOOP.Globals import CURRENT_VERSION
 		database(BEGIN - TRANSACTION)
 		database.clearIndexes()
 		for index in database.indexes:
 			database(CREATE - INDEX - sql(index))
-		database(PRAGMA (user_version = CURRENT_VERSION))
+		database(PRAGMA (user_version = database.CURRENT_VERSION))
 		database(COMMIT)

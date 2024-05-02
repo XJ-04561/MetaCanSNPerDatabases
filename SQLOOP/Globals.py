@@ -21,6 +21,9 @@ from This import this
 class Rest(Iterator): pass
 class All(Iterator): pass
 
+class NoHash:
+    def __eq__(self, other): return True
+    
 ASSERTIONS = [
 	SchemaNotEmpty,
 	ValidTablesSchema,
@@ -45,13 +48,6 @@ formatPattern = re.compile(r"[{](.*?)[}]")
 fileNamePattern = re.compile(r"[a-zA-Z0-9_\-]*")
 antiFileNamePattern = re.compile(r"[^a-zA-Z0-9_\-]")
 
-LOGGER = logging.Logger(__package__, level=100)
-
-DATABASE_VERSIONS : dict[str,int] = {}
-
-CURRENT_VERSION = 2
-CURRENT_TABLES_HASH = ""
-CURRENT_INDEXES_HASH = ""
 SOFTWARE_NAME = "SQLOOP"
 
 SOURCES = []

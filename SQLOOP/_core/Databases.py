@@ -116,18 +116,7 @@ class Selector:
 			raise NoMatchingDefinition(self.__qualname__+".__getitem__", items)
 		return self
 
-class MetaDatabase(type):
-	def checkDatabase(cls, filepath):
-		database = cls(filepath, "w")
-				
-		for _ in range(10):
-			if not database.checkDatabase():
-				break
-		else:
-			database.checkDatabase("r")
-			# Will raise exception, since database was still faulty after 10 attempts at fixing it.
-
-class Database(metaclass=MetaDatabase):
+class Database:
 	"""Usage:
 	```python
 	database = Database("database.db", "w")
@@ -148,6 +137,14 @@ class Database(metaclass=MetaDatabase):
 	indexes : set[Index]
 	assertions : list[Assertion] = Globals.ASSERTIONS
 	"""A look-up list of assertions and the exceptions to be raised should the assertion fail. Assertions are checked last to first."""
+	
+	LOGGER = logging.Logger(__package__, level=100)
+
+	DATABASE_VERSIONS : dict[str,int] = {}
+
+	CURRENT_VERSION = 0
+	CURRENT_TABLES_HASH = NoHash()
+	CURRENT_INDEXES_HASH = NoHash()
 
 	def __init__(self, filename : str, mode : Mode):
 		self.mode = mode
@@ -225,18 +222,22 @@ class Database(metaclass=MetaDatabase):
 	def columns(self):
 		return set().union(map(column for table in self.tables for column in table.columns))
 
-	def checkDatabase(self, mode=None):
-		"""Will raise appropriate exceptions when in read-mode. Will attempt to fix the database if in write mode."""
-		mode = mode or self.mode
-		tripped = False
-		for assertion in self.assertions:
-			if assertion.condition(database=self):
-				tripped = True
-				if mode == "r": # Raise exception
-					assertion.exception(self)
-				elif mode == "w": # Try to rectify
-					assertion.rectify(self)
-		return tripped
+	@cached_property
+	def valid(self):
+		
+		return not any(map(*this.condition(database=self), self.assertions))
+
+	def fix(self):
+
+		for assertion in filter(*this.condition(database=self), self.assertions):
+			assertion.rectify(self)
+		del self.valid
+
+	@property
+	def exception(self):
+
+		for assertion in filter(*this.condition(database=self), self.assertions):
+			return assertion.exception(self)
 
 	@property
 	def indexesHash(self):

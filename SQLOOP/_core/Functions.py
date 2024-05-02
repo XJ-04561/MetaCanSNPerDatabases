@@ -67,6 +67,20 @@ def hashQuery(database : Database, query : Query):
 			).encode("utf-8")
 		).hexdigest()
 
+def correctDatabase(cls, filepath):
+	database = cls(filepath, "w")
+			
+	for _ in range(10):
+		if database.valid:
+			break
+		database.fix()
+	else:
+		raise database.exception
+		# Will raise exception, since database was still faulty after 10 attempts at fixing it.
+
+def verifyDatabase(cls, filepath):
+	return cls(filepath, "r").valid
+
 @cache
 def getSmallestFootprint(columns : set[Column], tables : set[tuple[set[Column],Table]]):
 	
