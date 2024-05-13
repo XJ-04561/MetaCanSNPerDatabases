@@ -129,6 +129,8 @@ class Database:
 	```
 	"""
 
+	LOG = logging.Logger(SOFTWARE_NAME, level=logging.FATAL)
+
 	_connection : sqlite3.Connection
 	mode : str
 	filename : str
@@ -137,8 +139,6 @@ class Database:
 	indexes : set[Index]
 	assertions : list[Assertion] = Globals.ASSERTIONS
 	"""A look-up list of assertions and the exceptions to be raised should the assertion fail. Assertions are checked last to first."""
-	
-	LOGGER = logging.Logger(__package__, level=100)
 
 	DATABASE_VERSIONS : dict[str,int] = {}
 

@@ -58,7 +58,9 @@ class AutoObject:
 		from SQLOOP._core.Functions import hiddenPattern
 		i = 0
 		for name, typeHint in self.__annotations__.items():
-			if hiddenPattern.fullmatch(name) is None:
+			if hiddenPattern.match(name) is not None:
+				continue
+			elif hasattr(self, name) and not isinstance(getattr(self, name), (cached_property, property)):
 				continue
 			elif name in kwargs:
 				self.__setattr__(name, kwargs[name])
@@ -77,6 +79,57 @@ Mode        = Literal["r", "w"]
 ReadMode    = Literal["r"]
 WriteMode   = Literal["w"]
 
+class NewMeta(type):
+
+	__name__ : str
+	name : str = cached_property(lambda self:self.__name__)
+	
+	def __repr__(self):
+		return f"<{self.__bases__[0].__name__} {self.__name__!r} at 0x{id(self):0>16X} {' '.join(map(lambda pair : '{}={:!r}'.format(*pair), filter(lambda x:not x[0].startswith('_'), vars(self).items())))}>"
+		
+	def __str__(self):
+		return self.name
+	
+	def __sql__(self):
+		return self.name
+	
+	def __format__(self, format_spec : str):
+		if format_spec.endswith("!sql"):
+			return self.__sql__().__format__(format_spec.rstrip("!sql"))
+		elif format_spec.endswith("!r"):
+			return self.__repr__().__format__(format_spec.rstrip("!r"))
+		elif format_spec.endswith("!s"):
+			return self.__str__().__format__(format_spec.rstrip("!s"))
+		else:
+			return self.__str__().__format__(format_spec)
+	
+	def __hash__(self):
+		return hash(tuple(sorted(filter(lambda x:not x[0].startswith("_") and hasattr(x[1], "__hash__"), vars(self).items()), key=lambda x:x)))
+
+class NewSQLObject(metaclass=NewMeta):
+	def __init_subclass__(cls) -> None:
+		from SQLOOP._core.Functions import pluralize
+		types = set(map(lambda x :cls.__annotations__.get(x[0]) if type(x[1]) in [property, cached_property] else type(x[1]), filter(lambda x:type(x[1]) in [list,str,tuple,int,float,type(None),frozenset,set], vars(cls).items())))
+		newAttrs = {}
+		for tp in types:
+			name = tp.__name__[0].lower() + tp.__name__[1:]
+			tupe = tuple(filter(lambda x:isinstance(x, tp), vars(cls).values()))
+			d = dict(filter(lambda x:isinstance(x[1], tp), vars(cls).items()))
+			newAttrs[pluralize(name)] = tupe
+			newAttrs[name + "Lookup"] = d
+		for name, value in newAttrs:
+			setattr(cls, name, value)
+
+class NewTable(NewSQLObject):
+	
+	columns : tuple[Column] = ()
+	columnLookup : dict[str,Column] = {}
+	options : tuple[Query] = ()
+	
+class NewColumn(NewSQLObject):
+
+	type : str = None
+
 class sql(str):
 	def __new__(cls, obj):
 		return super().__new__(cls, obj.__sql__())
@@ -84,7 +137,7 @@ class sql(str):
 class SQLObject(AutoObject):
 	
 	__name__ : str
-	name : str
+	name : str = cached_property(lambda self:self.__name__)
 	
 	def __repr__(self):
 		from SQLOOP._core.Functions import pluralize
