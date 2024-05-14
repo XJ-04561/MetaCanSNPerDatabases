@@ -2,15 +2,6 @@
 from typing import Any
 from SQLOOP.Globals import *
 
-__all__ = (
-	"sql", "NoMatchingDefinition", "AutoObject", "Mode", "ReadMode", "WriteMode", "NewMeta", "SQLObject", "HasColumns",
-	"SanitizedValue", "Comparison", "Assignment", "Table", "Column", "Index", "Query", "Prefix", "Word",
-	"EnclosedWord", "ALL", "SQLITE_MASTER", "SQL", "NAME", "TYPE", "ROW_ID", "TABLE_NAME", "ROOT_PAGE"
-)
-
-class sql(str):
-	def __new__(cls, obj):
-		return obj.__sql__()
 
 class NoMatchingDefinition(TypeError):
 	def __init__(self, name, args=(), kwargs={}):
@@ -40,13 +31,6 @@ class AutoObject:
 					from SQLOOP._core.Exceptions import MissingArgument
 					raise MissingArgument(f"Missing required argument {name} for {self.__class__.__name__}.__init__")
 
-class Mode: pass
-class ReadMode: pass
-class WriteMode: pass
-Mode        = Literal["r", "w"]
-ReadMode    = Literal["r"]
-WriteMode   = Literal["w"]
-
 class NewMeta(type):
 
 	__name__ : str
@@ -68,37 +52,56 @@ class NewMeta(type):
 		return Query(self, left)
 	
 	def __eq__(self, right):
-		return Comparison(self, "==", right)
+		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isinstance(right, NewMeta):
+			return Comparison(self, "==", right)
+		else:
+			return NotImplemented
 	def __ne__(self, right):
-		return Comparison(self, "!=", right)
+		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isinstance(right, NewMeta):
+			return Comparison(self, "!=", right)
+		else:
+			return NotImplemented
 	def __lt__(self, right):
-		return Comparison(self, "<", right)
+		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isinstance(right, NewMeta):
+			return Comparison(self, "<", right)
+		else:
+			return NotImplemented
 	def __le__(self, right):
-		return Comparison(self, "<=", right)
+		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isinstance(right, NewMeta):
+			return Comparison(self, "<=", right)
+		else:
+			return NotImplemented
 	def __gt__(self, right):
-		return Comparison(self, ">", right)
+		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isinstance(right, NewMeta):
+			return Comparison(self, ">", right)
+		else:
+			return NotImplemented
 	def __ge__(self, right):
-		return Comparison(self, ">=", right)
+		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isinstance(right, NewMeta):
+			return Comparison(self, ">=", right)
+		else:
+			return NotImplemented
 	
-	# def __format__(self, format_spec : str):
-	# 	if format_spec.endswith("!sql"):
-	# 		return self.__sql__().__format__(format_spec.rstrip("!sql"))
-	# 	elif format_spec.endswith("!r"):
-	# 		return self.__repr__().__format__(format_spec.rstrip("!r"))
-	# 	elif format_spec.endswith("!s"):
-	# 		return self.__str__().__format__(format_spec.rstrip("!s"))
-	# 	else:
-	# 		return self.__str__().__format__(format_spec)
+	def __or__(self, other):
+		return Union[self, other]
 
 	def __hash__(self):
 		return hash(tuple(sorted(filter(lambda x:x[0] == "__sql_name__" or (not x[0].startswith("_") and getattr(x[1], "__hash__", None) is not None), vars(self).items()), key=lambda x:x)))
 
 class SQLObject(metaclass=NewMeta):
 
+	__sql_name__ : str
+	"""Can be set through the 'name' keyword argument in class creation:
+	```python
+	class MyObject(SQLObject, name="my_thing"):
+		...
+	```
+	Defaults to a 'snake_case'-version of the class name (In the above example it would be "my_object")
+	"""
+
 	def __init_subclass__(cls, *, name=None, **kwargs) -> None:
 		super().__init_subclass__(**kwargs)
-		from SQLOOP._core.Functions import pluralize
-		cls.__sql_name__ = name or cls.__name__
+		cls.__sql_name__ = name or camel2snake(cls.__name__)
 
 		# types = set(map(lambda x :cls.__annotations__.get(x[0]) if type(x[1]) in [property, cached_property] else type(x[1]), filter(lambda x:isinstance(x[1], (SQLObject, property, cached_property)), vars(cls).items())))
 		
@@ -113,9 +116,19 @@ class SQLObject(metaclass=NewMeta):
 		# for name, value in newAttrs:
 		# 	setattr(cls, name, value)
 
-class Column(SQLObject):
+class ColumnMeta(NewMeta):
 
-	type : str = None
+	type : str
+
+	def __new__(cls, clsName, bases, namespace, **kwargs):
+		return super().__new__(cls, clsName, bases, namespace)
+	
+	def __sql__(self):
+		return f"{self} {self.type}"
+
+class Column(SQLObject, metaclass=ColumnMeta):
+
+	type : str = SQL_TYPE_NAMES[None]
 
 	def __init_subclass__(cls, *, type : str|Type=None, **kwargs) -> None:
 		super().__init_subclass__(**kwargs)
@@ -126,15 +139,23 @@ class Column(SQLObject):
 		else:
 			raise TypeError(f"Column type must either be a string or a python type mapped to sql type names in {SQL_TYPES=}." "\n" f"It was instead: {type!r}")
 
+class ColumnAlias(SQLObject, metaclass=ColumnMeta): pass
+
 class HasColumns:
 	
-	columns : tuple[Column]
-	columnLookup : dict[str,Column]
+	columns : SQLDict[str,Column]
 
 	def __init_subclass__(cls, **kwargs):
-		cls.columns = tuple(filter(lambda x : isinstance(x, type) and issubclass(x, Column), vars(cls).values()))
-		cls.columnLookup = dict(filter(lambda x : isinstance(x[1], type) and issubclass(x[1], Column), vars(cls).items()))
+		super().__init_subclass__(**kwargs)
+		cls.columns = SQLDict(filter(lambda v:isRelated(v, Column), vars(cls).values()))
 
+class HasTables:
+	
+	tables : SQLDict[str,Column]
+
+	def __init_subclass__(cls, **kwargs):
+		super().__init_subclass__(**kwargs)
+		cls.tables = SQLDict(filter(lambda v:isRelated(v, Table), vars(cls).values()))
 
 class SanitizedValue(SQLObject):
 	
@@ -160,7 +181,7 @@ class Comparison:
 	def __init__(self, left, operator, right):
 		self.left = left
 		self.operator = operator
-		self.right = SanitizedValue(right) if not isinstance(right, SQLObject) else right
+		self.right = SanitizedValue(right) if not isRelated(right, SQLObject) else right
 
 	def __repr__(self):
 		return f"<Comparison {str(self)!r}>"
@@ -169,7 +190,7 @@ class Comparison:
 		return f"{self.left} {self.operator} {self.right}"
 	
 	def __bool__(self):
-		return hash(self.left) == hash(self.right)
+		return getattr(hash(self.left), OPERATOR_DUNDERS[self.operator])(hash(self.right))
 	
 	@property
 	def params(self):
@@ -193,6 +214,7 @@ class Assignment:
 
 	def __str__(self):
 		return f"{self.variable} = {self.value}"
+
 T = TypeVar("T")
 def first(iterator : Iterable[T]|Iterator[T]) -> T|None:
 	try:
@@ -204,22 +226,23 @@ def first(iterator : Iterable[T]|Iterator[T]) -> T|None:
 			pass
 	finally:
 		return None
+
 _NO_KEY_VALUE = object()
 QUERY_CACHE = {}
+
 class Prefix(type):
 
 	def __str__(self):
 		return self.__name__
 	def __sub__(self, other):
 		return Query(self, other)
-class Table: pass
-class Index: pass
+
 class Word(metaclass=Prefix):
 	
 	content : tuple
 	sep : str = ", "
 
-	def __init__(self, *args : tuple[Table|Column|Index|Comparison], **kwargs : dict[str,Any]):
+	def __init__(self, *args : tuple[Union["Table", Column, "Index", Comparison]], **kwargs : dict[str,Any]):
 		self.content = args + tuple(map(lambda keyVal : Comparison(keyVal[0], "==", keyVal[1]), kwargs.items()))
 
 	def __sub__(self, other):
@@ -263,6 +286,7 @@ class Word(metaclass=Prefix):
 class EnclosedWord(Word):
 	def __str__(self):
 		return f"{self.__class__.__name__} ({self.sep.join(map(str, self.content))})"
+
 class Query:
 
 	words : tuple[Word] = tuple()
@@ -316,167 +340,70 @@ class Query:
 	def params(self):
 		return list(map(*this.params, filter(*this.__hasattr__("params"), self.words)))
 
-class Table(SQLObject, HasColumns):
-	
+class TableMeta(NewMeta):
+
 	columns : tuple[Column]
-	columnLookup : dict[str,Column]
+
+	def __contains__(self, column : Column):
+		return column in self.columns
+
+	def __sql__(self):
+		sep = ",\n\t"
+		return f"{self.__sql_name__} ({sep.join(itertools.chain(map(sql, self.columns), map(sql, self.options)))})"
+
+class Table(SQLObject, HasColumns, metaclass=TableMeta):
+	
+	columns : SQLDict[str,Column]
 	options : tuple[Query] = ()
 
-class Index(SQLObject, HasColumns):
+	def __init_subclass__(cls, **kwargs):
+		i = 0
+		for name, value in vars(cls).copy().items():
+			if not isRelated(value, Column):
+				continue
+			if name != value.__name__ and not hasattr(cls, value.__name__):
+				setattr(cls, value.__name__, value)
+			setattr(cls, alphabetize(i), ColumnMeta(f"{value.__name__}Alias", (ColumnAlias,), {}, name=alphabetize(i)))
+			i += 1
+		super().__init_subclass__(**kwargs)
+
+	def __init__(self, database):
+		self.database = database
+	
+	def __getitem__(self, items):
+		from SQLOOP._core.Databases import Selector
+		out = Selector(self.database._connection, (type(self), ))
+		return out[items]
+	
+	def __call__(self, *args, **kwargs):
+		from SQLOOP._core.Databases import Selector
+		selects = tuple(filter(lambda x:not isinstance(x, Comparison), args))
+		where = tuple(itertools.chain(filter(lambda x:not isinstance(x, Comparison), args), map(lambda x:Comparison(x[0], "=", x[1]), kwargs.items())))
+		return iter(Selector(self.database._connection, (type(self), ))[where])
+
+class IndexMeta(NewMeta):
+
+	def __sql__(self):
+		return f"{self} ON {self.table}({', '.join(map(str, self.columns))})"
+
+class Index(SQLObject, HasColumns, metaclass=IndexMeta):
 
 	table : Any
 
 	def __sql__(self):
 		return f"{self} ON {self.table}({', '.join(map(str, self.columns))})"
 
-# class SQLObject(AutoObject):
-	
-# 	__name__ : str
-# 	name : str = cached_property(lambda self:self.__name__)
-	
-# 	def __repr__(self):
-# 		from SQLOOP._core.Functions import pluralize
-# 		return f"<{pluralize(self.__class__.__name__)}.{self.__name__} {' '.join(map(lambda pair : '{}={!r}'.format(*pair), vars(self).items()))} at {hex(id(self))}>"
-		
-# 	def __str__(self):
-# 		return self.name
-	
-# 	def __sql__(self):
-# 		return self.name
-	
-# 	def __hash__(self):
-# 		return hash(self.__class__) + hash(self.__name__)
-	
-# 	def __format__(self, format_spec : str):
-# 		if format_spec.endswith("!sql"):
-# 			return self.__sql__().__format__(format_spec.rstrip("!sql"))
-# 		elif format_spec.endswith("!r"):
-# 			return self.__repr__().__format__(format_spec.rstrip("!r"))
-# 		elif format_spec.endswith("!s"):
-# 			return self.__str__().__format__(format_spec.rstrip("!s"))
-# 		else:
-# 			return self.__str__().__format__(format_spec)
-
-# class SanitizedValue(SQLObject):
-# 	value : Any
-# 	def __str__(self):
-# 		return "?" if self.value is not None else "null"
-# 	def __sql__(self):
-# 		return self.value
-# 	@property
-# 	def params(self):
-# 		return [self.value]
-
-# class Comparison(AutoObject):
-	
-# 	left : Any
-# 	operator : str
-# 	right : Any
-
-# 	def __init__(self, left, operator, right):
-# 		self.left = left
-# 		self.operator = operator
-# 		self.right = SanitizedValue(right) if not isinstance(right, SQLObject) else right
-
-# 	def __repr__(self):
-# 		return f"<Comparison {str(self)!r}>"
-
-# 	def __str__(self):
-# 		f"{self.left} {self.operator} {self.right}"
-	
-# 	def __bool__(self):
-# 		return hash(self.left) == hash(self.right)
-	
-# 	@property
-# 	def params(self):
-# 		out = []
-# 		for item in self.content:
-# 			if hasattr(item, "params"):
-# 				out.extend(item.params)
-# 		return out
-
-# class Assignment(AutoObject):
-	
-# 	variable : str|Column
-# 	value : Any
-
-# 	def __repr__(self):
-# 		return f"<Assignment {str(self)!r}>"
-
-# 	def __str__(self):
-# 		f"{self.variable} = {self.value}"
-
-# class Column(SQLObject):
-	
-# 	__name__ : str
-# 	name : str
-# 	type : str
-	
-# 	@overload
-# 	def __init__(self, name : str): ...
-# 	@overload
-# 	def __init__(self, name : str, type : str): ...
-# 	@overload
-# 	def __init__(self, __name__ : str, name : str, type : str): ...
-	
-# 	def __init__(self, __name__ : str, /, name : str=None, type : str=None):
-# 		self.__name__ = __name__
-# 		self.name = name or __name__
-# 		self.type = type
-# 		assert isinstance(self.name, str)
-# 		assert namePattern.fullmatch(self.name) is not None, f"Name of column must be alphanumeric [a-zA-Z0-9_\-*], and {self.name} is not."
-# 		assert self.type is None or (isinstance(self.type, str) and sqlite3TypePattern.fullmatch(self.type) is not None), f"Type of column must be valid sqlite3 type, and {self.type} is not."
-	
-# 	def __sql__(self):
-# 		return f"{self.name} {self.type}"
-	
-# 	def __lt__(self, right):
-# 		return Comparison(self, "<", right)
-# 	def __gt__(self, right):
-# 		return Comparison(self, ">", right)
-# 	def __le__(self, right):
-# 		return Comparison(self, "<=", right)
-# 	def __ge__(self, right):
-# 		return Comparison(self, ">=", right)
-# 	def __eq__(self, right):
-# 		return Comparison(self, "==", right)
-# 	def __ne__(self, right):
-# 		return Comparison(self, "!=", right)
-# 	def __contains__(self, right):
-# 		return Comparison(self, "IN", right)
-
-
-# class Table(SQLObject):
-
-# 	columns : tuple[Column] = tuple()
-# 	options : tuple[Query|Word] = tuple()
-# 	columnLookup : dict[Column,Column]
-
-# 	def __sql__(self):
-# 		sep = ",\n\t"
-# 		return f"{self.name} ({sep.join(itertools.chain(map(sql, self.columns), map(sql, self.options)))})"
-	
-# 	def __hash__(self):
-# 		return self.__sql__().__hash__()
-	
-# 	def __repr__(self):
-# 		return f"<{__name__}.{self.__class__.__name__} columns={[c.__name__ for c in self.columns]} at {hex(id(self))}>"
-	
-# 	def __iter__(self):
-# 		for column in self.columns:
-# 			yield column
-	
-# 	@cached_property
-# 	def columnLookup(self):
-# 		return {col:col for col in self.columns}
-
-# class Index(SQLObject):
-
-# 	table : Any
-# 	columns : tuple[Column]
-
-# 	def __sql__(self):
-# 		return f"{self} ON {self.table}({', '.join(map(str, self.columns))})"
+class SQL_TYPE(type):
+	args : tuple
+	def __init__(self, *args):
+		self.arg = args
+	def __str__(self):
+		if self.args:
+			return f"{type(self).__name__}({', '.join(self.args)})"
+		else:
+			return f"{type(self).__name__}"
+class VARCHAR(SQL_TYPE): pass
+class CHAR(SQL_TYPE): pass
 
 class ALL(Column, name="*"): pass
 

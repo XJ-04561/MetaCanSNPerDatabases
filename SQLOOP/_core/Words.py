@@ -4,6 +4,8 @@ from typing import overload, final, Any
 
 
 class BEGIN(Word): pass
+class ROLLBACK(Word): pass
+class IN(Word): pass
 class TRANSACTION(Word): pass
 class COMMIT(Word): pass
 class PRAGMA(Word):
@@ -15,8 +17,9 @@ class PRAGMA(Word):
 		...
 	@final
 	def __init__(self, *columns, **assignments):
+		from SQLOOP.Globals import isRelated
 		if len(columns) > 0:
-			assert all(isinstance(col, Column) for col in columns), f"Only columns are allowed for a PRAGMA-statement not: {set(col for col in columns if not isinstance(col, Column))}"
+			assert all(isRelated(col, Column) for col in columns), f"Only columns are allowed for a PRAGMA-statement not: {set(col for col in columns if not isRelated(col, Column))}"
 			self.content = columns
 		elif len(assignments) > 0:
 			content = []

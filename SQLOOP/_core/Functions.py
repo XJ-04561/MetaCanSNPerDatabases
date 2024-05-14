@@ -4,7 +4,31 @@ import SQLOOP.Globals as Globals
 
 def isType(instance, cls):
 	
-	if isinstance(cls, Generic|GenericAlias):
+	if isinstance(instance, type):
+		if not isinstance(cls, Generic|GenericAlias):
+			return isRelated(instance, cls)
+		if not hasattr(instance, "__iter__"):
+			return False
+		if not isRelated(instance, get_origin(cls)):
+			return False
+		
+		args = get_args(cls)
+		if isinstance(args[0], Generic|GenericAlias) and get_origin(args[0]) is All:
+			args = itertools.repeat(Union[get_args(args[0])])
+		elif sum(1 for _ in instance) < len(args)-1:
+			return False
+		elif isinstance(args[-1], Generic|GenericAlias) and get_origin(args[-1]) is Rest:
+			args = itertools.chain(args[:-1], itertools.repeat(Union[get_args(args[-1])]))
+		elif sum(1 for _ in instance) != len(args):
+			return False
+		
+		for item, tp in zip(instance, get_args(cls), strict=True):
+			if not isType(item, tp):
+				return False
+		return True
+	elif isinstance(cls, Generic|GenericAlias):
+		if isinstance(instance, type):
+			return isRelated(instance, cls)
 		if not isType(instance, get_origin(cls)):
 			return False
 		if isType(instance, dict):
@@ -34,8 +58,8 @@ def pluralize(string : str) -> str:
 		case _:
 			return f"{string}es"
 		
-class Column: pass
-def formatType(columns : tuple[Column]):
+
+def formatType(columns : tuple["Column"]):
 
 	d = {"unknown" : True}
 	d.setdefault(False)
@@ -56,19 +80,22 @@ def formatType(columns : tuple[Column]):
 			case "unknown":
 				yield "{:>12}"
 
-class Query: pass
-class Database: pass
-def hashQuery(database : Database, query : Query):
-	return hashlib.md5(
-			whitespacePattern.sub(
-				" ",
-				"; ".join([
-					x[0]
-					for x in database(query)
-					if type(x) is tuple and x[0] is not None
-				])
-			).encode("utf-8")
-		).hexdigest()
+def hashQuery(database : "Database", query : "Query"):
+	"""Converts entries returned into strings via str or repr (if __str__ not implemented) and then replaces whitespace
+	with a simple " " and joines all the entries with "; " before getting the hash of the final `str` object."""
+	return hash(
+		whitespacePattern.sub(
+			" ",
+			"; ".join(
+				map(
+					lambda x:str(x) if hasattr(x, "__str__") else repr(x),
+					database(query)
+				)
+			)
+		)
+	)
+def hashSQL(items : Iterable):
+	return hash(whitespacePattern.sub(" ", "; ".join(map(sql, items))))
 
 def correctDatabase(cls, filepath):
 	database = cls(filepath, "w")
@@ -84,9 +111,8 @@ def correctDatabase(cls, filepath):
 def verifyDatabase(cls, filepath):
 	return cls(filepath, "r").valid
 
-class Table: pass
 @cache
-def getSmallestFootprint(columns : set[Column], tables : set[tuple[set[Column],Table]]):
+def getSmallestFootprint(columns : set["Column"], tables : set[tuple[set["Column"],"Table"]]):
 	
 	if len(columns) == 0:
 		return []
@@ -101,13 +127,13 @@ def getSmallestFootprint(columns : set[Column], tables : set[tuple[set[Column],T
 			raise e
 
 @overload
-def getShortestPath(table1 : Table, table2 : Table, tables : set[Table]) -> tuple[tuple[Table,Column]]:
+def getShortestPath(table1 : "Table", table2 : "Table", tables : set["Table"]) -> tuple[tuple["Table","Column"]]:
 	...
 @overload
-def getShortestPath(sources : tuple[Table], destinations : tuple[Table], tables : set[Table]) -> tuple[tuple[Table,Column]]:
+def getShortestPath(sources : tuple["Table"], destinations : tuple["Table"], tables : set["Table"]) -> tuple[tuple["Table","Column"]]:
 	...
 @cache
-def getShortestPath(*args) -> tuple[tuple[Table,Column]]:
+def getShortestPath(*args) -> tuple[tuple["Table","Column"]]:
 	from SQLOOP.core import Table, Column
 	if isType(args, tuple[tuple[Table],tuple[Table], set[Table]]):
 		sources : tuple[Table] = args[0]
@@ -143,3 +169,5 @@ def getShortestPath(*args) -> tuple[tuple[Table,Column]]:
 			(commonCol, table), path = max(filter(*this[1][-1] != None, paths.items()), key=next(this[1].__len__()))
 			return ((commonCol, table),) + path
 
+from SQLOOP._core.Structures import Column, Table, Query
+from SQLOOP._core.Databases import Database

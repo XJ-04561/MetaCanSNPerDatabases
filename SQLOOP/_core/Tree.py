@@ -5,40 +5,26 @@ from SQLOOP._core.Structures import *
 from SQLOOP._core.Words import *
 from SQLOOP._core.Databases import *
 
-try:
-	Database
-except NameError:
-	class Database: pass
-
-try:
-	Table
-except NameError:
-	class Table: pass
-	
-try:
-	Column
-except NameError:
-	class Column: pass
 class Branch:
 
-	database : Database
-	table : Table
-	parentCol : Column
-	childCol : Column
+	database : "Database"
+	table : "Table"
+	parentCol : "Column"
+	childCol : "Column"
 	node : Any
 
-	def __init__(self, database : Database, node : Any):
+	def __init__(self, database : "Database", node : Any):
 		self.database = database
 		self.node = node
 	
 	@property
-	def parent(self) -> Self|None:
+	def parent(self) -> Union["Branch", None]:
 		try:
 			return self.__class__(self.database, next(self.database(SELECT(self.parentCol) - FROM(self.table) - WHERE(self.childCol == self.node))))
 		except StopIteration:
 			return None
 
 	@property
-	def children(self) -> Generator[Self,None,None]:
+	def children(self) -> Generator["Branch",None,None]:
 		for childNode in self.database(SELECT(self.childCol) - FROM(self.table) - WHERE(self.parentCol == self.node)):
 			yield self.__class__(self.database, childNode)

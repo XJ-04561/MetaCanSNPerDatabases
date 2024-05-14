@@ -35,14 +35,14 @@ class Aggregate:
 	# 	else:
 	# 		return self.__str__().__format__(format_spec)
 
-class AVG: pass
-class COUNT: pass
-class MAX: pass
-class MIN: pass
-class SUM: pass
-class TOTAL: pass
+class AVG(Aggregate): pass
+class COUNT(Aggregate): pass
+class MAX(Aggregate): pass
+class MIN(Aggregate): pass
+class SUM(Aggregate): pass
+class TOTAL(Aggregate): pass
 
-class GROUP_CONCAT:
+class GROUP_CONCAT(Aggregate):
 
 	Y : str
 	
