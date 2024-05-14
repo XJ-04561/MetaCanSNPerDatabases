@@ -42,10 +42,10 @@ class SchemaNotEmpty(Assertion):
 class ValidTablesSchema(Assertion):
 	@classmethod
 	def exception(cls, database) -> Exception:
-		return SchemaTablesMismatch(f"Tables are constructed differently to the current version (Database table schema hash:{database.tablesSchema!r} | Current version hash: {database.CURRENT_TABLES_HASH!r}).")
+		return SchemaTablesMismatch(f"Tables are constructed differently to the current version (Database table schema hash:{database.tablesHash!r} | Current version hash: {database.CURRENT_TABLES_HASH!r}).")
 	@classmethod
 	def condition(cls, database) -> bool:
-		return database.tablesSchema != database.CURRENT_TABLES_HASH
+		return database.tablesHash != database.CURRENT_TABLES_HASH
 	@classmethod
 	def rectify(cls, database) -> None:
 		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, ALL, FROM, DROP, INDEX
@@ -70,10 +70,10 @@ class ValidTablesSchema(Assertion):
 class ValidIndexesSchema(Assertion):
 	@classmethod
 	def exception(cls, database) -> Exception:
-		return SchemaIndexesMismatch(f"Indexes are constructed differently to the current version (Database index schema hash:{database.indexesSchema!r} | Current version hash: {database.CURRENT_INDEXES_HASH!r}).")
+		return SchemaIndexesMismatch(f"Indexes are constructed differently to the current version (Database index schema hash:{database.indexesHash!r} | Current version hash: {database.CURRENT_INDEXES_HASH!r}).")
 	@classmethod
 	def condition(cls, database) -> bool:
-		return database.indexesSchema != database.CURRENT_INDEXES_HASH
+		return database.indexesHash != database.CURRENT_INDEXES_HASH
 	@classmethod
 	def rectify(cls, database) -> None:
 		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, ALL, FROM, DROP, INDEX

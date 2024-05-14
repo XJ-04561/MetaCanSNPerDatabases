@@ -1,5 +1,6 @@
 
 from SQLOOP._core.Structures import *
+from typing import overload, final, Any
 
 
 class BEGIN(Word): pass
@@ -41,7 +42,7 @@ class SELECT(Word):
 	def __mult__(self : Word, right : Column|str):
 		return Query(self(ALL), right)
 class FROM(Word): pass
-class WHERE(Word): sep : str = "AND"
+class WHERE(Word): sep : str = " AND "
 class ASC(Word): pass
 class DESC(Word): pass
 class ORDER(Word): pass
@@ -49,6 +50,7 @@ class BY(Word): pass
 class LIMIT(Word): pass
 class CREATE(Word): pass
 class ALTER(Word): pass
+class AND(Word): pass
 class RENAME(Word): pass
 class DROP(Word): pass
 class TO(Word): pass

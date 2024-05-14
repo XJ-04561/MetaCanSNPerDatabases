@@ -5,6 +5,20 @@ from SQLOOP._core.Structures import *
 from SQLOOP._core.Words import *
 from SQLOOP._core.Databases import *
 
+try:
+	Database
+except NameError:
+	class Database: pass
+
+try:
+	Table
+except NameError:
+	class Table: pass
+	
+try:
+	Column
+except NameError:
+	class Column: pass
 class Branch:
 
 	database : Database

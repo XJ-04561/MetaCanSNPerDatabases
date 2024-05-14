@@ -1,9 +1,9 @@
 
 from SQLOOP.Globals import *
 import SQLOOP.Globals as Globals
-from SQLOOP._core.Words import *
 
 def isType(instance, cls):
+	
 	if isinstance(cls, Generic|GenericAlias):
 		if not isType(instance, get_origin(cls)):
 			return False
@@ -33,7 +33,8 @@ def pluralize(string : str) -> str:
 			return f"{string}s"
 		case _:
 			return f"{string}es"
-
+		
+class Column: pass
 def formatType(columns : tuple[Column]):
 
 	d = {"unknown" : True}
@@ -55,6 +56,8 @@ def formatType(columns : tuple[Column]):
 			case "unknown":
 				yield "{:>12}"
 
+class Query: pass
+class Database: pass
 def hashQuery(database : Database, query : Query):
 	return hashlib.md5(
 			whitespacePattern.sub(
@@ -81,6 +84,7 @@ def correctDatabase(cls, filepath):
 def verifyDatabase(cls, filepath):
 	return cls(filepath, "r").valid
 
+class Table: pass
 @cache
 def getSmallestFootprint(columns : set[Column], tables : set[tuple[set[Column],Table]]):
 	
@@ -104,6 +108,7 @@ def getShortestPath(sources : tuple[Table], destinations : tuple[Table], tables 
 	...
 @cache
 def getShortestPath(*args) -> tuple[tuple[Table,Column]]:
+	from SQLOOP.core import Table, Column
 	if isType(args, tuple[tuple[Table],tuple[Table], set[Table]]):
 		sources : tuple[Table] = args[0]
 		destinations : tuple[Table] = args[1]

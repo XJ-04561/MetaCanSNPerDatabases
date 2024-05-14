@@ -37,7 +37,18 @@ SQL_TYPES = {
 	"DATE" : str,
 	"DATETIME" : str,
 	"DECIMAL" : float,
-	"NULL" : None
+	"NULL" : (lambda x : None)
+}
+
+SQL_TYPE_NAMES = {
+	int : "INTEGER",
+	str : "TEXT",
+	str : "VARCHAR",
+	str : "CHAR",
+	str : "DATE",
+	str : "DATETIME",
+	float : "DECIMAL",
+	None : "NULL"
 }
 
 whitespacePattern = re.compile(r"\s+")
@@ -51,11 +62,3 @@ SOFTWARE_NAME = "SQLOOP"
 
 SOURCES = []
 
-class Query: pass
-class Comparison: pass
-class Column: pass
-class Table: pass
-class Index: pass
-class Database: pass
-class Word: pass
-class Aggregate: pass

@@ -2,8 +2,9 @@
 from sqlite3 import Connection
 from SQLOOP.Globals import *
 import SQLOOP.Globals as Globals
-from SQLOOP.core import *
 from SQLOOP._core.Structures import *
+from SQLOOP._core.Words import *
+from SQLOOP._core.Aggregates import *
 
 class Fetcher:
 	"""Fetches data from a cursor. Consumes the cursor object during iteration/indexation."""
@@ -86,6 +87,7 @@ class Selector:
 	def __getitem__(self, items : tuple[Column|Table|Comparison]):
 		if isinstance(items[0], Column):
 			assert len(set(items).difference(self.databaseColumns)) == 0, f"Given columns don't exist in the database: {set(items).difference(self.databaseColumns)}"
+			from SQLOOP._core.Functions import getSmallestFootprint
 			self.columns = items
 			self.tables = tuple(getSmallestFootprint(set(items), [[set(table.columns), table, 0] for table in self.databaseTables]))
 		elif isinstance(items[0], Table):
@@ -96,6 +98,7 @@ class Selector:
 			self.wheres = self.wheres + tuple()
 		elif isinstance(items[0], Comparison):
 			assert all(col in self.databaseColumns for comp in items for col in [comp.left, comp.right] if isinstance(col, Column)), f"Columns in comparisons are not found in the database: {set(col for comp in items for col in [comp.left, comp.right] if isinstance(col, Column) and col not in self.databaseColumns)}"
+			from SQLOOP._core.Functions import getShortestPath
 			wheres = list(self.wheres)
 			for comp in items:
 				if isinstance(comp.left, Column) and all(comp.left not in table for table in self.tables):
@@ -241,10 +244,12 @@ class Database:
 
 	@property
 	def indexesHash(self):
+		from SQLOOP._core.Functions import hashQuery
 		return hashQuery(self, SELECT("sql") - FROM - SQLITE_MASTER - WHERE(type='index') - ORDER - BY("sql DESC"))
 
 	@property
 	def tablesHash(self):
+		from SQLOOP._core.Functions import hashQuery
 		return hashQuery(self, SELECT("sql") - FROM - SQLITE_MASTER - WHERE(type='table') - ORDER - BY("sql DESC"))
 
 	def createIndex(self : Self, index : Index) -> bool:
