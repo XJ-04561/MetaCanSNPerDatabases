@@ -13,9 +13,16 @@ class Fetcher:
 	cols : int
 	resultsLength : int
 
+	def __new__(cls, *args, **kwargs):
+		obj = super().__new__(cls, *args, **kwargs)
+		if all(map(lambda x:isRelated(x, Aggregate), itertools.islice(obj.query.words, 1, obj.cols))):
+			return next(obj)
+		else:
+			return obj
+
 	def __init__(self, connection : sqlite3.Connection, query : Query):
 		self._connection = connection
-		self._cursor = self._connection(*query)
+		self._cursor = self._connection.execute(*query)
 		self.query = query
 		self.position = 0
 	
@@ -37,19 +44,27 @@ class Fetcher:
 			raise NoResultsFromQuery(f"When looking for row number {rowNumber} in query: '{next(q)}', {next(q)}")
 		
 		if self.cols == 1:
-			return self._connection(self.query - LIMIT(rowNumber,rowNumber))[0]
+			return self._connection.execute(*self.query - LIMIT(rowNumber,rowNumber)).fetchone()[0]
 		else:
-			return self._connection(self.query - LIMIT(rowNumber,rowNumber))
+			return self._connection.execute(*self.query - LIMIT(rowNumber,rowNumber)).fetchone()
 	
 	@cached_property
 	def cols(self):
-		if not isinstance(self.query.words[0], SELECT) and not self.query.words[0] is SELECT:
+		if isinstance(self.query.words[0], SELECT):
+			return len(self.query.words[0].content)
+		elif self.query.words[0] is SELECT:
+			return sum(map(lambda x:1, itertools.takewhile(lambda x:not isRelated(x, Word), itertools.islice(self.query.words, 1, None))))
+		else:
 			return None
-		return len(self.query.words[0].content)
 	
 	@cached_property
 	def resultsLength(self):
-		return self._connection(Query(SELECT(COUNT(ALL)), self.query.words[1:])).fetchone()[0]
+		if isinstance(self.query.words[0], SELECT):
+			return self._connection.execute(*Query(SELECT(COUNT(ALL)), self.query.words[1:])).fetchone()[0]
+		elif self.query.words[0] is SELECT:
+			return self._connection.execute(*Query(SELECT(COUNT(ALL)), itertools.dropwhile(lambda x:not isRelated(x, Word) and not isinstance(x, Aggregate), itertools.islice(self.query.words, 1, None)))).fetchone()[0]
+		else:
+			return 0
 
 
 class Selector:
@@ -60,19 +75,19 @@ class Selector:
 
 	appended : Query
 
-	_connection : Connection
+	database : Connection
 	databaseTables : set[Table]
 	databaseColumns : set[Column]
 
-	def __init__(self, connection : Connection, tables : tuple[Table]):
-		self._connection = connection
-		self.databaseTables = set(tables)
-		self.databaseColumns = set().union(map(*this.columns, self.databaseTables))
+	def __init__(self, database : "Database"):
+		self.database = database
+		self.databaseTables = set(database.tables)
+		self.databaseColumns = set(database.columns)
 		self.appended = Query()
 		self.wheres = tuple()
 	
 	def __iter__(self):
-		return Fetcher(self._connection, SELECT (*self.columns) - FROM (*self.tables) - WHERE (*self.wheres) - self.appended)
+		return Fetcher(self.database._connection, SELECT (*self.columns) - FROM (*self.tables) - WHERE (*self.wheres) - self.appended)
 
 	def __sub__(self, append : Word|Query):
 		self.appended -= append
@@ -151,29 +166,35 @@ class Database:
 
 	DATABASE_VERSIONS : dict[str,int] = {}
 	CURRENT_VERSION = 0
-	CURRENT_TABLES_HASH = classProperty(lambda self:hash(whitespacePattern.sub(" ", "; ".join(map(lambda x:str(x) if hasattr(x, "__str__") else repr(x), getattr(self, "tables", ()))))))
-	CURRENT_INDEXES_HASH = classProperty(lambda self:hash(whitespacePattern.sub(" ", "; ".join(map(lambda x:str(x) if hasattr(x, "__str__") else repr(x), getattr(self, "indexes", ()))))))
+	CURRENT_TABLES_HASH : int
+	CURRENT_INDEXES_HASH : int
+	
+	@ClassProperty
+	def CURRENT_TABLES_HASH(self) -> int:
+		return hash(whitespacePattern.sub(" ", "; ".join(map(sql, self.tables))))
+	@ClassProperty
+	def CURRENT_INDEXES_HASH(self) -> int:
+		return hash(whitespacePattern.sub(" ", "; ".join(map(sql, self.indexes))))
 
 	LOG = logging.Logger(SOFTWARE_NAME, level=logging.FATAL)
 
 	_connection : sqlite3.Connection
 	mode : str
 	filename : str
-	columns : SQLDict[Column]
+	columns : SQLDict[Column] = SQLDict()
 	"""A hybrid between a tuple and a dict. Can be indexed using number in column order or by column
 	in-sql name (Column.__sql_name__). When iterated, returns dict.values() instead of the usual dict.keys()."""
-	tables : SQLDict[Table]
+	tables : SQLDict[Table] = SQLDict()
 	"""A hybrid between a tuple and a dict. Can be indexed using number in table order or by table
 	in-sql name (Table.__sql_name__). When iterated, returns dict.values() instead of the usual dict.keys()."""
-	indexes : SQLDict[Index]
+	indexes : SQLDict[Index] = SQLDict()
 	"""A hybrid between a tuple and a dict. Can be indexed using number in index order or by index
 	in-sql name (Index.__sql_name__). When iterated, returns dict.values() instead of the usual dict.keys()."""
-	assertions : list[Assertion]
+	assertions : list[Assertion] = Globals.ASSERTIONS
 	"""A look-up list of assertions and the exceptions to be raised should the assertion fail. Assertions are checked last to first."""
 
 	def __init__(self, filename : str, mode : Mode):
-		from SQLOOP._core.Databases import Database as _baseClass
-		if type(self) is _baseClass:
+		if type(self) is Database:
 			raise NotImplementedError("The base Database class is not to be used, please subclass `Database` with your own appropriate tables and indexes.")
 		self.mode = mode
 		self.filename = filename if os.path.isabs(filename) or filename == ":memory:" else os.path.realpath(os.path.expanduser(filename))
@@ -193,21 +214,23 @@ class Database:
 			case _:
 				raise ValueError(f"{mode!r} is not a recognized file-stream mode. Only 'w'/'r' allowed.")
 	
-	def __init_subclass__(cls, *, baseAssertions : tuple=Globals.ASSERTIONS, **kwargs):
+	def __init_subclass__(cls, *, baseAssertions : tuple=(), **kwargs):
+		super().__init_subclass__(**kwargs)
 		if baseAssertions:
 			cls.assertions = cls.assertions + baseAssertions
-		tables = SQLDict()
-		indexes = SQLDict()
-		for name, item in vars(cls).items():
+		cls.columns = SQLDict()
+		cls.tables = SQLDict()
+		cls.indexes = SQLDict()
+		for item in map(lambda name:getattr(cls, name), tuple(dir(cls))):
 			if isRelated(item, Table):
-				tables[str(item)] = item
+				cls.tables.append(item)
 			elif isRelated(item, Index):
-				indexes[str(item)] = item
-		columns = SQLDict()
-		for table in tables:
+				cls.indexes.append(item)
+		
+		for table in cls.tables:
 			for column in table.columns:
-				if column not in columns:
-					columns[str(column)] = column
+				if column not in cls.columns:
+					cls.columns.append(column)
 		
 
 	def __enter__(self):
@@ -234,38 +257,24 @@ class Database:
 		return "\n".join(string)
 
 	@overload
-	def __call__(self, query : Query) -> Generator[tuple[Any],None,None]: ...
+	def __call__(self, query : Query|Word|type[Word]) -> Generator[tuple[Any],None,None]: ...
 	@overload
 	def __call__(self, query : str, params : list[Any]) -> Generator[tuple[Any],None,None]: ...
 	@final
-	def __call__(self, query : str|Query, params : list[Any]=None) -> Generator[tuple[Any],None,None]:
-		if isinstance(query, str) and isinstance(params, list[Any]):
+	def __call__(self, query : str|Query|Word|type[Word], params : list[Any]=[]) -> Generator[tuple[Any],None,None]:
+		if isinstance(query, str):
 			for row in self._connection.execute(query, params):
 				yield row
-		elif isinstance(query, Query) and params is None:
-			if isinstance(query.words[0], SELECT) or query.words[0] is SELECT:
-				if query.words[0] is SELECT:
-					assert len(query.words) > 1, f"SELECT statement must not be alone in query {query=}"
-					if isinstance(query.words[1], (tuple,list)):
-						n = len(query.words[1])
-					else:
-						n = sum(1 for _ in itertools.takewhile(lambda x:isRelated(x, Column), query.words[1:]))
-					
-				else:
-					n = len(query.words[0].content)
-				if n == 1:
-					for row in self._connection.execute(*query):
-						yield row[0]
-				else:
-					for row in self._connection.execute(*query):
-						yield row
-			else:
-				self._connection.execute(*query)
-				return None
-
+		elif isinstance(query, Query):
+			return Fetcher(self._connection, query)
+		elif isinstance(query, (Word, type(Word))):
+			return Fetcher(self._connection, Query(query))
+		else:
+			raise ValueError(f"Trying to call database with seomthing other than a 'str' or a 'Query' object.\ndatabase({query}, {params})")
+			
 
 	def __getitem__(self, tuple):
-		out = Selector(self._connection, list(self.Tables.values()))
+		out = Selector(self._connection, self.tables)
 		return out[tuple]
 
 	@property

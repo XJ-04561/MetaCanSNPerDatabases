@@ -35,9 +35,9 @@ class NewMeta(type):
 
 	__name__ : str
 	__sql_name__ : str
-	
+
 	def __repr__(self):
-		return f"<{self.__bases__[0].__name__} {self.__name__!r} at 0x{id(self):0>16X} {' '.join(map(lambda pair : '{}={!r}'.format(*pair), filter(lambda x:not x[0].startswith('_'), vars(self).items())))}>"
+		return f"<{self.__bases__[0].__name__} {self.__name__!r} at 0x{id(self):0>16X} {' '.join(map(lambda pair : '{}={!r}'.format(*pair), filter(lambda x:not x[0].startswith('_') or x[0] == '__sql_name__', vars(self).items())))}>"
 		
 	def __str__(self):
 		return self.__sql_name__
@@ -52,32 +52,32 @@ class NewMeta(type):
 		return Query(self, left)
 	
 	def __eq__(self, right):
-		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isinstance(right, NewMeta):
+		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isRelated(right, SQLObject):
 			return Comparison(self, "==", right)
 		else:
 			return NotImplemented
 	def __ne__(self, right):
-		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isinstance(right, NewMeta):
+		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isRelated(right, SQLObject):
 			return Comparison(self, "!=", right)
 		else:
 			return NotImplemented
 	def __lt__(self, right):
-		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isinstance(right, NewMeta):
+		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isRelated(right, SQLObject):
 			return Comparison(self, "<", right)
 		else:
 			return NotImplemented
 	def __le__(self, right):
-		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isinstance(right, NewMeta):
+		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isRelated(right, SQLObject):
 			return Comparison(self, "<=", right)
 		else:
 			return NotImplemented
 	def __gt__(self, right):
-		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isinstance(right, NewMeta):
+		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isRelated(right, SQLObject):
 			return Comparison(self, ">", right)
 		else:
 			return NotImplemented
 	def __ge__(self, right):
-		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isinstance(right, NewMeta):
+		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isRelated(right, SQLObject):
 			return Comparison(self, ">=", right)
 		else:
 			return NotImplemented
@@ -101,28 +101,12 @@ class SQLObject(metaclass=NewMeta):
 
 	def __init_subclass__(cls, *, name=None, **kwargs) -> None:
 		super().__init_subclass__(**kwargs)
-		cls.__sql_name__ = name or camel2snake(cls.__name__)
-
-		# types = set(map(lambda x :cls.__annotations__.get(x[0]) if type(x[1]) in [property, cached_property] else type(x[1]), filter(lambda x:isinstance(x[1], (SQLObject, property, cached_property)), vars(cls).items())))
-		
-		# newAttrs = {}
-		# for tp in types:
-		# 	name = tp.__name__[0].lower() + tp.__name__[1:]
-		# 	tupe = tuple(filter(lambda x:isinstance(x, tp), vars(cls).values()))
-		# 	d = dict(filter(lambda x:isinstance(x[1], tp), vars(cls).items()))
-		# 	newAttrs[pluralize(name)] = tupe
-		# 	newAttrs[name + "Lookup"] = d
-		
-		# for name, value in newAttrs:
-		# 	setattr(cls, name, value)
+		cls.__sql_name__ = (name or camel2snake(cls.__name__)).lower()
 
 class ColumnMeta(NewMeta):
 
 	type : str
 
-	def __new__(cls, clsName, bases, namespace, **kwargs):
-		return super().__new__(cls, clsName, bases, namespace)
-	
 	def __sql__(self):
 		return f"{self} {self.type}"
 
@@ -130,16 +114,26 @@ class Column(SQLObject, metaclass=ColumnMeta):
 
 	type : str = SQL_TYPE_NAMES[None]
 
-	def __init_subclass__(cls, *, type : str|Type=None, **kwargs) -> None:
+	def __init_subclass__(cls, *, type : Union[str,ColumnMeta,"SQL_TYPE"]=None, **kwargs) -> None:
 		super().__init_subclass__(**kwargs)
-		if type in SQL_TYPE_NAMES:
+		if isinstance(type, SQL_TYPE):
+			cls.type = type
+		elif type in SQL_TYPE_NAMES:
 			cls.type = SQL_TYPE_NAMES[type]
 		elif isinstance(type, str) and any(type.upper().startswith(name) for name in SQL_TYPES):
 			cls.type = type
 		else:
 			raise TypeError(f"Column type must either be a string or a python type mapped to sql type names in {SQL_TYPES=}." "\n" f"It was instead: {type!r}")
 
-class ColumnAlias(SQLObject, metaclass=ColumnMeta): pass
+class ColumnAlias(SQLObject, metaclass=ColumnMeta):
+
+	type : str
+	fullName : str
+
+	def __init_subclass__(cls, *, original, **kwargs) -> None:
+		super().__init_subclass__(**kwargs)
+		cls.fullName = str(original)
+		cls.type = original.type
 
 class HasColumns:
 	
@@ -157,8 +151,9 @@ class HasTables:
 		super().__init_subclass__(**kwargs)
 		cls.tables = SQLDict(filter(lambda v:isRelated(v, Table), vars(cls).values()))
 
-class SanitizedValue(SQLObject):
+class SanitizedValue(metaclass=NewMeta):
 	
+	__sql_name__ : str = "SanitizedValue"
 	value : Any
 
 	def __init__(self, value : Any):
@@ -170,7 +165,10 @@ class SanitizedValue(SQLObject):
 	
 	@property
 	def params(self):
-		return [self.value]
+		if self.value is not None:
+			return [self.value]
+		else:
+			return []
 
 class Comparison:
 	
@@ -178,10 +176,10 @@ class Comparison:
 	operator : str
 	right : Any
 
-	def __init__(self, left, operator, right):
-		self.left = left
+	def __init__(self, left, operator, right, forceLeft=False, forceRight=False):
+		self.left = SanitizedValue(left) if not isRelated(left, SQLObject) and not forceLeft else left
 		self.operator = operator
-		self.right = SanitizedValue(right) if not isRelated(right, SQLObject) else right
+		self.right = SanitizedValue(right) if not isRelated(right, SQLObject) and not forceRight else right
 
 	def __repr__(self):
 		return f"<Comparison {str(self)!r}>"
@@ -194,10 +192,17 @@ class Comparison:
 	
 	@property
 	def params(self):
+
 		out = []
-		for item in self.content:
-			if hasattr(item, "params"):
-				out.extend(item.params)
+		if hasattr(self.left, "params") and isinstance(self.left, object):
+			value = self.left.params
+			if not isinstance(value, (property, cached_property)):
+				out.extend(self.left.params)
+		if hasattr(self.right, "params") and isinstance(self.right, object):
+			value = self.right.params
+			if not isinstance(value, (property, cached_property)):
+				out.extend(self.right.params)
+		
 		return out
 
 class Assignment:
@@ -236,6 +241,10 @@ class Prefix(type):
 		return self.__name__
 	def __sub__(self, other):
 		return Query(self, other)
+	def __mul__(self, other):
+		return Query(self, ALL, other)
+	def __iter__(self):
+		return iter(Query(self))
 
 class Word(metaclass=Prefix):
 	
@@ -243,7 +252,7 @@ class Word(metaclass=Prefix):
 	sep : str = ", "
 
 	def __init__(self, *args : tuple[Union["Table", Column, "Index", Comparison]], **kwargs : dict[str,Any]):
-		self.content = args + tuple(map(lambda keyVal : Comparison(keyVal[0], "==", keyVal[1]), kwargs.items()))
+		self.content = args + tuple(map(lambda keyVal : Comparison(keyVal[0], "==", keyVal[1], forceLeft=True), kwargs.items()))
 
 	def __sub__(self, other):
 		return Query(self, other)
@@ -256,8 +265,7 @@ class Word(metaclass=Prefix):
 		return f"{self.__class__.__name__} {self.sep.join(map(str, self.content))}" if len(self.content) else ""
 	
 	def __iter__(self):
-		for item in self.content:
-			yield item
+		return iter(Query(self))
 
 	def __sql__(self):
 		return self.__str__()
@@ -265,22 +273,14 @@ class Word(metaclass=Prefix):
 	def __hash__(self):
 		return sql(self).__hash__()
 	
-	# def __format__(self, format_spec : str):
-	# 	if format_spec.endswith("!sql"):
-	# 		return self.__sql__().__format__(format_spec.rstrip("!sql"))
-	# 	elif format_spec.endswith("!r"):
-	# 		return self.__repr__().__format__(format_spec.rstrip("!r"))
-	# 	elif format_spec.endswith("!s"):
-	# 		return self.__str__().__format__(format_spec.rstrip("!s"))
-	# 	else:
-	# 		return self.__str__().__format__(format_spec)
-	
 	@property
 	def params(self):
 		out = []
 		for item in self.content:
-			if hasattr(item, "params"):
-				out.extend(item.params)
+			if hasattr(item, "params") and isinstance(item, object):
+				value = item.params
+				if not isinstance(value, (property, cached_property)):
+					out.extend(value)
 		return out
 		
 class EnclosedWord(Word):
@@ -290,20 +290,28 @@ class EnclosedWord(Word):
 class Query:
 
 	words : tuple[Word] = tuple()
+	sep : str
 
-	def __init__(self, *words : tuple[Word]):
-		self.words = []
-		for word in words:
-			if not isinstance(word, Query):
-				self.words.append(word)
+	def __init__(self, *words : tuple[Word], sep : str=" "):
+		self.sep = sep
+		if len(words) == 1 and isinstance(words[0], tuple):
+			words = words[0]
+		newWords = []
+		for word in map(lambda x:x if not isinstance(x, tuple) else StrTuple(x), words):
+			if isinstance(word, Query):
+				newWords.extend(word.words)
 			else:
-				self.words.extend(word.words)
-		self.words = tuple(self.words)
+				newWords.append(word)
+		self.words = tuple(newWords)
 	
-	@cache
 	def __iter__(self):
-		yield sql(self)
-		yield self.params
+		string = sql(self)
+		params = self.params
+		print(string)
+		print(params)
+		print()
+		yield string
+		yield params
 	
 	def __hash__(self):
 		return hash(self.words)
@@ -313,7 +321,7 @@ class Query:
 
 	def __str__(self):
 		if (ret := QUERY_CACHE.get(hash(self), _NO_KEY_VALUE)) is _NO_KEY_VALUE:
-			ret = QUERY_CACHE[hash(self)] = " ".join(map(format, self.words))
+			ret = QUERY_CACHE[hash(self)] = self.sep.join(map(format, self.words))
 		return ret
 	
 	def __format__(self, format_spec):
@@ -338,7 +346,13 @@ class Query:
 	
 	@property
 	def params(self):
-		return list(map(*this.params, filter(*this.__hasattr__("params"), self.words)))
+		params = []
+		for word in self.words:
+			if hasattr(word, "params") and isinstance(word, object):
+				value = word.params
+				if not isinstance(value, (property, cached_property)):
+					params.extend(word.params)
+		return params
 
 class TableMeta(NewMeta):
 
@@ -349,7 +363,7 @@ class TableMeta(NewMeta):
 
 	def __sql__(self):
 		sep = ",\n\t"
-		return f"{self.__sql_name__} ({sep.join(itertools.chain(map(sql, self.columns), map(sql, self.options)))})"
+		return f"{self.__sql_name__} (\n\t{sep.join(itertools.chain(map(sql, self.columns), map(str, self.options)))}\n)"
 
 class Table(SQLObject, HasColumns, metaclass=TableMeta):
 	
@@ -357,14 +371,21 @@ class Table(SQLObject, HasColumns, metaclass=TableMeta):
 	options : tuple[Query] = ()
 
 	def __init_subclass__(cls, **kwargs):
-		i = 0
-		for name, value in vars(cls).copy().items():
-			if not isRelated(value, Column):
-				continue
-			if name != value.__name__ and not hasattr(cls, value.__name__):
-				setattr(cls, value.__name__, value)
-			setattr(cls, alphabetize(i), ColumnMeta(f"{value.__name__}Alias", (ColumnAlias,), {}, name=alphabetize(i)))
-			i += 1
+		
+		numberOfColumns = sum(map(lambda x:1, filter(lambda x:isRelated(x, Column), vars(cls).values())))
+		for i in range(numberOfColumns):
+			if hasattr(cls, alphabetize(i)):
+				break
+		else:
+			for i, value in enumerate(filter(lambda x:isRelated(x, Column), vars(cls).copy().values())):
+				setattr(cls,
+						alphabetize(i),
+						ColumnMeta(
+							f"{value.__name__}Alias",
+							(ColumnAlias,),
+							{},
+							name=alphabetize(i),
+							original=value))
 		super().__init_subclass__(**kwargs)
 
 	def __init__(self, database):
@@ -393,17 +414,43 @@ class Index(SQLObject, HasColumns, metaclass=IndexMeta):
 	def __sql__(self):
 		return f"{self} ON {self.table}({', '.join(map(str, self.columns))})"
 
-class SQL_TYPE(type):
+class SQL_TYPE:
 	args : tuple
 	def __init__(self, *args):
-		self.arg = args
+		self.args = args
 	def __str__(self):
 		if self.args:
-			return f"{type(self).__name__}({', '.join(self.args)})"
+			return f"{type(self).__name__.replace('_', ' ')}({', '.join(map(str, self.args))})"
 		else:
 			return f"{type(self).__name__}"
 class VARCHAR(SQL_TYPE): pass
 class CHAR(SQL_TYPE): pass
+class INT(SQL_TYPE): pass
+class INTEGER(SQL_TYPE): pass
+class TINYINT(SQL_TYPE): pass
+class SMALLINT(SQL_TYPE): pass
+class MEDIUMINT(SQL_TYPE): pass
+class BIGINT(SQL_TYPE): pass
+class UNSIGNED_BIG_INT(SQL_TYPE): pass
+class INT2(SQL_TYPE): pass
+class INT8(SQL_TYPE): pass
+class CHARACTER(SQL_TYPE): pass
+class VARYING_CHARACTER(SQL_TYPE): pass
+class NCHAR(SQL_TYPE): pass
+class NATIVE_CHARACTER(SQL_TYPE): pass
+class NVARCHAR(SQL_TYPE): pass
+class TEXT(SQL_TYPE): pass
+class CLOB(SQL_TYPE): pass
+class BLOB(SQL_TYPE): pass
+class REAL(SQL_TYPE): pass
+class DOUBLE(SQL_TYPE): pass
+class DOUBLE_PRECISION(SQL_TYPE): pass
+class FLOAT(SQL_TYPE): pass
+class NUMERIC(SQL_TYPE): pass
+class DECIMAL(SQL_TYPE): pass
+class BOOLEAN(SQL_TYPE): pass
+class DATE(SQL_TYPE): pass
+class DATETIME (SQL_TYPE): pass
 
 class ALL(Column, name="*"): pass
 

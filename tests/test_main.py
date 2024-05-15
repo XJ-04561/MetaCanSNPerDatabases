@@ -4,7 +4,6 @@ from SQLOOP import *
 from SQLOOP.core import *
 
 def test_new():
-	from pprint import pprint
 
 	from SQLOOP.core import Column, Table
 
@@ -17,7 +16,7 @@ def test_new():
 		id = IDColumn
 		name = NameColumn
 		special = SpecialColumn
-	pprint(MyTable.columns)
+	
 	assert MyTable.__name__ == "MyTable", f'{MyTable.__name__=} == {"MyTable"=}'
 	assert MyTable.__sql_name__ == "my_table", f'{MyTable.__sql_name__=} == {"my_table"=}'
 	assert MyTable.columns["id"] == MyTable.id, f'{MyTable.columns["id"]=} == {MyTable.id=}'
@@ -66,13 +65,17 @@ def test_database():
 	class Age(Column, type=int): pass
 
 	class PN(Column, type=int): pass
-	class PhoneNumber(Column, type=int): pass
+	class PhoneNumber(Column, type=CHAR(20)): pass
 	class Adress(Column, type=VARCHAR(200)): pass
 
 	class NamesTable(Table):
 		A = ID
 		B = Name
 		C = Age
+
+		options = (
+			PRIMARY - KEY - ID,
+		)
 	
 	class PhoneBookTable(Table):
 		A = PN
@@ -81,13 +84,13 @@ def test_database():
 	
 	class NameIndex(Index):
 		table = NamesTable
-		Name = Name # type: ignore
+		A = Name
 
 	class MyDatabase(Database):
-		NamesTable = NamesTable # type: ignore
-		PhoneBookTable = PhoneBookTable # type: ignore
+		A = NamesTable
+		B = PhoneBookTable
 
-		NameIndex = NameIndex # type: ignore
+		C = NameIndex
 
 	assert NamesTable in MyDatabase.tables
 	assert PhoneBookTable in MyDatabase.tables
@@ -103,8 +106,8 @@ def test_database():
 	assert PhoneBookTable.A in PhoneBookTable
 	assert NamesTable.A in NamesTable
 	
-	assert sql(NamesTable) == "names_table (pn INTEGER, name VARCHAR(100), age INTEGER)"
-	assert sql(PhoneBookTable) == "phone_book_table (pn INTEGER, phone_number INTEGER, age VARCHAR(200))"
+	assert sql(NamesTable) == "names_table (\n\tpn INTEGER,\n\tname VARCHAR(100),\n\tage INTEGER,\n\tPRIMARY KEY pn\n)"
+	assert sql(PhoneBookTable) == "phone_book_table (\n\tpn INTEGER,\n\tphone_number CHAR(20),\n\tadress VARCHAR(200)\n)"
 
 	###############################################################
 
@@ -113,8 +116,10 @@ def test_database():
 	assert not database.valid
 	# Is True if all assertions for a good database holds
 
-	database.fix()
-	# Will attempt to fix all problems which cause assertions to not hold
+	print(database.tablesHash, database.CURRENT_TABLES_HASH)
+	print(database.indexesHash, database.CURRENT_INDEXES_HASH)
+	for ass in database.assertions:
+		print(ass, ass.condition(database=database))
 
 	try:
 		database.exception
@@ -123,3 +128,27 @@ def test_database():
 	# Is the exception that the first broken assertion wants to raise.
 	# Use is:
 	# raise database.exception
+
+	database.fix()
+	# Will attempt to fix all problems which cause assertions to not hold
+
+	print(database.tablesHash, database.CURRENT_TABLES_HASH)
+	print(database.indexesHash, database.CURRENT_INDEXES_HASH)
+	print(list(database(*SELECT - ALL - FROM - SQLITE_MASTER)))
+	for ass in database.assertions:
+		print(ass, ass.condition(database=database))
+	
+	assert database.valid
+
+	assert list(database(SELECT * FROM - PhoneBookTable)) == []
+	database(INSERT - INTO - PhoneBookTable - (PN, Name, Age) - VALUES - (1, "Eddrik Reensen", "69"))
+	database(INSERT - INTO - PhoneBookTable - (PN, Name, Age) - VALUES - (2, "Brunhilda Brunson", "68"))
+	
+	database(INSERT - INTO - PhoneBookTable - (PN, PhoneNumber, Adress) - VALUES - (1, "+46731234567", "Råttgränd 90"))
+	database(INSERT - INTO - PhoneBookTable - (PN, PhoneNumber, Adress) - VALUES - (1, "+46733025383", "Klintvägen 69"))
+
+	assert list(*database[PN][NamesTable]) == [1,2]
+	assert list(*database[Name][NamesTable]) == ["Eddrik Reensen", "Brunhilda Brunson"]
+	assert list(*database[PhoneNumber][Name == "Eddrik Reensen"]) == ["+46731234567", "+46733025383"]
+
+	

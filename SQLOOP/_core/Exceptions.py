@@ -24,13 +24,16 @@ class Assertion:
 
 class SchemaNotEmpty(Assertion):
 	@classmethod
-	def exception(self, database) -> Exception:
+	def exception(self, database : "Database") -> Exception:
 		return DatabaseSchemaEmpty("Database is empty.")
 	@classmethod
-	def condition(self, database) -> bool:
-		return database._connection(f"SELECT COUNT(*) FROM sqlite_master;").fetchone()[0] != 0
+	def condition(self, database : "Database") -> bool:
+		from SQLOOP._core.Words import SELECT, FROM, SQLITE_MASTER
+		from SQLOOP._core.Structures import ALL
+		from SQLOOP._core.Aggregates import COUNT
+		return database(SELECT - COUNT (ALL) - FROM - SQLITE_MASTER)[0] != 0
 	@classmethod
-	def rectify(self, database) -> None:
+	def rectify(self, database : "Database") -> None:
 		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT
 		from SQLOOP._core.Structures import sql
 		database(BEGIN - TRANSACTION)
@@ -41,13 +44,13 @@ class SchemaNotEmpty(Assertion):
 
 class ValidTablesSchema(Assertion):
 	@classmethod
-	def exception(cls, database) -> Exception:
+	def exception(cls, database : "Database") -> Exception:
 		return SchemaTablesMismatch(f"Tables are constructed differently to the current version (Database table schema hash:{database.tablesHash:X} | Current version hash: {database.CURRENT_TABLES_HASH:X}).")
 	@classmethod
-	def condition(cls, database) -> bool:
+	def condition(cls, database : "Database") -> bool:
 		return database.tablesHash == database.CURRENT_TABLES_HASH
 	@classmethod
-	def rectify(cls, database) -> None:
+	def rectify(cls, database : "Database") -> None:
 		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, ALL, FROM, DROP, INDEX
 		from SQLOOP._core.Structures import sql
 		database(BEGIN - TRANSACTION)
@@ -61,7 +64,7 @@ class ValidTablesSchema(Assertion):
 			database(CREATE - INDEX - sql(index))
 		database(COMMIT)
 		database(BEGIN - TRANSACTION)
-		for (table,) in database._connection.execute("SELECT name FROM sqlite_master WHERE type='table';"):
+		for (table,) in database("SELECT name FROM sqlite_master WHERE type='table';"):
 			if not any(table == validTable.name for validTable in database.tables):
 				database(DROP - TABLE - table)
 		database(PRAGMA (user_version = database.CURRENT_VERSION))
@@ -69,13 +72,13 @@ class ValidTablesSchema(Assertion):
 
 class ValidIndexesSchema(Assertion):
 	@classmethod
-	def exception(cls, database) -> Exception:
+	def exception(cls, database : "Database") -> Exception:
 		return SchemaIndexesMismatch(f"Indexes are constructed differently to the current version (Database index schema hash:{database.indexesHash:X} | Current version hash: {database.CURRENT_INDEXES_HASH:X}).")
 	@classmethod
-	def condition(cls, database) -> bool:
+	def condition(cls, database : "Database") -> bool:
 		return database.indexesHash == database.CURRENT_INDEXES_HASH
 	@classmethod
-	def rectify(cls, database) -> None:
+	def rectify(cls, database : "Database") -> None:
 		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, ALL, FROM, DROP, INDEX
 		from SQLOOP._core.Structures import sql
 		database(BEGIN - TRANSACTION)
@@ -84,3 +87,7 @@ class ValidIndexesSchema(Assertion):
 			database(CREATE - INDEX - sql(index))
 		database(PRAGMA (user_version = database.CURRENT_VERSION))
 		database(COMMIT)
+try:
+	from SQLOOP._core.Databases import Database
+except:
+	pass

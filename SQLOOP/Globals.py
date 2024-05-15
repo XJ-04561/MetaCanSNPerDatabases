@@ -17,6 +17,16 @@ from PseudoPathy.PathShortHands import *
 from SQLOOP._core.Exceptions import *
 from This import this
 
+class StrTuple(tuple):
+	def __new__(cls, *args, **kwargs):
+		if args:
+			super.__new__(cls, map(lambda x:x if not isinstance(x, tuple) else StrTuple(x), args[0]), *(args[1:]), **kwargs)
+		else:
+			return super().__new__(cls, *args, **kwargs)
+
+	def __str__(self):
+		return f"({', '.join(map(str, self))})"
+
 class Nothing:
 	def __eq__(self, other):
 		return False
@@ -32,21 +42,79 @@ class All(Iterator): pass
 
 class sql(str):
 	def __new__(cls, obj):
-		return obj.__sql__()
+		if isinstance(obj, type):
+			return type(obj).__sql__(obj)
+		else:
+			return obj.__sql__()
 	
 class NoHash:
 	def __eq__(self, other): return True
 
-class classProperty(property):
+class ClassProperty:
+
+	owner : type
+	name : str
+	fget : Callable
+	fset : Callable
+	fdel : Callable
+
+	def __init__(self, fget, fset=None, fdel=None, doc=None):
+		self.fget = fget
+		self.fset = fset
+		self.fdel = fdel
+		
+		self.__doc__ = doc if doc else fget.__doc__
+	
+	def __get__(self, instance, owner=None):
+		return self.fget(instance or owner)
+	
+	def __set__(self, instance, value):
+		self.fset(instance, value)
+	
+	def __delete__(self, instance):
+		self.fdel(instance)
+	
+	def __set_name__(self, owner, name):
+		self.owner = owner
+		self.name = name
+	
+	def __repr__(self):
+		return f"{object.__repr__(self)[:-1]} name={self.name!r}>"
+
+
+class CachedClassProperty:
+
+	def __init__(self, func):
+		self.func = func
 
 	def __get__(self, instance, owner=None):
 		if instance is None and owner is not None:
-			return super().__get__(self, owner)
+			if self.name in owner.__dict__:
+				return owner.__dict__[self.name]
+			ret = self.func(owner)
+			setattr(owner, self.name, ret)
+			return ret
 		else:
-			return super().__get__(self, instance)
+			if self.name in instance.__dict__:
+				return instance.__dict__[self.name]
+			ret = self.func(instance)
+			setattr(instance, self.name, ret)
+			return ret
+	
+	def __set__(self, instance, value):
+		instance.__dict__ = value
+	
+	def __delete__(self, instance):
+		del instance.__dict__[self.name]
+
+	def __set_name__(self, owner, name):
+		self.name = name
+		
+	def __repr__(self):
+		return f"{object.__repr__(self)[:-1]} name={self.name!r}>"
 
 allCapsSnakecase = re.compile("^[A-Z_0-9]+$")
-snakeCase = re.compile("^[a-zA-Z_0-9]+$")
+snakeCase = re.compile("^[a-z_0-9]+$")
 camelKiller = re.compile(r"(?<=[^A-Z])(?=[A-Z])")
 
 camelCase = re.compile("^[^_]+$")
@@ -74,17 +142,26 @@ class SQLDict(dict):
 		"""
 		if iterable is None:
 			super().__init__((), *args, **kwargs)
-		elif hasattr(iterable, "__iter__") and all(map(lambda x:hasattr(x, "__len__"), iterable)) and all(map(lambda x:len(x) == 2, iterable)):
+		elif not hasattr(iterable, "__iter__") and not hasattr(iterable, "__next__"):
 			super().__init__(iterable, *args, **kwargs)
 		else:
-			super().__init__(map(lambda x:(str(x),x), iterable), *args, **kwargs)
+			data = list(iterable)
+			if all(map(lambda x:hasattr(x, "__len__"), data)) and all(map(lambda x:len(x) == 2, data)):
+				super().__init__(data, *args, **kwargs)
+			else:
+				super().__init__(list(map(lambda x:(str(x),x), data)), *args, **kwargs)
 	
 	def __iter__(self):
 		return iter(self.values())
 	
 	def __contains__(self, item):
+		from SQLOOP._core.Structures import ColumnAlias
 		if isinstance(item, str):
 			return super().__contains__(item)
+		elif isRelated(item, ColumnAlias):
+			return super().__contains__(item.fullName)
+		elif hasattr(item, "__sql__"):
+			return super().__contains__(str(item))
 		else:
 			return item in self.values()
 	
@@ -109,6 +186,9 @@ class SQLDict(dict):
 			raise IndexError(f"Position {key} is out of range in {self!r} that has a length of {len(self)}")
 		else:
 			return super().__getitem__(key)
+	
+	def append(self, item):
+		super().__setitem__(str(item), item)
 
 @cache
 def alphabetize(n : int):
