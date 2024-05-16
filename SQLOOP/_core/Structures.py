@@ -103,6 +103,31 @@ class SQLObject(metaclass=NewMeta):
 		super().__init_subclass__(**kwargs)
 		cls.__sql_name__ = (name or camel2snake(cls.__name__)).lower()
 
+class Hardcoded:
+
+	value : Any
+
+	def __init__(self, value) -> None:
+		self.value = value
+		if hasattr(value, "__doc__"):
+			self.__doc__ = value.__doc__
+	
+	def __str__(self):
+		if isinstance(self.value, str):
+			return f"'{self.value}'"
+		else:
+			return str(self.value)
+	
+	def __sub__(self, right):
+		return Query(self, right)
+	
+	def __rsub__(self, left):
+		return Query(left, self)
+	
+	@property
+	def params(self):
+		return []
+
 class ColumnMeta(NewMeta):
 
 	type : str
@@ -207,18 +232,28 @@ class Comparison:
 
 class Assignment:
 	
-	variable : str|Column
-	value : Any
+	left : str|Column
+	right : Any
 
-	def __init__(self, variable : str|Column, value : Any):
-		self.variable = variable
-		self.value = value
+	def __init__(self, left : str|Column, right : Any, hardcode=False):
+		self.left = left
+		if hardcode:
+			self.right = Hardcoded(right)
+		else:
+			self.right = right
 
 	def __repr__(self):
 		return f"<Assignment {str(self)!r}>"
 
 	def __str__(self):
-		return f"{self.variable} = {self.value}"
+		return f"{self.left} = {self.right if isinstance(self.right , Hardcoded) else '?'}"
+	
+	@property
+	def params(self):
+		if not isinstance(self.right, (SQLObject, NewMeta, Hardcoded)):
+			return [self.right]
+		elif hasattr(self.right, "params"):
+			return self.right.params
 
 T = TypeVar("T")
 def first(iterator : Iterable[T]|Iterator[T]) -> T|None:
@@ -239,12 +274,20 @@ class Prefix(type):
 
 	def __str__(self):
 		return self.__name__
-	def __sub__(self, other):
-		return Query(self, other)
+	def __sub__(self, right):
+		return Query(self, right)
+	def __rsub__(self, left):
+		return Query(left, self)
 	def __mul__(self, other):
 		return Query(self, ALL, other)
 	def __iter__(self):
 		return iter(Query(self))
+
+class PragmaMeta(Prefix):
+	def __sub__(self, right):
+		if isinstance(right, str):
+			return Query(self, Hardcoded(right))
+		return Query(self, right)
 
 class Word(metaclass=Prefix):
 	
@@ -297,7 +340,7 @@ class Query:
 		if len(words) == 1 and isinstance(words[0], tuple):
 			words = words[0]
 		newWords = []
-		for word in map(lambda x:x if not isinstance(x, tuple) else StrTuple(x), words):
+		for word in map(lambda x:x if not isinstance(x, tuple) else SQLTuple(x), words):
 			if isinstance(word, Query):
 				newWords.extend(word.words)
 			else:
@@ -307,9 +350,6 @@ class Query:
 	def __iter__(self):
 		string = sql(self)
 		params = self.params
-		print(string)
-		print(params)
-		print()
 		yield string
 		yield params
 	
@@ -328,11 +368,9 @@ class Query:
 		return f"({format(str(self), format_spec)})"
 
 	def __sub__(self, right : Self|Word):
-		from SQLOOP._core.Words import FROM
 		return Query(self, right)
 	
 	def __rsub__(self, left : Self|Word):
-		from SQLOOP._core.Words import FROM
 		return Query(self, left)
 
 	def __mult__(self, right):
@@ -372,6 +410,9 @@ class Table(SQLObject, HasColumns, metaclass=TableMeta):
 
 	def __init_subclass__(cls, **kwargs):
 		
+		if any(not any(isinstance(word, (SQLTuple, Query)) for word in opt.words) for opt in cls.options):
+			sep = "\n"
+			raise ValueError(f"All table options must contain a tuple of columns/an expression. These did not: {sep.join(filter(lambda opt:any(not any(isinstance(word, (SQLTuple, Query)) for word in opt.words),cls.options)))}")
 		numberOfColumns = sum(map(lambda x:1, filter(lambda x:isRelated(x, Column), vars(cls).values())))
 		for i in range(numberOfColumns):
 			if hasattr(cls, alphabetize(i)):
@@ -404,15 +445,17 @@ class Table(SQLObject, HasColumns, metaclass=TableMeta):
 
 class IndexMeta(NewMeta):
 
+	table : Any
+
 	def __sql__(self):
-		return f"{self} ON {self.table}({', '.join(map(str, self.columns))})"
+		return f"{self} ON {self.table} ({', '.join(map(str, self.columns))})"
 
 class Index(SQLObject, HasColumns, metaclass=IndexMeta):
 
 	table : Any
 
 	def __sql__(self):
-		return f"{self} ON {self.table}({', '.join(map(str, self.columns))})"
+		return f"{self} ON {self.table} ({', '.join(map(str, self.columns))})"
 
 class SQL_TYPE:
 	args : tuple

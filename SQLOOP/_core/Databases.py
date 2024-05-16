@@ -13,26 +13,37 @@ class Fetcher:
 	cols : int
 	resultsLength : int
 
-	def __new__(cls, *args, **kwargs):
-		obj = super().__new__(cls, *args, **kwargs)
-		if all(map(lambda x:isRelated(x, Aggregate), itertools.islice(obj.query.words, 1, obj.cols))):
+	def __new__(cls, connection : sqlite3.Connection, query : Query, *args, **kwargs):
+		
+		assert len(query.words) > 0, "Query must not be empty."
+		obj = super().__new__(cls)
+		obj.__init__(connection, query)
+		if obj.singlet:
 			return next(obj)
-		else:
-			return obj
+		return super().__new__(cls)
 
 	def __init__(self, connection : sqlite3.Connection, query : Query):
+		if getattr(self, "_connection", None) is connection:
+			return
 		self._connection = connection
 		self._cursor = self._connection.execute(*query)
 		self.query = query
 		self.position = 0
 	
+	def __iter__(self):
+		return self
+
 	def __next__(self):
+		if not self.position < self.resultsLength:
+			raise StopIteration()
 		match self.cols:
 			case None:
 				raise StopIteration()
 			case 1:
+				self.position += 1
 				return next(self._cursor)[0]
 			case _:
+				self.position += 1
 				return next(self._cursor)
 	
 	def __getitem__(self, rowNumber) -> Any|tuple[Any]:
@@ -48,21 +59,37 @@ class Fetcher:
 		else:
 			return self._connection.execute(*self.query - LIMIT(rowNumber,rowNumber)).fetchone()
 	
+	def __len__(self):
+		return self.resultsLength
+
 	@cached_property
 	def cols(self):
 		if isinstance(self.query.words[0], SELECT):
 			return len(self.query.words[0].content)
 		elif self.query.words[0] is SELECT:
-			return sum(map(lambda x:1, itertools.takewhile(lambda x:not isRelated(x, Word), itertools.islice(self.query.words, 1, None))))
+			return sum(map(lambda x:1, itertools.takewhile(lambda x:not isRelated(x, Word) or isinstance(x, Aggregate), itertools.islice(self.query.words, 1, None))))
 		else:
 			return None
 	
 	@cached_property
-	def resultsLength(self):
+	def singlet(self):
 		if isinstance(self.query.words[0], SELECT):
-			return self._connection.execute(*Query(SELECT(COUNT(ALL)), self.query.words[1:])).fetchone()[0]
+			if all(map(lambda x:isinstance(x, Aggregate), self.query.words[0].content)):
+				return True
+			return self._connection.execute(*Query(SELECT(COUNT(ALL)), *self.query.words[1:])).fetchone()[0]
 		elif self.query.words[0] is SELECT:
-			return self._connection.execute(*Query(SELECT(COUNT(ALL)), itertools.dropwhile(lambda x:not isRelated(x, Word) and not isinstance(x, Aggregate), itertools.islice(self.query.words, 1, None)))).fetchone()[0]
+			if all(map(lambda x:isinstance(x, Aggregate), itertools.islice(self.query.words, 1, self.cols+1))):
+				return True
+		return False
+
+	@cached_property
+	def resultsLength(self):
+		if self.singlet:
+			return 1
+		if isinstance(self.query.words[0], SELECT):
+			return self._connection.execute(*Query(SELECT(COUNT(ALL)), *self.query.words[1:])).fetchone()[0]
+		elif self.query.words[0] is SELECT:
+			return self._connection.execute(*Query(SELECT(COUNT(ALL)), *itertools.dropwhile(lambda x:not isRelated(x, Word) or isinstance(x, Aggregate), itertools.islice(self.query.words, 1, None)))).fetchone()[0]
 		else:
 			return 0
 
@@ -87,6 +114,8 @@ class Selector:
 		self.wheres = tuple()
 	
 	def __iter__(self):
+		from pprint import pprint
+		pprint(list(SELECT (*self.columns) - FROM (*self.tables) - WHERE (*self.wheres) - self.appended))
 		return Fetcher(self.database._connection, SELECT (*self.columns) - FROM (*self.tables) - WHERE (*self.wheres) - self.appended)
 
 	def __sub__(self, append : Word|Query):
@@ -100,6 +129,8 @@ class Selector:
 	def __getitem__(self, comparisons : tuple[Comparison]): ...
 	@final
 	def __getitem__(self, items : tuple[Column|Table|Comparison]):
+		if not isinstance(items, tuple):
+			items = (items,)
 		if isRelated(items[0], Column):
 			assert len(set(items).difference(self.databaseColumns)) == 0, f"Given columns don't exist in the database: {set(items).difference(self.databaseColumns)}"
 			from SQLOOP._core.Functions import getSmallestFootprint
@@ -133,7 +164,7 @@ class Selector:
 		else:
 			raise NoMatchingDefinition(self.__qualname__+".__getitem__", items)
 		return self
-
+DEBUG = False
 class Database:
 	"""Usage:
 	```python
@@ -171,10 +202,10 @@ class Database:
 	
 	@ClassProperty
 	def CURRENT_TABLES_HASH(self) -> int:
-		return hash(whitespacePattern.sub(" ", "; ".join(map(sql, self.tables))))
+		return hash(whitespacePattern.sub(" ", "; ".join(sorted(map(sql, self.tables)))))
 	@ClassProperty
 	def CURRENT_INDEXES_HASH(self) -> int:
-		return hash(whitespacePattern.sub(" ", "; ".join(map(sql, self.indexes))))
+		return hash(whitespacePattern.sub(" ", "; ".join(sorted(map(sql, self.indexes)))))
 
 	LOG = logging.Logger(SOFTWARE_NAME, level=logging.FATAL)
 
@@ -194,6 +225,7 @@ class Database:
 	"""A look-up list of assertions and the exceptions to be raised should the assertion fail. Assertions are checked last to first."""
 
 	def __init__(self, filename : str, mode : Mode):
+
 		if type(self) is Database:
 			raise NotImplementedError("The base Database class is not to be used, please subclass `Database` with your own appropriate tables and indexes.")
 		self.mode = mode
@@ -252,29 +284,38 @@ class Database:
 	def __repr__(self):
 		string = [f"<{self.__class__.__name__} at {hex(id(self))} version={self.__version__} tablesHash={self.tablesHash:X}>"]
 		for table in self.tables:
-			string.append(f"\t<Table.{table.__name__} rows={self(SELECT - COUNT(ALL) - FROM(table))} columns={table.columns}>")
+			string.append(
+				f"\t<Table.{table.__name__} rows={self(SELECT - COUNT(ALL) - FROM(table)) if self(SELECT - COUNT(ALL) - FROM - SQLITE_MASTER - WHERE (type='table', name=str(table))) == 1 else 'N/A'} columns={table.columns}>")
 		string.append(f"</{self.__class__.__name__}>")
 		return "\n".join(string)
 
 	@overload
-	def __call__(self, query : Query|Word|type[Word]) -> Generator[tuple[Any],None,None]: ...
+	def __call__(self, query : Query|Word|type[Word]) -> Generator[tuple[Any],None,None]|Any|None: ...
 	@overload
-	def __call__(self, query : str, params : list[Any]) -> Generator[tuple[Any],None,None]: ...
+	def __call__(self, query : str, params : list[Any]) -> Generator[tuple[Any],None,None]|Any|None: ...
 	@final
-	def __call__(self, query : str|Query|Word|type[Word], params : list[Any]=[]) -> Generator[tuple[Any],None,None]:
+	def __call__(self, query : str|Query|Word|type[Word], params : list[Any]=[]) -> Generator[tuple[Any],None,None]|Any|None:
 		if isinstance(query, str):
-			for row in self._connection.execute(query, params):
-				yield row
+			if query.strip().lower().startswith("select"):
+				return (row for row in self._connection.execute(query, params))
+			else:
+				self._connection.execute(query, params)
+				return None
 		elif isinstance(query, Query):
-			return Fetcher(self._connection, query)
+			if isinstance(query.words[0] , SELECT) or query.words[0] is SELECT:
+				return Fetcher(self._connection, query)
+			else:
+				self._connection.execute(*query)
+				return None
 		elif isinstance(query, (Word, type(Word))):
-			return Fetcher(self._connection, Query(query))
+			self._connection.execute(*Query(query))
+			return None
 		else:
 			raise ValueError(f"Trying to call database with seomthing other than a 'str' or a 'Query' object.\ndatabase({query}, {params})")
 			
 
 	def __getitem__(self, tuple):
-		out = Selector(self._connection, self.tables)
+		out = Selector(self)
 		return out[tuple]
 
 	@property
@@ -288,12 +329,13 @@ class Database:
 	@property
 	def valid(self):
 		"""Check if all of the class-specific assertions hold."""
-		return all(map(*this.condition(database=self), self.assertions))
+		return all(map(*this.condition(self), self.assertions))
 
 	def fix(self):
 		"""Apply the pre-defined fix for all class-specified assertions."""
-		for assertion in filter(*this.condition(database=self), self.assertions):
-			assertion.rectify(self)
+		for assertion in self.assertions:
+			if not assertion.condition(self):
+				assertion.rectify(self)
 
 	@property
 	def exception(self):
@@ -304,14 +346,12 @@ class Database:
 	@property
 	def indexesHash(self) -> int:
 		"""md5 hash of the original SQL text that created all indexes in the database."""
-		from SQLOOP._core.Functions import hashQuery
-		return hashQuery(self, SELECT(SQL) - FROM - SQLITE_MASTER - WHERE (type='index') - ORDER - BY(SQL - DESC))
+		return hash(whitespacePattern.sub(" ", "; ".join(sorted(map(lambda s:tableCreationCommand.sub("",s), self(SELECT - SQL - FROM - SQLITE_MASTER - WHERE (type='index')))))))
 
 	@property
 	def tablesHash(self) -> int:
 		"""md5 hash of the original SQL text that created all tables in the database."""
-		from SQLOOP._core.Functions import hashQuery
-		return hashQuery(self, SELECT(SQL) - FROM - SQLITE_MASTER - WHERE (type='table') - ORDER - BY(SQL - DESC))
+		return hash(whitespacePattern.sub(" ", "; ".join(sorted(map(lambda s:tableCreationCommand.sub("",s), self(SELECT - SQL - FROM - SQLITE_MASTER - WHERE (type='table')))))))
 
 	def createIndex(self : Self, index : Index) -> bool:
 		"""Create a given Index-object inside the database. Returns True if succesfull, returns False otherwise."""

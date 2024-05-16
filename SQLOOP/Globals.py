@@ -17,15 +17,29 @@ from PseudoPathy.PathShortHands import *
 from SQLOOP._core.Exceptions import *
 from This import this
 
-class StrTuple(tuple):
+tableCreationCommand = re.compile(r"^\W*CREATE\W+(TEMP|TEMPORARY\W)?\W*(TABLE|INDEX)(\W+IF\W+NOT\W+EXISTS)?\W+(\w[.])?", flags=re.ASCII|re.IGNORECASE)
+
+class SQLTuple(tuple):
 	def __new__(cls, *args, **kwargs):
 		if args:
-			super.__new__(cls, map(lambda x:x if not isinstance(x, tuple) else StrTuple(x), args[0]), *(args[1:]), **kwargs)
+			return super().__new__(cls, map(lambda x:x if not isinstance(x, tuple) else SQLTuple(x), args[0]), *(args[1:]), **kwargs)
 		else:
 			return super().__new__(cls, *args, **kwargs)
-
+	
 	def __str__(self):
-		return f"({', '.join(map(str, self))})"
+		from SQLOOP._core.Structures import SQLObject, NewMeta, Hardcoded
+		return f"({', '.join(map(lambda x:str(x) if isinstance(x, (Hardcoded, SQLObject, NewMeta, SQLTuple)) else "?", self))})"
+	
+	@property
+	def params(self):
+		from SQLOOP._core.Structures import Hardcoded, SQLObject, NewMeta
+		out = []
+		for item in self:
+			if not isinstance(item, (Hardcoded, SQLObject, NewMeta)):
+				out.append(item)
+			elif hasattr(item, "params"):
+				out.extend(item.params)
+		return out
 
 class Nothing:
 	def __eq__(self, other):

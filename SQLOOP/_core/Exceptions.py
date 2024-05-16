@@ -31,11 +31,12 @@ class SchemaNotEmpty(Assertion):
 		from SQLOOP._core.Words import SELECT, FROM, SQLITE_MASTER
 		from SQLOOP._core.Structures import ALL
 		from SQLOOP._core.Aggregates import COUNT
-		return database(SELECT - COUNT (ALL) - FROM - SQLITE_MASTER)[0] != 0
+		res = database(SELECT - COUNT (ALL) - FROM - SQLITE_MASTER)
+		return database(SELECT - COUNT (ALL) - FROM - SQLITE_MASTER) != 0
 	@classmethod
 	def rectify(self, database : "Database") -> None:
 		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT
-		from SQLOOP._core.Structures import sql
+		from SQLOOP.Globals import sql
 		database(BEGIN - TRANSACTION)
 		for table in database.tables:
 			database(CREATE - TABLE - sql(table))
@@ -52,9 +53,10 @@ class ValidTablesSchema(Assertion):
 	@classmethod
 	def rectify(cls, database : "Database") -> None:
 		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, ALL, FROM, DROP, INDEX
-		from SQLOOP._core.Structures import sql
+		from SQLOOP.Globals import sql
+		if not database.clearIndexes():
+			raise DatabaseError("Could not clear indexes!")
 		database(BEGIN - TRANSACTION)
-		database.clearIndexes()
 		for table in database.tables:
 			database(ALTER - TABLE - table - RENAME - TO - f"{table}2")
 			database(CREATE - TABLE - sql(table))
@@ -65,7 +67,7 @@ class ValidTablesSchema(Assertion):
 		database(COMMIT)
 		database(BEGIN - TRANSACTION)
 		for (table,) in database("SELECT name FROM sqlite_master WHERE type='table';"):
-			if not any(table == validTable.name for validTable in database.tables):
+			if table not in database.tables:
 				database(DROP - TABLE - table)
 		database(PRAGMA (user_version = database.CURRENT_VERSION))
 		database(COMMIT)
@@ -79,12 +81,13 @@ class ValidIndexesSchema(Assertion):
 		return database.indexesHash == database.CURRENT_INDEXES_HASH
 	@classmethod
 	def rectify(cls, database : "Database") -> None:
-		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, ALL, FROM, DROP, INDEX
-		from SQLOOP._core.Structures import sql
+		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, ALL, FROM, DROP, INDEX, IF, NOT, EXISTS
+		from SQLOOP.Globals import sql
+		if not database.clearIndexes():
+			raise DatabaseError("Could not clear indexes!")
 		database(BEGIN - TRANSACTION)
-		database.clearIndexes()
 		for index in database.indexes:
-			database(CREATE - INDEX - sql(index))
+			database(CREATE - INDEX - IF - NOT - EXISTS - sql(index))
 		database(PRAGMA (user_version = database.CURRENT_VERSION))
 		database(COMMIT)
 try:

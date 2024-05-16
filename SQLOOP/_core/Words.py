@@ -8,7 +8,7 @@ class ROLLBACK(Word): pass
 class IN(Word): pass
 class TRANSACTION(Word): pass
 class COMMIT(Word): pass
-class PRAGMA(Word):
+class PRAGMA(Word, metaclass=PragmaMeta):
 	@overload
 	def __init__(self, *columns : tuple[Column]):
 		...
@@ -24,7 +24,7 @@ class PRAGMA(Word):
 		elif len(assignments) > 0:
 			content = []
 			for variable, value in assignments.items():
-				content.append(Assignment(variable, value))
+				content.append(Assignment(variable, value, hardcode=True))
 			self.content = tuple(content)
 		else:
 			raise ValueError("PRAGMA what? Nothing provided to PRAGMA.")

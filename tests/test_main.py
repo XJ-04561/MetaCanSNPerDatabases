@@ -74,7 +74,7 @@ def test_database():
 		C = Age
 
 		options = (
-			PRIMARY - KEY - ID,
+			PRIMARY - KEY - (ID,),
 		)
 	
 	class PhoneBookTable(Table):
@@ -106,7 +106,7 @@ def test_database():
 	assert PhoneBookTable.A in PhoneBookTable
 	assert NamesTable.A in NamesTable
 	
-	assert sql(NamesTable) == "names_table (\n\tpn INTEGER,\n\tname VARCHAR(100),\n\tage INTEGER,\n\tPRIMARY KEY pn\n)"
+	assert sql(NamesTable) == "names_table (\n\tpn INTEGER,\n\tname VARCHAR(100),\n\tage INTEGER,\n\tPRIMARY KEY (pn)\n)"
 	assert sql(PhoneBookTable) == "phone_book_table (\n\tpn INTEGER,\n\tphone_number CHAR(20),\n\tadress VARCHAR(200)\n)"
 
 	###############################################################
@@ -116,11 +116,6 @@ def test_database():
 	assert not database.valid
 	# Is True if all assertions for a good database holds
 
-	print(database.tablesHash, database.CURRENT_TABLES_HASH)
-	print(database.indexesHash, database.CURRENT_INDEXES_HASH)
-	for ass in database.assertions:
-		print(ass, ass.condition(database=database))
-
 	try:
 		database.exception
 	except Exception as e:
@@ -129,26 +124,35 @@ def test_database():
 	# Use is:
 	# raise database.exception
 
+	# print(database.tablesHash, database.CURRENT_TABLES_HASH)
+	# print(database.indexesHash, database.CURRENT_INDEXES_HASH)
+
 	database.fix()
 	# Will attempt to fix all problems which cause assertions to not hold
 
-	print(database.tablesHash, database.CURRENT_TABLES_HASH)
-	print(database.indexesHash, database.CURRENT_INDEXES_HASH)
-	print(list(database(*SELECT - ALL - FROM - SQLITE_MASTER)))
-	for ass in database.assertions:
-		print(ass, ass.condition(database=database))
+	# print(database.tablesHash, database.CURRENT_TABLES_HASH)
+	# print(database.indexesHash, database.CURRENT_INDEXES_HASH)
+	# for string in database(SELECT - SQL - FROM - SQLITE_MASTER):
+	# 	if "INDEX" in string:
+	# 		print(hash(sql(database.indexes[string.split("(")[0].strip().split()[-3]])), sql(database.indexes[string.split("(")[0].strip().split()[-3]]))
+	# 	elif "TABLE" in string:
+	# 		print(hash(sql(database.tables[string.split("(")[0].strip().split()[-1]])), sql(database.tables[string.split("(")[0].strip().split()[-1]]))
+		
+	# 	print(hash(tableCreationCommand.sub("", string)), tableCreationCommand.sub("", string))
+	# for ass in database.assertions:
+	# 	print(ass, ass.condition(database=database))
 	
 	assert database.valid
 
 	assert list(database(SELECT * FROM - PhoneBookTable)) == []
-	database(INSERT - INTO - PhoneBookTable - (PN, Name, Age) - VALUES - (1, "Eddrik Reensen", "69"))
-	database(INSERT - INTO - PhoneBookTable - (PN, Name, Age) - VALUES - (2, "Brunhilda Brunson", "68"))
+	database(INSERT - INTO - NamesTable - (PN, Name, Age) - VALUES - (1, "Eddrik Reensen", 69))
+	database(INSERT - INTO - NamesTable - (PN, Name, Age) - VALUES - (2, "Brunhilda Brunson", 68))
 	
 	database(INSERT - INTO - PhoneBookTable - (PN, PhoneNumber, Adress) - VALUES - (1, "+46731234567", "Råttgränd 90"))
 	database(INSERT - INTO - PhoneBookTable - (PN, PhoneNumber, Adress) - VALUES - (1, "+46733025383", "Klintvägen 69"))
 
-	assert list(*database[PN][NamesTable]) == [1,2]
-	assert list(*database[Name][NamesTable]) == ["Eddrik Reensen", "Brunhilda Brunson"]
-	assert list(*database[PhoneNumber][Name == "Eddrik Reensen"]) == ["+46731234567", "+46733025383"]
+	assert list(database[PN][NamesTable]) == [1,2]
+	assert list(database[Name][NamesTable]) == ["Eddrik Reensen", "Brunhilda Brunson"]
+	assert list(database[ALL][Name == "Eddrik Reensen"]) == [(1, "+46731234567", "Råttgränd 90"), (1, "+46733025383", "Klintvägen 69")]
 
 	
