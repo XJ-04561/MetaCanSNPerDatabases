@@ -7,6 +7,9 @@ from SQLOOP._core.Tree import *
 from SQLOOP._core.Functions import *
 from SQLOOP._core.Exceptions import *
 
+def newColumn(name : str|Column, table : type[Table]=None):
+	return NewMeta(name if isinstance(name, str) else str(name), (LinkedColumn,), {}, table=table)
+
 def createTempTable() -> type[Table]:
 	class TempTable(Table):
 		

@@ -139,8 +139,10 @@ class Column(SQLObject, metaclass=ColumnMeta):
 
 	type : str = SQL_TYPE_NAMES[None]
 
-	def __init_subclass__(cls, *, type : Union[str,ColumnMeta,"SQL_TYPE"]=None, **kwargs) -> None:
+	def __init_subclass__(cls, *, type : Union[str,ColumnMeta,"SQL_TYPE"]=None, table=None, **kwargs) -> None:
 		super().__init_subclass__(**kwargs)
+		if table is not None:
+			cls.__sql_name__ = f"{table}.{cls.__sql_name__}"
 		if isinstance(type, SQL_TYPE):
 			cls.type = type
 		elif type in SQL_TYPE_NAMES:
@@ -452,7 +454,10 @@ class Table(SQLObject, HasColumns, metaclass=TableMeta):
 							{},
 							name=alphabetize(i),
 							original=value))
-		cls.__doc__ += "\n".join(["```python", *(f"{cls.__name__}.{name} = {col.__name__} # {col}" for name, col in vars(cls).items() if isRelated(col, Column)), "```"])
+		if cls.__doc__ is not None:
+			cls.__doc__ += "\n".join(["```python", *(f"{cls.__name__}.{name} = {col.__name__} # {col}" for name, col in vars(cls).items() if isRelated(col, Column)), "```"])
+		else:
+			cls.__doc__ = "\n".join(["```python", *(f"{cls.__name__}.{name} = {col.__name__} # {col}" for name, col in vars(cls).items() if isRelated(col, Column)), "```"])
 		super().__init_subclass__(**kwargs)
 
 	def __init__(self, database):
@@ -522,6 +527,8 @@ class DATE(SQL_TYPE): pass
 class DATETIME (SQL_TYPE): pass
 
 class ALL(Column, name="*"): pass
+
+class LinkedColumn(Column): pass
 
 class SQLITE_MASTER(Table, name="sqlite_master"):
 	
