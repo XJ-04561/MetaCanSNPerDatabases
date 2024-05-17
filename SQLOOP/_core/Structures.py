@@ -422,9 +422,18 @@ class Query:
 class TableMeta(NewMeta):
 
 	columns : SQLDict[str,Column]
+	linkedColumns : dict[str,"LinkedColumn"]
+	options : tuple[Query]
 
 	def __contains__(self, column : Column):
 		return column in self.columns
+
+	def __getattribute__(self, name: str) -> Any:
+		value = super().__getattribute__(name)
+		if isRelated(value, Column):
+			return self.linkedColumns[str(value)]
+		else:
+			return value
 
 	def __sql__(self):
 		sep = ",\n\t"
@@ -433,10 +442,12 @@ class TableMeta(NewMeta):
 class Table(SQLObject, HasColumns, metaclass=TableMeta):
 	
 	columns : SQLDict[str,Column]
+	linkedColumns : dict[str,"LinkedColumn"]
 	options : tuple[Query] = ()
 
 	def __init_subclass__(cls, **kwargs):
 		
+		super().__init_subclass__(**kwargs)
 		if any(not any(isinstance(word, (SQLTuple, Query)) for word in opt.words) for opt in cls.options):
 			sep = "\n"
 			raise ValueError(f"All table options must contain a tuple of columns/an expression. These did not: {sep.join(filter(lambda opt:any(not any(isinstance(word, (SQLTuple, Query)) for word in opt.words),cls.options)))}")
@@ -458,6 +469,7 @@ class Table(SQLObject, HasColumns, metaclass=TableMeta):
 			cls.__doc__ += "\n".join(["```python", *(f"{cls.__name__}.{name} = {col.__name__} # {col}" for name, col in vars(cls).items() if isRelated(col, Column)), "```"])
 		else:
 			cls.__doc__ = "\n".join(["```python", *(f"{cls.__name__}.{name} = {col.__name__} # {col}" for name, col in vars(cls).items() if isRelated(col, Column)), "```"])
+		cls.linkedColumns = {str(col):NewMeta(str(col), (LinkedColumn,), {}, type=col.type, table=cls) for col in cls.columns}
 		super().__init_subclass__(**kwargs)
 
 	def __init__(self, database):

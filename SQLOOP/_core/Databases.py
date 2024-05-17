@@ -238,10 +238,10 @@ class Database:
 			case _:
 				raise ValueError(f"{mode!r} is not a recognized file-stream mode. Only 'w'/'r' allowed.")
 	
-	def __init_subclass__(cls, *, baseAssertions : tuple=(), **kwargs):
+	def __init_subclass__(cls, *, assertions : tuple=(), **kwargs):
 		super().__init_subclass__(**kwargs)
-		if baseAssertions:
-			cls.assertions = cls.assertions + baseAssertions
+		if assertions:
+			cls.assertions = cls.assertions + assertions
 		cls.columns = SQLDict()
 		cls.tables = SQLDict()
 		cls.indexes = SQLDict()
