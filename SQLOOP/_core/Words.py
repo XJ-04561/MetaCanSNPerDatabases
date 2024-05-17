@@ -8,6 +8,8 @@ class ROLLBACK(Word): pass
 class IN(EnclosedWord): pass
 class TRANSACTION(Word): pass
 class COMMIT(Word): pass
+class CONSTRAINT(Word): pass
+class CHECK(Word): pass
 class PRAGMA(Word, metaclass=PragmaMeta):
 	@overload
 	def __init__(self, *columns : tuple[Column]):

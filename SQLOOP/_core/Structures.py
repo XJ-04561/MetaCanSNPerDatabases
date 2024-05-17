@@ -308,6 +308,9 @@ class Word(metaclass=Prefix):
 	def __hash__(self):
 		return sql(self).__hash__()
 	
+	def __contains__(self, item):
+		return item in self.content
+	
 	@property
 	def params(self):
 		out = []
@@ -326,6 +329,24 @@ class Query:
 
 	words : tuple[Word|Any] = tuple()
 	sep : str
+
+	def __new__(cls, *args, **kwargs):
+		
+		from SQLOOP._core.Expressions import Expression
+		item = args
+		while isinstance(item, (Query, tuple)) and len(args) > 0:
+			item = item[0] if isinstance(item, tuple) else item.words[0]
+			if isinstance(item, Word):
+				item = type(item)
+				break
+			elif isinstance(item, Prefix):
+				break
+		else:
+			return super().__new__(cls, *args, **kwargs)
+
+		for expr in Expression.__subclasses__():
+			if item in expr.startWords:
+				return expr(*args, **kwargs)
 
 	def __init__(self, *words : tuple[Word], sep : str=" "):
 		self.sep = sep
@@ -410,6 +431,24 @@ class Query:
 			return None
 	
 	@property
+	def type(self):
+		if isinstance(self.words[0], SQLObject):
+			return type(self.words[0])
+		elif isRelated(self.words[0], SQLObject):
+			return self.words[0]
+		else:
+			return None
+		
+	@property
+	def content(self):
+		for word in self.words:
+			if isinstance(word, Word) and word.content:
+				return word.content
+			elif isinstance(word, SQLTuple):
+				return word
+		return ()
+	
+	@property
 	def params(self):
 		params = []
 		for word in self.words:
@@ -423,7 +462,7 @@ class TableMeta(NewMeta):
 
 	columns : SQLDict[str,Column]
 	linkedColumns : dict[str,"LinkedColumn"]
-	options : tuple[Query]
+	constraints : tuple
 
 	def __contains__(self, column : Column):
 		return column in self.columns
@@ -437,13 +476,13 @@ class TableMeta(NewMeta):
 
 	def __sql__(self):
 		sep = ",\n\t"
-		return f"{self.__sql_name__} (\n\t{sep.join(itertools.chain(map(sql, self.columns), map(str, self.options)))}\n)"
+		return f"{self.__sql_name__} (\n\t{sep.join(itertools.chain(map(sql, self.columns), map(str, self.constraints)))}\n)"
 
 class Table(SQLObject, HasColumns, metaclass=TableMeta):
 	
 	columns : SQLDict[str,Column]
 	linkedColumns : dict[str,"LinkedColumn"]
-	options : tuple[Query] = ()
+	constraints : tuple = ()
 
 	def __init_subclass__(cls, **kwargs):
 		

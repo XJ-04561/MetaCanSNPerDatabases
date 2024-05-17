@@ -20,6 +20,12 @@ class Fetcher:
 		obj.__init__(connection, query)
 		if obj.singlet:
 			return next(obj)
+		elif isinstance(query, SelectStatement) and query.wheres:
+			conditionCols = set(map(*this.left, filter(lambda x:isinstance(x, Comparison) and isRelated(x.left, Column), query.wheres)))
+			for t in self.tables:
+				for constraint in t.constraints:
+					if all(map(lambda x:x in conditionCols, constraint.columns)):
+						return self.database(SELECT (*self.columns) - FROM (*self.tables) - WHERE (*self.wheres) - self.appended)
 		return super().__new__(cls)
 
 	def __init__(self, connection : sqlite3.Connection, query : Query):
@@ -155,6 +161,7 @@ class Selector:
 			self.wheres = (*self.wheres, *local, *createSubqueries(self.tables, self.database.tables, distant))
 		else:
 			raise NoMatchingDefinition(self.__qualname__+".__getitem__", items)
+
 		return self
 DEBUG = False
 class Database:
