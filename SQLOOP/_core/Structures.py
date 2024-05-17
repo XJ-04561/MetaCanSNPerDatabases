@@ -452,6 +452,7 @@ class Table(SQLObject, HasColumns, metaclass=TableMeta):
 							{},
 							name=alphabetize(i),
 							original=value))
+		cls.__doc__ += "\n".join(["```python", *(f"{cls.__name__}.{name} = {col.__name__} # {col}" for name, col in vars(cls).items() if isRelated(col, Column)), "```"])
 		super().__init_subclass__(**kwargs)
 
 	def __init__(self, database):
