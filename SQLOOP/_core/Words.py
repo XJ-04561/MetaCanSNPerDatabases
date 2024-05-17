@@ -68,6 +68,7 @@ class FOREIGN(Word): pass
 class EXISTS(Word): pass
 class INSERT(Word): pass
 class INTO(Word): pass
+class NULL(Word): pass
 class KEY(EnclosedWord): pass
 class REFERENCES(Word):
 	def __str__(self : Word):
