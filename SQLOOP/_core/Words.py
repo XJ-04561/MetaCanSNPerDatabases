@@ -5,7 +5,7 @@ from typing import overload, final, Any
 
 class BEGIN(Word): pass
 class ROLLBACK(Word): pass
-class IN(Word): pass
+class IN(EnclosedWord): pass
 class TRANSACTION(Word): pass
 class COMMIT(Word): pass
 class PRAGMA(Word, metaclass=PragmaMeta):

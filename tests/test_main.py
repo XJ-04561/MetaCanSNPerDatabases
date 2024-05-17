@@ -151,8 +151,6 @@ def test_database():
 	database(INSERT - INTO - PhoneBookTable - (PN, PhoneNumber, Adress) - VALUES - (1, "+46731234567", "Råttgränd 90"))
 	database(INSERT - INTO - PhoneBookTable - (PN, PhoneNumber, Adress) - VALUES - (1, "+46733025383", "Klintvägen 69"))
 
-	assert list(database[PN][NamesTable]) == [1,2]
-	assert list(database[Name][NamesTable]) == ["Eddrik Reensen", "Brunhilda Brunson"]
-	assert list(database[ALL][Name == "Eddrik Reensen"]) == [(1, "+46731234567", "Råttgränd 90"), (1, "+46733025383", "Klintvägen 69")]
-
-	
+	assert list(database[PN][NamesTable]) == [2,1]
+	assert list(database[Name][NamesTable]) == ["Brunhilda Brunson", "Eddrik Reensen"]
+	assert list(database[ALL][PhoneBookTable][Name == "Eddrik Reensen"]) == [(1, "+46731234567", "Råttgränd 90"), (1, "+46733025383", "Klintvägen 69")]

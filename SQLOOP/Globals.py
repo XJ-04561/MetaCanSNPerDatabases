@@ -19,6 +19,13 @@ from This import this
 
 tableCreationCommand = re.compile(r"^\W*CREATE\W+(TEMP|TEMPORARY\W)?\W*(TABLE|INDEX)(\W+IF\W+NOT\W+EXISTS)?\W+(\w[.])?", flags=re.ASCII|re.IGNORECASE)
 
+class Error(Exception):
+	
+	msg : str
+	def __init__(self, *args, **kwargs):
+		super().__init__()
+		self.args = self.msg.format(*args, **kwargs)
+
 class SQLTuple(tuple):
 	def __new__(cls, *args, **kwargs):
 		if args:
@@ -134,6 +141,25 @@ camelKiller = re.compile(r"(?<=[^A-Z])(?=[A-Z])")
 camelCase = re.compile("^[^_]+$")
 snakeKiller = re.compile(r"[_](\w)")
 
+def binner(key, iterable, outType=list):
+	if issubclass(outType, dict):
+		return outType((i,tuple(data)) for i, data in itertools.groupby(sorted(iterable, key=key), key=key))
+	else:
+		return outType(tuple(data) for i, data in itertools.groupby(sorted(iterable, key=key), key=key))
+		
+
+T = TypeVar("T")
+def first(iterator : Iterable[T]|Iterator[T]) -> T|None:
+	try:
+		return next(iterator)
+	except TypeError:
+		try:
+			return next(iter(iterator))
+		except:
+			pass
+	finally:
+		return None
+
 def camel2snake(string):
 	if allCapsSnakecase.fullmatch(string) or snakeCase.fullmatch(string):
 		return string
@@ -164,6 +190,7 @@ class SQLDict(dict):
 				super().__init__(data, *args, **kwargs)
 			else:
 				super().__init__(list(map(lambda x:(str(x),x), data)), *args, **kwargs)
+		self.valueSet = set(self)
 	
 	def __iter__(self):
 		return iter(self.values())
@@ -179,6 +206,9 @@ class SQLDict(dict):
 		else:
 			return item in self.values()
 	
+	def __or__(self, other):
+		return type(self)(itertools.chain(self, other))
+
 	def __eq__(self, other):
 		if (not hasattr(other, "__len__") or len(other) != len(self)) \
 			and not hasattr(other, "__next__"):
@@ -189,6 +219,10 @@ class SQLDict(dict):
 			# The following will return False if one of the iterables/iterators outpaces the other.
 			return all(x == y for x,y in zip(itertools.chain(self, itertools.repeat(Nothing())), itertools.chain(other, itertools.repeat(Nothing()))))
 		return False
+	
+	def __setitem__(self, key, value):
+		self.valueSet.add(value)
+		super().__setitem__(key, value)
 	
 	def __getitem__(self, key):
 		if isinstance(key, str):
@@ -201,8 +235,19 @@ class SQLDict(dict):
 		else:
 			return super().__getitem__(key)
 	
+	def __delitem__(self, key):
+		self.valueSet.remove(self[key])
+		super().__delitem__(key)
+
 	def append(self, item):
+		self.valueSet.add(item)
 		super().__setitem__(str(item), item)
+	
+	def isdisjoint(self, *args, **kwargs): return self.valueSet.isdisjoint(*args, **kwargs)
+	def intersection(self, *args, **kwargs): return SQLDict(self.valueSet.intersection(*args, **kwargs))
+	def difference(self, *args, **kwargs): return SQLDict(self.valueSet.difference(*args, **kwargs))
+	def union(self, *args, **kwargs): return SQLDict(self.valueSet.union(*args, **kwargs))
+	def without(self, *iterables): return SQLDict(filter(lambda x:not any(x in it for it in iterables), self))
 
 @cache
 def alphabetize(n : int):

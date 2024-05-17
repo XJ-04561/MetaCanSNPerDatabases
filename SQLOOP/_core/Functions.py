@@ -3,6 +3,10 @@ from SQLOOP.Globals import *
 import SQLOOP.Globals as Globals
 from threading import Lock
 
+
+class ImpossiblePathing(Error):
+	msg = "Unable to find path through which to conditionally select from {tables} based on columns {columns}."
+
 class LimitDict(dict):
 	
 	_size : int
@@ -194,93 +198,63 @@ def verifyDatabase(cls, filepath):
 	return cls(filepath, "r").valid
 
 @AnyCache
-def getSmallestFootprint(columns : set["Column"], tables : set["Table"]):
+def getSmallestFootprint(columns : set["Column"], tables : set["Table"]) -> tuple["Table"]|None:
 	
-	if len(columns) == 0:
-		return []
-	elif len(tables) == 0:
-		raise ColumnNotFoundError(f"Columns: {columns} could not be found in any of the given tables: ")
+	for i in range(len(tables)):
+		for subTables in itertools.combinations(tables, i+1):
+			if all(map(lambda c:any(map(lambda t:c in t, subTables)), columns)):
+				return subTables
+
+def recursiveSubquery(startCol : "Column", tables : SQLDict["Table"], values : list[Union["Comparison", "Query"]]):
+	from SQLOOP._core.Words import IN, SELECT, FROM, WHERE
+	if len(tables) == 0:
+		raise ValueError(f"SubQuerying ran out of tables to subquery! {values=}")
+	elif len(tables) == 1:
+		return startCol - IN (SELECT (startCol) - FROM (tables[0]) - WHERE (*values))
 	else:
-		bestTable = max(tables, key=lambda x:len(columns.intersection(x.columns)))
-		try:
-			return [bestTable] + getSmallestFootprint(columns.difference(bestTable.columns), tables.difference({bestTable}))
-		except ColumnNotFoundError as e:
-			e.add_note(f"{columns=}")
-			e.add_note(f"{tables=}")
-			raise e
+		commonColumn = tables[0].columns.intersection(tables[1].columns)[0]
+		return startCol - IN (SELECT (startCol) - FROM (tables[0]) - WHERE (recursiveSubquery(commonColumn, tables[1:], values)))
 
-@overload
-def getShortestPath(table1 : "Table", table2 : "Table", tables : set["Table"]) -> tuple[tuple["Table","Column"]]:
-	...
-@overload
-def getShortestPath(sources : tuple["Table"], destinations : tuple["Table"], tables : set["Table"]) -> tuple[tuple["Table","Column"]]:
-	...
-
-def shortPath(startTables, columns, allTables):
+def subqueryPaths(startTables : SQLDict["Table"], columns : SQLDict["Column"], allTables : SQLDict["Table"]) -> list[list[list["Table"], SQLDict["Column"]]]:
 	
-	hits = {}
-	paths = [[t] for t in startTables]
+	visited : set[Table] = set(startTables)
+	paths : list[list[Table]] = [[t] for t in startTables]
 	while paths:
 		nPaths = []
 		for p in paths:
-			connected = filter(lambda t:not p[-1].columns.isdisjoint(t.columns) and all(t2.columns.isdisjoint(t.columns) for t2 in p[:-1]), allTables)
-			for t in connected:
+			for t in allTables:
+				if t in visited:
+					continue
+				if p[-1].columns.isdisjoint(t.columns):
+					continue
+				if not all(t2.columns.isdisjoint(t.columns) for t2 in p[:-1]):
+					continue
 				nPaths.append([*p, t])
+				visited.add(t)
+		best, hits = max(map(lambda x:(x, columns.intersection(x[-1].columns)), nPaths), key=lambda x:len(x[0]))
+		if len(hits) == len(columns):
+			return [[best, hits]]
+		elif len(hits) > 0:
+			return [[best, hits]] + subqueryPaths(startTables | best, columns.without(hits), allTables.without(best))
 		paths = nPaths
-		
-			
+	return None
 
-	colSet = set(columns)
-	visited = set()
-	paths = [list(filter(lambda t:not colSet.isdisjoint(t.columns), allTables))]
-	while paths[-1] != []:
+def createSubqueries(startTables : SQLDict["Table"], allTables : SQLDict["Table"], values : "Comparison"):
+	_allTables = allTables.difference(startTables)
+	paths = subqueryPaths(startTables, SQLDict(map(*this.left, values)), _allTables)
+	subqueries = {}
+	for path, targetColumn in reversed(paths):
+		subValues = []
+		for comp in values:
+			if comp.left is targetColumn:
+				subValues.append(comp)
+		if path[-1] in subqueries:
+			subValues.append(subqueries.pop(path[-1]))
+		subqueries[path[0]] = recursiveSubquery(path[0].columns.intersection(path[1].columns)[0], path[1:], subValues)
+		if subqueries[path[0]] is None:
+			raise ImpossiblePathing(tables=startTables, columns=f"({', '.join(map(lambda x:str(x.left), values))})")
+	return list(subqueries.values())
 
-	layers = []
-	while True:
-		layers.append( list(map(lambda t:t[1] and not colSet.isdisjoint(allTables[t[0]].columns), enumerate(layers[-1]))))
-		newLayer = SQLDict()
-		for table in filter(lambda t:not colSet.isdisjoint(t.columns), layers[-1]):
-			if table not in layers[-1]
-			newLayer.append(table)
-		
 
-@AnyCache
-def getShortestPath(*args) -> tuple[tuple["Table","Column"]]:
-	from SQLOOP.core import Table, Column
-
-	if isinstance(args, tuple) and tuple[tuple[Table],tuple[Table], set[Table]]:
-		sources : tuple[Table] = args[0]
-		destinations : tuple[Table] = args[1]
-		tables : set[Table] = args[2]
-
-		shortestPath = range(len(tables)+1)
-		for source in sources:
-			for destination in destinations:
-				if len(path := getShortestPath(source, destination, tables)) < len(shortestPath):
-					shortestPath = path
-		if isinstance(shortestPath, range):
-			raise TablesNotRelated(f"Source tables {sources} are not connected to destination tables {destinations}")
-		else:
-			return shortestPath
-	elif isType(args, tuple[Table,Table,set[Table]]):
-		table1 : Table = args[0]
-		table2 : Table = args[1]
-		tables : set[Table] = args[2]
-		if table1 == table2:
-			return tuple()
-		elif len(tables) == 0:
-			return (None, )
-		else:
-			cols = set(table1.columns)
-			paths = {}
-			for table in tables:
-				if len(commonCols := cols.intersection(table)):
-					paths[tuple(commonCols)[0], table] = getShortestPath(table, table2, tables.difference({table}))
-			if len(paths) == 0:
-				return (None, )
-			
-			(commonCol, table), path = max(filter(*this[1][-1] != None, paths.items()), key=next(this[1].__len__()))
-			return ((commonCol, table),) + path
-
-from SQLOOP._core.Structures import Column, Table, Query
+from SQLOOP._core.Structures import Column, Table, Query, Comparison
 from SQLOOP._core.Databases import Database

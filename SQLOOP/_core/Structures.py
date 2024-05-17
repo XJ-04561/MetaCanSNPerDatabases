@@ -203,6 +203,8 @@ class Comparison:
 
 	def __init__(self, left, operator, right, forceLeft=False, forceRight=False):
 		self.left = SanitizedValue(left) if not isRelated(left, SQLObject) and not forceLeft else left
+		if operator not in ["==", "!=", "<", "<=", ">", ">="]:
+			raise ValueError(f"Not a valid operator for comparison: {operator=}")
 		self.operator = operator
 		self.right = SanitizedValue(right) if not isRelated(right, SQLObject) and not forceRight else right
 
@@ -254,18 +256,6 @@ class Assignment:
 			return [self.right]
 		elif hasattr(self.right, "params"):
 			return self.right.params
-
-T = TypeVar("T")
-def first(iterator : Iterable[T]|Iterator[T]) -> T|None:
-	try:
-		return next(iterator)
-	except TypeError:
-		try:
-			return next(iter(iterator))
-		except:
-			pass
-	finally:
-		return None
 
 _NO_KEY_VALUE = object()
 QUERY_CACHE = {}
@@ -332,7 +322,7 @@ class EnclosedWord(Word):
 
 class Query:
 
-	words : tuple[Word] = tuple()
+	words : tuple[Word|Any] = tuple()
 	sep : str
 
 	def __init__(self, *words : tuple[Word], sep : str=" "):
@@ -383,6 +373,41 @@ class Query:
 		return self.__getattribute__(key)
 	
 	@property
+	def cols(self):
+		from SQLOOP._core.Words import FROM, SELECT
+		if isinstance(self.words[0], SELECT):
+			if ALL not in self.words[0].content:
+				return len(self.words[0].content)
+			for i, word in enumerate(self.words):
+				if isinstance(word, FROM):
+					fullLength = sum(map(lambda x:len(x.columns) if isRelated(x, Table) else x.cols, word.content))
+					break
+				elif word is FROM:
+					fullLength = sum(map(lambda x:len(x.columns) if isRelated(x, Table) else x.cols, itertools.takewhile(lambda x:isRelated(x, Table) or isinstance(x, Query),self.words[i+1:])))
+					break
+			else:
+				raise MissingArgument(f"Could not find the 'FROM' of the following 'SELECT' statement:\n{str(self)}")
+			return sum(map(lambda x:1 if x is not ALL else fullLength, self.words[0].content))
+		
+		elif self.words[0] is SELECT:
+			from SQLOOP._core.Aggregates import Aggregate
+			columns = tuple(itertools.takewhile(lambda x:not isRelated(x, Word) or isinstance(x, Aggregate), itertools.islice(self.words, 1, None)))
+			if ALL not in columns:
+				return len(columns)
+			for i, word in itertools.islice(enumerate(self.words), 1+len(columns), None):
+				if isinstance(word, FROM):
+					fullLength = sum(map(lambda x:len(x.columns) if isRelated(x, Table) else x.cols, word.content))
+					break
+				elif word is FROM:
+					fullLength = sum(map(lambda x:len(x.columns) if isRelated(x, Table) else x.cols, itertools.takewhile(lambda x:isRelated(x, Table) or isinstance(x, Query),self.words[i+1:])))
+					break
+			else:
+				raise MissingArgument(f"Could not find the 'FROM' of the following 'SELECT' statement:\n{str(self)}")
+			return sum(map(lambda x:1 if x is not ALL else fullLength, columns))
+		else:
+			return None
+	
+	@property
 	def params(self):
 		params = []
 		for word in self.words:
@@ -394,7 +419,7 @@ class Query:
 
 class TableMeta(NewMeta):
 
-	columns : tuple[Column]
+	columns : SQLDict[str,Column]
 
 	def __contains__(self, column : Column):
 		return column in self.columns

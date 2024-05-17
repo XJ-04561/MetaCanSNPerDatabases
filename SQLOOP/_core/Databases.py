@@ -26,7 +26,10 @@ class Fetcher:
 		if getattr(self, "_connection", None) is connection:
 			return
 		self._connection = connection
-		self._cursor = self._connection.execute(*query)
+		try:
+			self._cursor = self._connection.execute(*query)
+		except Exception as e:
+			raise type(e)(f"Query: ({str(query)}, {query.params})\n"+e.args[0], *e.args[1:])
 		self.query = query
 		self.position = 0
 	
@@ -64,19 +67,13 @@ class Fetcher:
 
 	@cached_property
 	def cols(self):
-		if isinstance(self.query.words[0], SELECT):
-			return len(self.query.words[0].content)
-		elif self.query.words[0] is SELECT:
-			return sum(map(lambda x:1, itertools.takewhile(lambda x:not isRelated(x, Word) or isinstance(x, Aggregate), itertools.islice(self.query.words, 1, None))))
-		else:
-			return None
+		return self.query.cols
 	
 	@cached_property
 	def singlet(self):
 		if isinstance(self.query.words[0], SELECT):
 			if all(map(lambda x:isinstance(x, Aggregate), self.query.words[0].content)):
 				return True
-			return self._connection.execute(*Query(SELECT(COUNT(ALL)), *self.query.words[1:])).fetchone()[0]
 		elif self.query.words[0] is SELECT:
 			if all(map(lambda x:isinstance(x, Aggregate), itertools.islice(self.query.words, 1, self.cols+1))):
 				return True
@@ -102,7 +99,7 @@ class Selector:
 
 	appended : Query
 
-	database : Connection
+	database : "Database"
 	databaseTables : set[Table]
 	databaseColumns : set[Column]
 
@@ -115,7 +112,6 @@ class Selector:
 	
 	def __iter__(self):
 		from pprint import pprint
-		pprint(list(SELECT (*self.columns) - FROM (*self.tables) - WHERE (*self.wheres) - self.appended))
 		return Fetcher(self.database._connection, SELECT (*self.columns) - FROM (*self.tables) - WHERE (*self.wheres) - self.appended)
 
 	def __sub__(self, append : Word|Query):
@@ -131,36 +127,32 @@ class Selector:
 	def __getitem__(self, items : tuple[Column|Table|Comparison]):
 		if not isinstance(items, tuple):
 			items = (items,)
-		if isRelated(items[0], Column):
-			assert len(set(items).difference(self.databaseColumns)) == 0, f"Given columns don't exist in the database: {set(items).difference(self.databaseColumns)}"
+		if len(items) == 0 and items[0] is ALL:
+			self.columns = SQLDict(items)
+			if getattr(self, "tables", None) is None:
+				self.tables = SQLDict()
+		elif isRelated(items[0], Column):
+			assert len(set(filter(lambda x:x is not ALL, items)).difference(self.databaseColumns)) == 0, f"Given columns don't exist in the database: {set(items).difference(self.databaseColumns)}"
 			from SQLOOP._core.Functions import getSmallestFootprint
-			self.columns = items
-			self.tables = tuple(getSmallestFootprint(set(items), [[set(table.columns), table, 0] for table in self.databaseTables]))
+			self.columns = SQLDict(items)
+			self.tables = SQLDict(getSmallestFootprint(set(filter(lambda x:x is not ALL, items)), self.databaseTables))
 		elif isRelated(items[0], Table):
 			assert len(set(items).difference(self.databaseTables)) == 0, f"Given tables don't exist in the database: {set(items).difference(self.databaseTables)}"
 			if not hasattr(self, "columns"):
-				self.columns = (ALL, )
-			self.tables = items
-			self.wheres = self.wheres + tuple()
+				self.columns = SQLDict(ALL, )
+			self.tables = SQLDict(items)
+			self.wheres = self.wheres
 		elif isinstance(items[0], Comparison):
 			assert all(col in self.databaseColumns for comp in items for col in [comp.left, comp.right] if isRelated(col, Column)), f"Columns in comparisons are not found in the database: {set(col for comp in items for col in [comp.left, comp.right] if isRelated(col, Column) and col not in self.databaseColumns)}"
-			from SQLOOP._core.Functions import getShortestPath
-			wheres = list(self.wheres)
+			from SQLOOP._core.Functions import createSubqueries
+
+			local, distant = [], []
 			for comp in items:
-				if isRelated(comp.left, Column) and all(comp.left not in table for table in self.tables):
-					targetTables = []
-					for table in self.databaseTables:
-						if comp.left in table.columns:
-							targetTables.append(table)
-					
-					path = getShortestPath(self.tables, targetTables)
-					subQuery = SELECT (path[-1][0]) - FROM (path[-1][1]) - WHERE(comp)
-					for col, table in path[-2::-1]:
-						subQuery = SELECT (col) - FROM (table) - WHERE(comp.left - IN - subQuery)
-					wheres.append(path[0][0] in subQuery)
+				if not isRelated(comp.left, Column) or comp.left is ALL or any(comp.left in table for table in self.tables):
+					local.append(comp)
 				else:
-					wheres.append(comp)
-			self.wheres = tuple(wheres)
+					distant.append(comp)
+			self.wheres = (*self.wheres, *local, *createSubqueries(self.tables, self.database.tables, distant))
 		else:
 			raise NoMatchingDefinition(self.__qualname__+".__getitem__", items)
 		return self
