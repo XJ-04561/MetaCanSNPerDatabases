@@ -3,99 +3,56 @@ from sqlite3 import Connection
 from SQLOOP.Globals import *
 import SQLOOP.Globals as Globals
 from SQLOOP._core.Structures import *
+from SQLOOP._core.Schema import *
+from SQLOOP._core.Types import *
+from SQLOOP._core.Expressions import *
 from SQLOOP._core.Words import *
 from SQLOOP._core.Aggregates import *
 
 class Fetcher:
 	"""Fetches data from a cursor. Consumes the cursor object during iteration/indexation."""
-	query : Query
+	query : SelectStatement
 	_connection : sqlite3.Connection
 	cols : int
 	resultsLength : int
 
-	def __new__(cls, connection : sqlite3.Connection, query : Query, *args, **kwargs):
+	def __new__(cls, connection : sqlite3.Connection, query : SelectStatement, *args, **kwargs):
 		
-		assert len(query.words) > 0, "Query must not be empty."
-		obj = super().__new__(cls)
-		obj.__init__(connection, query)
-		if obj.singlet:
-			return next(obj)
-		elif isinstance(query, SelectStatement) and query.wheres:
-			conditionCols = set(map(*this.left, filter(lambda x:isinstance(x, Comparison) and isRelated(x.left, Column), query.wheres)))
-			for t in self.tables:
-				for constraint in t.constraints:
-					if all(map(lambda x:x in conditionCols, constraint.columns)):
-						return self.database(SELECT (*self.columns) - FROM (*self.tables) - WHERE (*self.wheres) - self.appended)
+		assert isinstance(query, SelectStatement), "Fetcher must be given a SelectStatement."
+		
+		if query.singlet:
+			try:
+				return (query @ connection).fetchone()
+			except StopIteration:
+				return None
 		return super().__new__(cls)
 
-	def __init__(self, connection : sqlite3.Connection, query : Query):
-		if getattr(self, "_connection", None) is connection:
-			return
+	def __init__(self, connection : sqlite3.Connection, query : SelectStatement):
+
 		self._connection = connection
 		try:
-			self._cursor = self._connection.execute(*query)
+			self._cursor = query @ self._connection
 		except Exception as e:
 			raise type(e)(f"Query: ({str(query)}, {query.params})\n"+e.args[0], *e.args[1:])
 		self.query = query
-		self.position = 0
 	
 	def __iter__(self):
 		return self
 
 	def __next__(self):
-		if not self.position < self.resultsLength:
-			raise StopIteration()
-		match self.cols:
+		match self.query.columns:
 			case None:
 				raise StopIteration()
 			case 1:
-				self.position += 1
 				return next(self._cursor)[0]
 			case _:
-				self.position += 1
 				return next(self._cursor)
 	
 	def __getitem__(self, rowNumber) -> Any|tuple[Any]:
-		if not rowNumber < self.resultsLength:
-			q = iter(self.query)
-			raise ResultsShorterThanLookup(f"When looking for row number {rowNumber} in query: '{next(q)}', {next(q)}")
-		elif self.cols is None:
-			q = iter(self.query)
-			raise NoResultsFromQuery(f"When looking for row number {rowNumber} in query: '{next(q)}', {next(q)}")
-		
-		if self.cols == 1:
-			return self._connection.execute(*self.query - LIMIT(rowNumber,rowNumber)).fetchone()[0]
+		if self.query.columns == 1:
+			return (((self.query - LIMIT(rowNumber,rowNumber)) @ self._connection).fetchone() or [None])[0]
 		else:
-			return self._connection.execute(*self.query - LIMIT(rowNumber,rowNumber)).fetchone()
-	
-	def __len__(self):
-		return self.resultsLength
-
-	@cached_property
-	def cols(self):
-		return self.query.cols
-	
-	@cached_property
-	def singlet(self):
-		if isinstance(self.query.words[0], SELECT):
-			if all(map(lambda x:isinstance(x, Aggregate), self.query.words[0].content)):
-				return True
-		elif self.query.words[0] is SELECT:
-			if all(map(lambda x:isinstance(x, Aggregate), itertools.islice(self.query.words, 1, self.cols+1))):
-				return True
-		return False
-
-	@cached_property
-	def resultsLength(self):
-		if self.singlet:
-			return 1
-		if isinstance(self.query.words[0], SELECT):
-			return self._connection.execute(*Query(SELECT(COUNT(ALL)), *self.query.words[1:])).fetchone()[0]
-		elif self.query.words[0] is SELECT:
-			return self._connection.execute(*Query(SELECT(COUNT(ALL)), *itertools.dropwhile(lambda x:not isRelated(x, Word) or isinstance(x, Aggregate), itertools.islice(self.query.words, 1, None)))).fetchone()[0]
-		else:
-			return 0
-
+			return ((self.query - LIMIT(rowNumber,rowNumber)) @ self._connection).fetchone()
 
 class Selector:
 	columns : tuple[Column]
@@ -117,7 +74,6 @@ class Selector:
 		self.wheres = tuple()
 	
 	def __iter__(self):
-		from pprint import pprint
 		return Fetcher(self.database._connection, SELECT (*self.columns) - FROM (*self.tables) - WHERE (*self.wheres) - self.appended)
 
 	def __sub__(self, append : Word|Query):
@@ -160,11 +116,37 @@ class Selector:
 					distant.append(comp)
 			self.wheres = (*self.wheres, *local, *createSubqueries(self.tables, self.database.tables, distant))
 		else:
-			raise NoMatchingDefinition(self.__qualname__+".__getitem__", items)
+			raise TypeError(f"{items}")
 
 		return self
-DEBUG = False
-class Database:
+
+class DatabaseMeta(type):
+	
+	columns : SQLDict[Column] = SQLDict()
+	"""A hybrid between a tuple and a dict. Can be indexed using number in column order or by column
+	in-sql name (Column.__sql_name__). When iterated, returns dict.values() instead of the usual dict.keys()."""
+	tables : SQLDict[Table] = SQLDict()
+	"""A hybrid between a tuple and a dict. Can be indexed using number in table order or by table
+	in-sql name (Table.__sql_name__). When iterated, returns dict.values() instead of the usual dict.keys()."""
+	indexes : SQLDict[Index] = SQLDict()
+	"""A hybrid between a tuple and a dict. Can be indexed using number in index order or by index
+	in-sql name (Index.__sql_name__). When iterated, returns dict.values() instead of the usual dict.keys()."""
+
+	def __contains__(self, other):
+		
+		if isinstance(other, SQLOOP):
+			if isThing(other, Column):
+				return other in self.columns
+			elif isThing(other, Table):
+				return other in self.tables
+			elif isThing(other, Index):
+				return other in self.indexes
+		return False
+	
+	def __repr__(self):
+		return f"{object.__repr__(self)}\n\t<columns>\n\t\t{'\n\t\t'.join(map(repr, self.columns))}\n\t</columns>\n\t<tables>\n\t\t{'\n\t\t'.join(map(repr, self.tables))}\n\t</tables>\n\t<indexes>\n\t\t{'\n\t\t'.join(map(repr, self.indexes))}\n\t</indexes>\n</{self.__name__}>"
+
+class Database(metaclass=DatabaseMeta):
 	"""Usage:
 	```python
 	database = Database("database.db", "w")
@@ -300,30 +282,32 @@ class Database:
 			else:
 				self._connection.execute(query, params)
 				return None
-		elif isinstance(query, Query):
-			if isinstance(query.words[0] , SELECT) or query.words[0] is SELECT:
+		elif isinstance(query, SQLOOP):
+			if isinstance(query, SelectStatement):
 				return Fetcher(self._connection, query)
 			else:
-				self._connection.execute(*query)
+				query @ self._connection
 				return None
-		elif isinstance(query, (Word, type(Word))):
-			self._connection.execute(*Query(query))
-			return None
 		else:
 			raise ValueError(f"Trying to call database with seomthing other than a 'str' or a 'Query' object.\ndatabase({query}, {params})")
-			
+	
+	def __contains__(self, other):
+		if isinstance(other, SQLOOP):
+			if isThing(other, Column):
+				return other in self.columns
+			elif isThing(other, Table):
+				return other in self.tables
+			elif isThing(other, Index):
+				return other in self.indexes
+		return False
 
-	def __getitem__(self, tuple):
+	def __getitem__(self, items):
 		out = Selector(self)
-		return out[tuple]
+		return out[items]
 
 	@property
 	def __version__(self):
 		return int(self._connection.execute("PRAGMA user_version;").fetchone()[0])
-
-	@property
-	def columns(self):
-		return set().union(map(column for table in self.tables for column in table.columns))
 
 	@property
 	def valid(self):

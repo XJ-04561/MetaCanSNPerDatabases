@@ -28,8 +28,8 @@ class SchemaNotEmpty(Assertion):
 		return DatabaseSchemaEmpty("Database is empty.")
 	@classmethod
 	def condition(self, database : "Database") -> bool:
-		from SQLOOP._core.Words import SELECT, FROM, SQLITE_MASTER
-		from SQLOOP._core.Structures import ALL
+		from SQLOOP._core.Words import SELECT, FROM
+		from SQLOOP._core.Schema import ALL, SQLITE_MASTER
 		from SQLOOP._core.Aggregates import COUNT
 		res = database(SELECT - COUNT (ALL) - FROM - SQLITE_MASTER)
 		return database(SELECT - COUNT (ALL) - FROM - SQLITE_MASTER) != 0
@@ -52,7 +52,8 @@ class ValidTablesSchema(Assertion):
 		return database.tablesHash == database.CURRENT_TABLES_HASH
 	@classmethod
 	def rectify(cls, database : "Database") -> None:
-		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, ALL, FROM, DROP, INDEX
+		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, FROM, DROP, INDEX
+		from SQLOOP._core.Schema import ALL
 		from SQLOOP.Globals import sql
 		if not database.clearIndexes():
 			raise DatabaseError("Could not clear indexes!")
@@ -81,7 +82,8 @@ class ValidIndexesSchema(Assertion):
 		return database.indexesHash == database.CURRENT_INDEXES_HASH
 	@classmethod
 	def rectify(cls, database : "Database") -> None:
-		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, ALL, FROM, DROP, INDEX, IF, NOT, EXISTS
+		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, FROM, DROP, INDEX, IF, NOT, EXISTS
+		from SQLOOP._core.Schema import ALL
 		from SQLOOP.Globals import sql
 		if not database.clearIndexes():
 			raise DatabaseError("Could not clear indexes!")

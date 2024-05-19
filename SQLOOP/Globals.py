@@ -16,41 +16,13 @@ from PseudoPathy.PathShortHands import *
 
 from SQLOOP._core.Exceptions import *
 from This import this
+# from abc import ABC, ABCMeta, abstractmethod
 
 tableCreationCommand = re.compile(r"^\W*CREATE\W+(TEMP|TEMPORARY\W)?\W*(TABLE|INDEX)(\W+IF\W+NOT\W+EXISTS)?\W+(\w[.])?", flags=re.ASCII|re.IGNORECASE)
 
-class Error(Exception):
-	
-	msg : str
-	def __init__(self, *args, **kwargs):
-		super().__init__()
-		self.args = self.msg.format(*args, **kwargs)
+_NOT_SET = object()
+_T = TypeVar("_T")
 
-class SQLTuple(tuple):
-	def __new__(cls, *args, **kwargs):
-		if args:
-			return super().__new__(cls, map(lambda x:x if not isinstance(x, tuple) else SQLTuple(x), args[0]), *(args[1:]), **kwargs)
-		else:
-			return super().__new__(cls, *args, **kwargs)
-	
-	def __str__(self):
-		from SQLOOP._core.Structures import SQLObject, NewMeta, Hardcoded
-		return f"({', '.join(map(lambda x:str(x) if isinstance(x, (Hardcoded, SQLObject, NewMeta, SQLTuple)) else "?", self))})"
-	
-	@property
-	def params(self):
-		from SQLOOP._core.Structures import Hardcoded, SQLObject, NewMeta
-		out = []
-		for item in self:
-			if not isinstance(item, (Hardcoded, SQLObject, NewMeta)):
-				out.append(item)
-			elif hasattr(item, "params"):
-				out.extend(item.params)
-		return out
-
-class Nothing:
-	def __eq__(self, other):
-		return False
 
 class Mode: pass
 class ReadMode: pass
@@ -60,6 +32,153 @@ ReadMode    = Literal["r"]
 WriteMode   = Literal["w"]
 class Rest(Iterator): pass
 class All(Iterator): pass
+
+allCapsSnakecase = re.compile("^[A-Z_0-9]+$")
+snakeCase = re.compile("^[a-z_0-9]+$")
+camelKiller = re.compile(r"(?<=[^A-Z])(?=[A-Z])")
+
+camelCase = re.compile("^[^_]+$")
+snakeKiller = re.compile(r"[_](\w)")
+
+def binner(key, iterable, outType=list):
+	if issubclass(outType, dict):
+		return outType((i,tuple(data)) for i, data in itertools.groupby(sorted(iterable, key=key), key=key))
+	else:
+		return outType(tuple(data) for i, data in itertools.groupby(sorted(iterable, key=key), key=key))
+
+def first(iterator : Iterable[_T]|Iterator[_T]) -> _T|None:
+	try:
+		return next(iterator)
+	except TypeError:
+		try:
+			return next(iter(iterator))
+		except:
+			pass
+	finally:
+		return None
+
+def camel2snake(string : str):
+	if allCapsSnakecase.fullmatch(string) or snakeCase.fullmatch(string):
+		return string.lower()
+	else:
+		return camelKiller.sub("_", string).lower()
+
+def snake2camel(string):
+	if camelCase.fullmatch(string):
+		return string
+	else:
+		snakeKiller.sub(lambda m:m.group(1).upper(), string)
+
+@overload
+def getReadyAttr(obj, attrName) -> Any: ...
+@overload
+def getReadyAttr(obj, attrName, default : _T) -> Any|_T: ...
+def getReadyAttr(obj, attrName, default=_NOT_SET):
+	if default is _NOT_SET:
+		if isinstance((value := getattr(obj, attrName)), (property, cached_property)):
+			raise AttributeError(f"{type(obj)!r} object has a un-determined attribute {attrName!r} value ({value})")
+	elif isinstance((value := getattr(obj, attrName, default)), (property, cached_property)):
+		return default
+	return value
+
+def hasReadyAttr(obj, attrName) -> bool:
+	try:
+		if isinstance(getattr(obj, attrName), (property, cached_property)):
+			raise AttributeError()
+	except AttributeError:
+		return False
+	return True
+
+def isThing(thing, cls):
+	return isRelated(thing, cls) or isinstance(thing, cls)
+
+class Error(Exception):
+	
+	msg : str
+	def __init__(self, *args, **kwargs):
+		super().__init__()
+		self.args = self.msg.format(*args, **kwargs)
+
+class SQLOOP:
+
+	__sql_name__ : str
+	"""Can be set through the 'name' keyword argument in class creation:
+	```python
+	class MyObject(SQLObject, name="my_thing"):
+		...
+	```
+	Defaults to a 'snake_case'-version of the class name (In the above example it would be "my_object")
+	"""
+	params : list
+
+	def __init_subclass__(cls, *args, name : str|None=None, **kwargs) -> None:
+		if name is not None:
+			cls.__sql_name__ = name.lower()
+		else:
+			cls.__sql_name__ = camel2snake(cls.__name__) if "_" not in cls.__name__.strip("_") else cls.__name__.lower()
+		super().__init_subclass__(*args, **kwargs)
+
+	def __repr__(self):
+		if isinstance(self, type):
+			return f"<{(self.__bases__ or [self.__class__])[0].__name__} {self.__name__!r} at 0x{id(self):0>16X} {' '.join(map(lambda pair : '{}={!r}'.format(*pair), filter(lambda x:not x[0].startswith('_') or x[0] == '__sql_name__', vars(self).items())))}>"
+		else:
+			return f"<{self.__class__.__name__} at 0x{id(self):0>16X} {' '.join(map(lambda pair : '{}={!r}'.format(*pair), filter(lambda x:not x[0].startswith('_') or x[0] == '__sql_name__', vars(self).items())))}>"
+		
+	def __str__(self):
+		return self.__sql_name__
+	
+	def __sql__(self):
+		return self.__sql_name__
+	
+	def __sub__(self, right):
+		from SQLOOP._core.Structures import Query
+		return Query(self, right)
+	
+	def __rsub__(self, left):
+		from SQLOOP._core.Structures import Query
+		return Query(left, self)
+	
+	def __matmul__(self, other : sqlite3.Connection) -> Any:
+		from SQLOOP._core.Databases import Fetcher, Query
+		if isinstance(other, sqlite3.Connection):
+			return other.execute(str(self), self.params)
+		return NotImplemented
+
+	@property
+	def params(self):
+		return []
+
+
+class SQLTuple(SQLOOP, tuple):
+	
+	@overload
+	def __new__(cls, iterable : Iterable): ...
+	@overload
+	def __new__(cls, *items : Any): ...
+
+	def __new__(cls, arg, *args):
+		if not args and isinstance(arg, Iterable):
+			args = tuple(arg)
+		else:
+			args = (arg, *args)
+		return tuple.__new__(cls, map(lambda x:SQLTuple(x) if type(x) is tuple else x, args))
+	
+	def __str__(self):
+		return f"({', '.join(map(lambda x:str(x) if isinstance(x, SQLOOP) else "?", self))})"
+	
+	@property
+	def params(self):
+		out = []
+		for item in self:
+			if not isinstance(item, SQLOOP):
+				out.append(item)
+			elif hasattr(item, "params"):
+				out.extend(item.params)
+		return out
+
+class Nothing:
+	def __eq__(self, other):
+		return False
 
 class sql(str):
 	def __new__(cls, obj):
@@ -134,44 +253,6 @@ class CachedClassProperty:
 	def __repr__(self):
 		return f"{object.__repr__(self)[:-1]} name={self.name!r}>"
 
-allCapsSnakecase = re.compile("^[A-Z_0-9]+$")
-snakeCase = re.compile("^[a-z_0-9]+$")
-camelKiller = re.compile(r"(?<=[^A-Z])(?=[A-Z])")
-
-camelCase = re.compile("^[^_]+$")
-snakeKiller = re.compile(r"[_](\w)")
-
-def binner(key, iterable, outType=list):
-	if issubclass(outType, dict):
-		return outType((i,tuple(data)) for i, data in itertools.groupby(sorted(iterable, key=key), key=key))
-	else:
-		return outType(tuple(data) for i, data in itertools.groupby(sorted(iterable, key=key), key=key))
-		
-
-T = TypeVar("T")
-def first(iterator : Iterable[T]|Iterator[T]) -> T|None:
-	try:
-		return next(iterator)
-	except TypeError:
-		try:
-			return next(iter(iterator))
-		except:
-			pass
-	finally:
-		return None
-
-def camel2snake(string):
-	if allCapsSnakecase.fullmatch(string) or snakeCase.fullmatch(string):
-		return string
-	else:
-		return camelKiller.sub("_", string).lower()
-
-def snake2camel(string):
-	if camelCase.fullmatch(string):
-		return string
-	else:
-		snakeKiller.sub(lambda m:m.group(1).upper(), string)
-
 class SQLDict(dict):
 
 	def __init__(self, iterable : Iterable=None, *args, **kwargs):
@@ -196,12 +277,14 @@ class SQLDict(dict):
 		return iter(self.values())
 	
 	def __contains__(self, item):
-		from SQLOOP._core.Structures import ColumnAlias
+		from SQLOOP._core.Structures import ColumnAlias, LinkedColumn
 		if isinstance(item, str):
 			return super().__contains__(item)
 		elif isRelated(item, ColumnAlias):
 			return super().__contains__(item.fullName)
-		elif hasattr(item, "__sql__"):
+		elif isRelated(item, LinkedColumn):
+			return super().__contains__(item.__sql_name__)
+		elif isinstance(item, SQLOOP):
 			return super().__contains__(str(item))
 		else:
 			return item in self.values()

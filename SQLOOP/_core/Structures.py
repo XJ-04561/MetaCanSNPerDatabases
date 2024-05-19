@@ -1,107 +1,35 @@
 
-from typing import Any
 from SQLOOP.Globals import *
+from SQLOOP._core.Types import *
 
-
-class NoMatchingDefinition(TypeError):
-	def __init__(self, name, args=(), kwargs={}):
-		self.args = (f"No definition of {name!r} fits args={args}, kwargs={kwargs}")
-
-class AutoObject:
-	"""Automatically assigns values passed to the constructor to the annotations
-	of the object class. Skips 'hidden' attributes starting with only one
-	underscore. Meaning, _name would not be assigned a value from the
-	construction call, but __name__ would, as it starts with one, and not two
-	underscores."""
-	def __init__(self, *args, **kwargs):
-		from SQLOOP._core.Functions import hiddenPattern
-		i = 0
-		for name, typeHint in self.__annotations__.items():
-			if hiddenPattern.match(name) is not None:
-				continue
-			elif hasattr(self, name) and not isinstance(getattr(self, name), (cached_property, property)):
-				continue
-			elif name in kwargs:
-				self.__setattr__(name, kwargs[name])
-			elif len(args) > i:
-				self.__setattr__(name, args[i])
-				i += 1
-			else:
-				if not hasattr(self, name):
-					from SQLOOP._core.Exceptions import MissingArgument
-					raise MissingArgument(f"Missing required argument {name} for {self.__class__.__name__}.__init__")
-
-class NewMeta(type):
+class SQLStructure(SQLOOP, type):
 
 	__name__ : str
 	__sql_name__ : str
-
-	def __repr__(self):
-		return f"<{self.__bases__[0].__name__} {self.__name__!r} at 0x{id(self):0>16X} {' '.join(map(lambda pair : '{}={!r}'.format(*pair), filter(lambda x:not x[0].startswith('_') or x[0] == '__sql_name__', vars(self).items())))}>"
-		
-	def __str__(self):
-		return self.__sql_name__
-	
-	def __sql__(self):
-		return self.__sql_name__
-	
-	def __sub__(self, right):
-		return Query(self, right)
-	
-	def __rsub__(self, left):
-		return Query(self, left)
 	
 	def __eq__(self, right):
-		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isRelated(right, SQLObject):
-			return Comparison(self, "==", right)
-		else:
-			return NotImplemented
+		return Comparison(self, "==", right)
 	def __ne__(self, right):
-		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isRelated(right, SQLObject):
-			return Comparison(self, "!=", right)
-		else:
-			return NotImplemented
+		return Comparison(self, "!=", right)
 	def __lt__(self, right):
-		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isRelated(right, SQLObject):
-			return Comparison(self, "<", right)
-		else:
-			return NotImplemented
+		return Comparison(self, "<", right)
 	def __le__(self, right):
-		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isRelated(right, SQLObject):
-			return Comparison(self, "<=", right)
-		else:
-			return NotImplemented
+		return Comparison(self, "<=", right)
 	def __gt__(self, right):
-		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isRelated(right, SQLObject):
-			return Comparison(self, ">", right)
-		else:
-			return NotImplemented
+		return Comparison(self, ">", right)
 	def __ge__(self, right):
-		if getattr(type(right), "__module__", None) == "builtins" or isinstance(right, SQLObject) or isRelated(right, SQLObject):
-			return Comparison(self, ">=", right)
-		else:
-			return NotImplemented
-	
+		return Comparison(self, ">=", right)
+
 	def __or__(self, other):
 		return Union[self, other]
 
 	def __hash__(self):
-		return hash(tuple(sorted(filter(lambda x:x[0] == "__sql_name__" or (not x[0].startswith("_") and getattr(x[1], "__hash__", None) is not None), vars(self).items()), key=lambda x:x)))
+		return hash(self.__sql_name__)
 
-class SQLObject(metaclass=NewMeta):
-
-	__sql_name__ : str
-	"""Can be set through the 'name' keyword argument in class creation:
-	```python
-	class MyObject(SQLObject, name="my_thing"):
-		...
-	```
-	Defaults to a 'snake_case'-version of the class name (In the above example it would be "my_object")
-	"""
-
-	def __init_subclass__(cls, *, name=None, **kwargs) -> None:
-		super().__init_subclass__(**kwargs)
-		cls.__sql_name__ = (name or camel2snake(cls.__name__)).lower()
+class SQLObject(SQLOOP, metaclass=SQLStructure):
+	def __hash__(self):
+		from SQLOOP._core.Functions import forceHash
+		return hash(self.__sql_name__)+forceHash(vars(self).items())
 
 class Hardcoded:
 
@@ -128,9 +56,16 @@ class Hardcoded:
 	def params(self):
 		return []
 
-class ColumnMeta(NewMeta):
+class ColumnMeta(SQLStructure):
 
+	table : "Table"
 	type : str
+
+	def __str__(self):
+		if self.table is not None:
+			return f"{self.table}.{self.__sql_name__}"
+		else:
+			return super().__str__()
 
 	def __sql__(self):
 		return f"{self} {self.type}"
@@ -138,11 +73,11 @@ class ColumnMeta(NewMeta):
 class Column(SQLObject, metaclass=ColumnMeta):
 
 	type : str = SQL_TYPE_NAMES[None]
+	table : "Table"
 
-	def __init_subclass__(cls, *, type : Union[str,ColumnMeta,"SQL_TYPE"]=None, table=None, **kwargs) -> None:
+	def __init_subclass__(cls, *, type : Union[str,ColumnMeta,SQL_TYPE]=None, table=None, **kwargs) -> None:
 		super().__init_subclass__(**kwargs)
-		if table is not None:
-			cls.__sql_name__ = f"{table}.{cls.__sql_name__}"
+		cls.table = table
 		if isinstance(type, SQL_TYPE):
 			cls.type = type
 		elif type in SQL_TYPE_NAMES:
@@ -167,8 +102,8 @@ class HasColumns:
 	columns : SQLDict[str,Column]
 
 	def __init_subclass__(cls, **kwargs):
-		super().__init_subclass__(**kwargs)
 		cls.columns = SQLDict(filter(lambda v:isRelated(v, Column), vars(cls).values()))
+		super().__init_subclass__(**kwargs)
 
 class HasTables:
 	
@@ -178,7 +113,7 @@ class HasTables:
 		super().__init_subclass__(**kwargs)
 		cls.tables = SQLDict(filter(lambda v:isRelated(v, Table), vars(cls).values()))
 
-class SanitizedValue(metaclass=NewMeta):
+class SanitizedValue(SQLObject, metaclass=SQLStructure):
 	
 	__sql_name__ : str = "SanitizedValue"
 	value : Any
@@ -197,24 +132,47 @@ class SanitizedValue(metaclass=NewMeta):
 		else:
 			return []
 
-class Comparison:
+class Comparison(SQLOOP):
 	
 	left : Any
 	operator : str
 	right : Any
 
 	def __init__(self, left, operator, right, forceLeft=False, forceRight=False):
-		self.left = SanitizedValue(left) if not isRelated(left, SQLObject) and not forceLeft else left
-		if operator not in ["==", "!=", "<", "<=", ">", ">="]:
-			raise ValueError(f"Not a valid operator for comparison: {operator=}")
+		if isinstance(left, SQLOOP):
+			self.left = left
+		elif forceLeft:
+			self.left = Hardcoded(left)
+		else:
+			self.left = SanitizedValue(left)
+		
+		assert operator in ["==", "!=", "<", "<=", ">", ">=", "="], f"Not a valid operator for comparison: {operator=}"
 		self.operator = operator
-		self.right = SanitizedValue(right) if not isRelated(right, SQLObject) and not forceRight else right
+
+		if isinstance(right, SQLOOP):
+			self.right = right
+		elif forceRight:
+			self.right = Hardcoded(right)
+		else:
+			self.right = SanitizedValue(right)
 
 	def __repr__(self):
-		return f"<Comparison {str(self)!r}>"
+		return f"<{type(self).__name__} {str(self)!r}>"
 
 	def __str__(self):
-		return f"{self.left} {self.operator} {self.right}"
+		return f"{self.right if isinstance(self.right , SQLOOP) else '?'} {self.operator} {self.right if isinstance(self.right , SQLOOP) else '?'}"
+	
+	def __getitem__(self, key):
+		if isinstance(key, int):
+			if key == 0:
+				return self.left
+			elif key == 1:
+				return self.right
+			else:
+				raise IndexError()
+		else:
+			raise KeyError()
+		
 	
 	def __bool__(self):
 		return getattr(hash(self.left), OPERATOR_DUNDERS[self.operator])(hash(self.right))
@@ -223,57 +181,38 @@ class Comparison:
 	def params(self):
 
 		out = []
-		if hasattr(self.left, "params") and isinstance(self.left, object):
-			value = self.left.params
-			if not isinstance(value, (property, cached_property)):
-				out.extend(self.left.params)
-		if hasattr(self.right, "params") and isinstance(self.right, object):
-			value = self.right.params
-			if not isinstance(value, (property, cached_property)):
-				out.extend(self.right.params)
+
+		if isinstance(self.left, SanitizedValue):
+			out.append(self.left)
+		else:
+			out.extend(getReadyAttr(self.left, "params", []))
+		
+		if isinstance(self.right, SanitizedValue):
+			out.append(self.right)
+		else:
+			out.extend(getReadyAttr(self.left, "params", []))
 		
 		return out
 
-class Assignment:
+class Assignment(Comparison):
 	
 	left : str|Column
+	operator : str = "="
 	right : Any
 
 	def __init__(self, left : str|Column, right : Any, hardcode=False):
-		self.left = left
-		if hardcode:
-			self.right = Hardcoded(right)
-		else:
-			self.right = right
-
-	def __repr__(self):
-		return f"<Assignment {str(self)!r}>"
-
-	def __str__(self):
-		return f"{self.left} = {self.right if isinstance(self.right , Hardcoded) else '?'}"
-	
-	@property
-	def params(self):
-		if not isinstance(self.right, (SQLObject, NewMeta, Hardcoded)):
-			return [self.right]
-		elif hasattr(self.right, "params"):
-			return self.right.params
+		super().__init__(left, self.operator, right, forceRight=hardcode)
 
 _NO_KEY_VALUE = object()
 QUERY_CACHE = {}
 
-class Prefix(type):
+class Prefix(SQLOOP, type):
 
 	def __str__(self):
 		return self.__name__
-	def __sub__(self, right):
-		return Query(self, right)
-	def __rsub__(self, left):
-		return Query(left, self)
 	def __mul__(self, other):
+		from SQLOOP._core.Schema import ALL
 		return Query(self, ALL, other)
-	def __iter__(self):
-		return iter(Query(self))
 
 class PragmaMeta(Prefix):
 	def __sub__(self, right):
@@ -281,7 +220,7 @@ class PragmaMeta(Prefix):
 			return Query(self, Hardcoded(right))
 		return Query(self, right)
 
-class Word(metaclass=Prefix):
+class Word(SQLOOP, metaclass=Prefix):
 	
 	content : tuple
 	sep : str = ", "
@@ -297,10 +236,7 @@ class Word(metaclass=Prefix):
 		return f"<{pluralize(self.__class__.__base__.__name__)}.{self.__class__.__name__} content={self.content}>"
 		
 	def __str__(self) -> str:
-		return f"{self.__class__.__name__} {self.sep.join(map(str, self.content))}" if len(self.content) else ""
-	
-	def __iter__(self):
-		return iter(Query(self))
+		return f"{self.__class__.__name__} {self.sep.join(map(str, self.content))}"
 
 	def __sql__(self):
 		return self.__str__()
@@ -325,46 +261,63 @@ class EnclosedWord(Word):
 	def __str__(self):
 		return f"{self.__class__.__name__} ({self.sep.join(map(str, self.content))})"
 
-class Query:
+class Query(SQLOOP):
 
 	words : tuple[Word|Any] = tuple()
+	startWord : Word
 	sep : str
 
 	def __new__(cls, *args, **kwargs):
 		
 		from SQLOOP._core.Expressions import Expression
-		item = args
-		while isinstance(item, (Query, tuple)) and len(args) > 0:
-			item = item[0] if isinstance(item, tuple) else item.words[0]
-			if isinstance(item, Word):
-				item = type(item)
-				break
-			elif isinstance(item, Prefix):
-				break
+		from SQLOOP._core.Functions import recursiveWalk
+		
+		if cls is not Query:
+			return super().__new__(cls)
+		elif args and isinstance(args[0], Query) and type(args[0]) is not Query:
+			return super().__new__(type(args[0]))
 		else:
-			return super().__new__(cls, *args, **kwargs)
-
-		for expr in Expression.__subclasses__():
-			if item in expr.startWords:
-				return expr(*args, **kwargs)
-
-	def __init__(self, *words : tuple[Word], sep : str=" "):
-		self.sep = sep
-		if len(words) == 1 and isinstance(words[0], tuple):
-			words = words[0]
-		newWords = []
-		for word in map(lambda x:x if not isinstance(x, tuple) else SQLTuple(x), words):
-			if isinstance(word, Query):
-				newWords.extend(word.words)
+			for item in recursiveWalk(args):
+				if isinstance(item, Word):
+					startWord = type(item)
+					break
+				elif isRelated(item, Word):
+					startWord = item
+					break
 			else:
-				newWords.append(word)
-		self.words = tuple(newWords)
+				return super().__new__(cls)
+			
+			for expr in Expression.__subclasses__():
+				if startWord in expr.startWords:
+					return super().__new__(expr)
+		return super().__new__(cls)
+
+	@overload
+	def __init__(self, iterable : Iterable[Word|SQLTuple], sep : str=" "): ...
+	@overload
+	def __init__(self, *words : Word|SQLTuple, sep : str=" "): ...
+
+	def __init__(self, word, *words : tuple[Word], sep : str=" "):
+		self.sep = sep
+		if words:
+			words = (word, *words)
+		elif isinstance(word, Iterable):
+			words = tuple(word)
+		else:
+			words = (word,)
+		
+		self.words = tuple(SQLTuple(word) if isinstance(word, tuple) else word for word in words)
 	
-	def __iter__(self):
-		string = sql(self)
-		params = self.params
-		yield string
-		yield params
+	def __contains__(self, other):
+		
+		from SQLOOP._core.Functions import recursiveWalk
+		for item in recursiveWalk(self.words):
+			if item == other:
+				return True
+			elif isinstance(item, SQLOOP) and type(item) == other:
+				return True
+		else:
+			return False
 	
 	def __hash__(self):
 		return hash(self.words)
@@ -381,84 +334,60 @@ class Query:
 		return f"({format(str(self), format_spec)})"
 
 	def __sub__(self, right : Self|Word):
-		return Query(self, right)
+		return type(self)(self.words, right)
 	
 	def __rsub__(self, left : Self|Word):
-		return Query(self, left)
+		return type(self)(left, self.words)
 
 	def __mult__(self, right):
+		from SQLOOP._core.Schema import ALL
 		self.words[-1] = self.words[-1](ALL)
-		return Query(self, right)
+		return type(self)(self, right)
 	
-	def __getattr__(self, key):
-		if key in map(*this.__name__, Word.__subclasses__()):
-			return next(filter(*this.__name__ == key, Word.__subclasses__()))
-		return self.__getattribute__(key)
-	
+	@cached_property
+	def startWord(self):
+		
+		from SQLOOP._core.Functions import recursiveWalk
+		for item in recursiveWalk(self.words):
+			if isinstance(item, Word):
+				return type(item)
+			elif isRelated(item, Word):
+				return item
+			else:
+				return type(item)
+
 	@property
 	def cols(self):
+		from SQLOOP._core.Schema import ALL
 		from SQLOOP._core.Words import FROM, SELECT
 		if isinstance(self.words[0], SELECT):
 			if ALL not in self.words[0].content:
 				return len(self.words[0].content)
-			for i, word in enumerate(self.words):
-				if isinstance(word, FROM):
-					fullLength = sum(map(lambda x:len(x.columns) if isRelated(x, Table) else x.cols, word.content))
-					break
-				elif word is FROM:
-					fullLength = sum(map(lambda x:len(x.columns) if isRelated(x, Table) else x.cols, itertools.takewhile(lambda x:isRelated(x, Table) or isinstance(x, Query),self.words[i+1:])))
-					break
+			if self.words[1] is FROM:
+				allCols = len(self.words[2].columns)
+			elif isinstance(self.words[1], FROM):
+				allCols = sum(map(lambda x:len(x.columns), self.words[1].content))
 			else:
 				raise MissingArgument(f"Could not find the 'FROM' of the following 'SELECT' statement:\n{str(self)}")
-			return sum(map(lambda x:1 if x is not ALL else fullLength, self.words[0].content))
-		
-		elif self.words[0] is SELECT:
-			from SQLOOP._core.Aggregates import Aggregate
-			columns = tuple(itertools.takewhile(lambda x:not isRelated(x, Word) or isinstance(x, Aggregate), itertools.islice(self.words, 1, None)))
-			if ALL not in columns:
-				return len(columns)
-			for i, word in itertools.islice(enumerate(self.words), 1+len(columns), None):
-				if isinstance(word, FROM):
-					fullLength = sum(map(lambda x:len(x.columns) if isRelated(x, Table) else x.cols, word.content))
-					break
-				elif word is FROM:
-					fullLength = sum(map(lambda x:len(x.columns) if isRelated(x, Table) else x.cols, itertools.takewhile(lambda x:isRelated(x, Table) or isinstance(x, Query),self.words[i+1:])))
-					break
-			else:
-				raise MissingArgument(f"Could not find the 'FROM' of the following 'SELECT' statement:\n{str(self)}")
-			return sum(map(lambda x:1 if x is not ALL else fullLength, columns))
+			return sum(map(lambda x:1 if x is not ALL else allCols, self.words[0].content))
 		else:
 			return None
 	
 	@property
-	def type(self):
-		if isinstance(self.words[0], SQLObject):
-			return type(self.words[0])
-		elif isRelated(self.words[0], SQLObject):
-			return self.words[0]
-		else:
-			return None
-		
-	@property
 	def content(self):
 		for word in self.words:
-			if isinstance(word, Word) and word.content:
+			if hasattr(word, "content"):
 				return word.content
-			elif isinstance(word, SQLTuple):
-				return word
-		return ()
 	
 	@property
 	def params(self):
 		params = []
 		for word in self.words:
-			if hasattr(word, "params") and isinstance(word, object):
-				value = word.params
-				if not isinstance(value, (property, cached_property)):
-					params.extend(word.params)
+			if isinstance(word, SQLOOP):
+				params.extend(getReadyAttr(word, "params", []))
 		return params
 
-class TableMeta(NewMeta):
+class TableMeta(SQLStructure):
 
 	columns : SQLDict[str,Column]
 	linkedColumns : dict[str,"LinkedColumn"]
@@ -477,6 +406,10 @@ class TableMeta(NewMeta):
 	def __sql__(self):
 		sep = ",\n\t"
 		return f"{self.__sql_name__} (\n\t{sep.join(itertools.chain(map(sql, self.columns), map(str, self.constraints)))}\n)"
+	
+	def __getitem__(self, index : int|str|sql):
+		"""Shorthand for Table.columns[key]"""
+		return self.columns[index]
 
 class Table(SQLObject, HasColumns, metaclass=TableMeta):
 	
@@ -487,9 +420,6 @@ class Table(SQLObject, HasColumns, metaclass=TableMeta):
 	def __init_subclass__(cls, **kwargs):
 		
 		super().__init_subclass__(**kwargs)
-		if any(not any(isinstance(word, (SQLTuple, Query)) for word in opt.words) for opt in cls.options):
-			sep = "\n"
-			raise ValueError(f"All table options must contain a tuple of columns/an expression. These did not: {sep.join(filter(lambda opt:any(not any(isinstance(word, (SQLTuple, Query)) for word in opt.words),cls.options)))}")
 		numberOfColumns = sum(map(lambda x:1, filter(lambda x:isRelated(x, Column), vars(cls).values())))
 		for i in range(numberOfColumns):
 			if hasattr(cls, alphabetize(i)):
@@ -508,16 +438,13 @@ class Table(SQLObject, HasColumns, metaclass=TableMeta):
 			cls.__doc__ += "\n".join(["```python", *(f"{cls.__name__}.{name} = {col.__name__} # {col}" for name, col in vars(cls).items() if isRelated(col, Column)), "```"])
 		else:
 			cls.__doc__ = "\n".join(["```python", *(f"{cls.__name__}.{name} = {col.__name__} # {col}" for name, col in vars(cls).items() if isRelated(col, Column)), "```"])
-		cls.linkedColumns = {str(col):NewMeta(str(col), (LinkedColumn,), {}, type=col.type, table=cls) for col in cls.columns}
-		super().__init_subclass__(**kwargs)
+		cls.linkedColumns = {str(col):SQLStructure(str(col), (LinkedColumn,), {}, type=col.type, table=cls) for col in cls.columns}
 
 	def __init__(self, database):
 		self.database = database
 	
-	def __getitem__(self, items):
-		from SQLOOP._core.Databases import Selector
-		out = Selector(self.database._connection, (type(self), ))
-		return out[items]
+	def __getitem__(self, index : int|str|sql):
+		return self.columns[index]
 	
 	def __call__(self, *args, **kwargs):
 		from SQLOOP._core.Databases import Selector
@@ -525,7 +452,7 @@ class Table(SQLObject, HasColumns, metaclass=TableMeta):
 		where = tuple(itertools.chain(filter(lambda x:not isinstance(x, Comparison), args), map(lambda x:Comparison(x[0], "=", x[1]), kwargs.items())))
 		return iter(Selector(self.database._connection, (type(self), ))[where])
 
-class IndexMeta(NewMeta):
+class IndexMeta(SQLStructure):
 
 	table : Any
 
@@ -539,59 +466,4 @@ class Index(SQLObject, HasColumns, metaclass=IndexMeta):
 	def __sql__(self):
 		return f"{self} ON {self.table} ({', '.join(map(str, self.columns))})"
 
-class SQL_TYPE:
-	args : tuple
-	def __init__(self, *args):
-		self.args = args
-	def __str__(self):
-		if self.args:
-			return f"{type(self).__name__.replace('_', ' ')}({', '.join(map(str, self.args))})"
-		else:
-			return f"{type(self).__name__}"
-class VARCHAR(SQL_TYPE): pass
-class CHAR(SQL_TYPE): pass
-class INT(SQL_TYPE): pass
-class INTEGER(SQL_TYPE): pass
-class TINYINT(SQL_TYPE): pass
-class SMALLINT(SQL_TYPE): pass
-class MEDIUMINT(SQL_TYPE): pass
-class BIGINT(SQL_TYPE): pass
-class UNSIGNED_BIG_INT(SQL_TYPE): pass
-class INT2(SQL_TYPE): pass
-class INT8(SQL_TYPE): pass
-class CHARACTER(SQL_TYPE): pass
-class VARYING_CHARACTER(SQL_TYPE): pass
-class NCHAR(SQL_TYPE): pass
-class NATIVE_CHARACTER(SQL_TYPE): pass
-class NVARCHAR(SQL_TYPE): pass
-class TEXT(SQL_TYPE): pass
-class CLOB(SQL_TYPE): pass
-class BLOB(SQL_TYPE): pass
-class REAL(SQL_TYPE): pass
-class DOUBLE(SQL_TYPE): pass
-class DOUBLE_PRECISION(SQL_TYPE): pass
-class FLOAT(SQL_TYPE): pass
-class NUMERIC(SQL_TYPE): pass
-class DECIMAL(SQL_TYPE): pass
-class BOOLEAN(SQL_TYPE): pass
-class DATE(SQL_TYPE): pass
-class DATETIME (SQL_TYPE): pass
-
-class ALL(Column, name="*"): pass
-
 class LinkedColumn(Column): pass
-
-class SQLITE_MASTER(Table, name="sqlite_master"):
-	
-	class SQL(Column, name="sql"): pass
-	class NAME(Column, name="name"): pass
-	class TYPE(Column, name="type"): pass
-	class ROW_ID(Column, name="rowid"): pass
-	class TABLE_NAME(Column, name="tbl_name"): pass
-	class ROOT_PAGE(Column, name="rootpage"): pass
-class SQL(Column, name="sql"): pass
-class NAME(Column, name="name"): pass
-class TYPE(Column, name="type"): pass
-class ROW_ID(Column, name="rowid"): pass
-class TABLE_NAME(Column, name="tbl_name"): pass
-class ROOT_PAGE(Column, name="rootpage"): pass

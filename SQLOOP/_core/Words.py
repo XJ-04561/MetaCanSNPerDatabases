@@ -45,6 +45,7 @@ class SET(Word):
 class UNIQUE(EnclosedWord): pass
 class SELECT(Word):
 	def __mult__(self : Word, right : Column|str):
+		from SQLOOP._core.Schema import ALL
 		return Query(self(ALL), right)
 class FROM(Word): pass
 class WHERE(Word): sep : str = " AND "

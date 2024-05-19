@@ -35,22 +35,16 @@ class LimitDict(dict):
 			return super().popitem()
 
 
-def prodHash(obj, start=True):
+def forceHash(obj):
+	if hasattr(obj, "__hash__"):
+		try:
+			return hash(obj)
+		except TypeError:
+			pass
 	if isinstance(obj, Iterable):
-		N = 0
-		totalSize = 0
-		for el in obj:
-			n, size = prodHash(el, start=False)
-			N += n << 64*totalSize
-			totalSize += size
-		if start:
-			return N
-		else:
-			return N, totalSize
-	elif hasattr(obj, "__hash__"):
-		return hash(obj) if start else (hash(obj), 1)
+		return sum(forceHash(el) for el in obj)
 	else:
-		return id(obj) if start else (hash(obj), 1)
+		return id(obj)
 
 class CacheMeta(type):
 
@@ -68,9 +62,9 @@ class AnyCache(metaclass=CacheMeta):
 
 	def __call__(self, *args, __self__=None, **kwargs):
 		if hasattr(self.func, "__self__"):
-			hashKey = prodHash(itertools.chain((self.func.__self__,), args, kwargs.items()))
+			hashKey = forceHash(itertools.chain((self.func.__self__,), args, kwargs.items()))
 		else:
-			hashKey = prodHash(itertools.chain(args, kwargs.items()))
+			hashKey = forceHash(itertools.chain(args, kwargs.items()))
 		if hashKey not in self._cache:
 			if __self__ is not None:
 				self._cache[hashKey] = self.func(*args, **kwargs)
@@ -166,6 +160,16 @@ def formatType(columns : tuple["Column"]):
 			case "unknown":
 				yield "{:>12}"
 
+def recursiveWalk(iterable):
+	"""Generator that iterates in-order through an iterable and down through all their iterable elements. Going all the
+	way down through an element before progressing to the next element."""
+	for item in iterable:
+		if isinstance(item, Iterable):
+			for innerItem in recursiveWalk(item):
+				yield innerItem
+		else:
+			yield item
+
 def hashQuery(database : "Database", query : "Query"):
 	"""Converts entries returned into strings via str or repr (if __str__ not implemented) and then replaces whitespace
 	with a simple " " and joines all the entries with "; " before getting the hash of the final `str` object."""
@@ -199,9 +203,10 @@ def verifyDatabase(cls, filepath):
 
 @AnyCache
 def getSmallestFootprint(columns : set["Column"], tables : set["Table"]) -> tuple["Table"]|None:
-	
+	set.issubset
+	mustHaves = set(filter(None, map(*this.table, columns)))
 	for i in range(len(tables)):
-		for subTables in itertools.combinations(tables, i+1):
+		for subTables in filter(mustHaves.issubset, itertools.combinations(tables, i+1)):
 			if all(map(lambda c:any(map(lambda t:c in t, subTables)), columns)):
 				return subTables
 
@@ -255,6 +260,8 @@ def createSubqueries(startTables : SQLDict["Table"], allTables : SQLDict["Table"
 			raise ImpossiblePathing(tables=startTables, columns=f"({', '.join(map(lambda x:str(x.left), values))})")
 	return list(subqueries.values())
 
-
-from SQLOOP._core.Structures import Column, Table, Query, Comparison
-from SQLOOP._core.Databases import Database
+try:
+	from SQLOOP._core.Structures import Column, Table, Query, Comparison
+	from SQLOOP._core.Databases import Database
+except:
+	pass

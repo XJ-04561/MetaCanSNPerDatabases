@@ -32,9 +32,9 @@ def test_new():
 	
 	assert MySecondTable.__name__ == "MySecondTable", f'{MySecondTable.__name__=} == {"MySecondTable"=}'
 	assert MySecondTable.__sql_name__ == "my_table2", f'{MySecondTable.__sql_name__=} == {"my_table2"=}'
-	assert MySecondTable.columns["id"] == MySecondTable.id, f'{MySecondTable.columns["id"]=} == {MySecondTable.id=}'
-	assert MySecondTable.columns["name"] == MySecondTable.name, f'{MySecondTable.columns["name"]=} == {MySecondTable.name=}'
-	assert MySecondTable.columns["special_column"] == MySecondTable.special, f'{MySecondTable.columns["special_column"]=} == {MySecondTable.special=}'
+	assert MySecondTable["id"] == MySecondTable.id, f'{MySecondTable["id"]=} == {MySecondTable.id=}'
+	assert MySecondTable["name"] == MySecondTable.name, f'{MySecondTable["name"]=} == {MySecondTable.name=}'
+	assert MySecondTable["special_column"] == MySecondTable.special, f'{MySecondTable["special_column"]=} == {MySecondTable.special=}'
 	assert MySecondTable.columns == (MySecondTable.id, MySecondTable.name, MySecondTable.special), f'{MySecondTable.columns=} == {(MySecondTable.id, MySecondTable.name, MySecondTable.special)=}'
 
 	assert MyTable.columns == MySecondTable.columns, f'{MyTable.columns=} == {MySecondTable.columns=}'
@@ -58,7 +58,7 @@ def test_words():
 
 def test_database():
 
-	from SQLOOP.core import Column, Table, VARCHAR
+	from SQLOOP.core import Column, Table, VARCHAR, CHAR
 
 	class ID(Column, name="pn", type=int): pass
 	class Name(Column, type=VARCHAR(100)): pass
@@ -73,8 +73,8 @@ def test_database():
 		B = Name
 		C = Age
 
-		options = (
-			PRIMARY - KEY - (ID,),
+		constraints = (
+			PRIMARY - KEY (ID),
 		)
 	
 	class PhoneBookTable(Table):
@@ -93,13 +93,19 @@ def test_database():
 		C = NameIndex
 
 	assert NamesTable in MyDatabase.tables
+	assert NamesTable in MyDatabase
 	assert PhoneBookTable in MyDatabase.tables
+	assert PhoneBookTable in MyDatabase
+	assert NameIndex not in MyDatabase.tables
 	assert NameIndex in MyDatabase.indexes
+	assert NameIndex in MyDatabase
 	
 	assert ID in NamesTable
 	assert PN in PhoneBookTable
 	assert ID in PhoneBookTable
 	assert PN in NamesTable
+	assert ID in MyDatabase
+	assert PN in MyDatabase
 
 	assert NamesTable.A in NamesTable
 	assert PhoneBookTable.A in PhoneBookTable
@@ -117,30 +123,15 @@ def test_database():
 	# Is True if all assertions for a good database holds
 
 	try:
-		database.exception
+		raise database.exception
 	except Exception as e:
 		assert isinstance(e, DatabaseSchemaEmpty)
 	# Is the exception that the first broken assertion wants to raise.
 	# Use is:
 	# raise database.exception
 
-	# print(database.tablesHash, database.CURRENT_TABLES_HASH)
-	# print(database.indexesHash, database.CURRENT_INDEXES_HASH)
-
 	database.fix()
 	# Will attempt to fix all problems which cause assertions to not hold
-
-	# print(database.tablesHash, database.CURRENT_TABLES_HASH)
-	# print(database.indexesHash, database.CURRENT_INDEXES_HASH)
-	# for string in database(SELECT - SQL - FROM - SQLITE_MASTER):
-	# 	if "INDEX" in string:
-	# 		print(hash(sql(database.indexes[string.split("(")[0].strip().split()[-3]])), sql(database.indexes[string.split("(")[0].strip().split()[-3]]))
-	# 	elif "TABLE" in string:
-	# 		print(hash(sql(database.tables[string.split("(")[0].strip().split()[-1]])), sql(database.tables[string.split("(")[0].strip().split()[-1]]))
-		
-	# 	print(hash(tableCreationCommand.sub("", string)), tableCreationCommand.sub("", string))
-	# for ass in database.assertions:
-	# 	print(ass, ass.condition(database=database))
 	
 	assert database.valid
 
@@ -154,3 +145,4 @@ def test_database():
 	assert list(database[PN][NamesTable]) == [2,1]
 	assert list(database[Name][NamesTable]) == ["Brunhilda Brunson", "Eddrik Reensen"]
 	assert list(database[ALL][PhoneBookTable][Name == "Eddrik Reensen"]) == [(1, "+46731234567", "Råttgränd 90"), (1, "+46733025383", "Klintvägen 69")]
+	assert list(database[Name][NamesTable][PN == 1]) == "Eddrik Reensen"
