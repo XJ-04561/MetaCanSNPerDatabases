@@ -202,13 +202,19 @@ def verifyDatabase(cls, filepath):
 	return cls(filepath, "r").valid
 
 @AnyCache
-def getSmallestFootprint(columns : set["Column"], tables : set["Table"]) -> tuple["Table"]|None:
-	set.issubset
+def getSmallestFootprint(tables : set["Table"], columns : set["Column"], secondaryColumns : set["Column"]=None) -> tuple["Table"]|None:
+	
 	mustHaves = set(filter(None, map(*this.table, columns)))
+	candidates = []
 	for i in range(len(tables)):
 		for subTables in filter(mustHaves.issubset, itertools.combinations(tables, i+1)):
 			if all(map(lambda c:any(map(lambda t:c in t, subTables)), columns)):
-				return subTables
+				candidates.append(subTables)
+	if secondaryColumns is not None:
+		return max(candidates, key=lambda x:sum(c in x for c in secondaryColumns))
+	else:
+		return next(iter(candidates)) if candidates else ()
+	
 
 def recursiveSubquery(startCol : "Column", tables : SQLDict["Table"], values : list[Union["Comparison", "Query"]]) -> "Comparison":
 	from SQLOOP._core.Words import IN, SELECT, FROM, WHERE
