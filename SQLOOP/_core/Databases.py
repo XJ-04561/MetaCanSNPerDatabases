@@ -244,9 +244,13 @@ class Database(metaclass=DatabaseMeta):
 			items = (items, )
 		from SQLOOP._core.Functions import getSmallestFootprint, createSubqueries
 		columns = tuple(filter(lambda x:isRelated(x, Column), items)) or (ALL)
-		tables = tuple(filter(lambda x:isRelated(x, Table), items)) or getSmallestFootprint(set(filter(lambda x:x is not ALL, itertools.chain(*map(lambda x:(x,) if not isinstance(x, Aggregate) else x.content, columns)))), self.tables)
+
+		comps = tuple(filter(lambda x:isinstance(x, Comparison), items))
+		tables = tuple(filter(lambda x:isRelated(x, Table), items)) or getSmallestFootprint(self.tables, set(filter(lambda x:x is not ALL, itertools.chain(*map(lambda x:(x,) if not isinstance(x, Aggregate) else x.content, columns)))), secondaryColumns=tuple(map(*this.left, comps)))
+		
 		joinedColumns = {col for t in tables for col in t.columns}
-		distant, local = binner(lambda x:x.left in joinedColumns, tuple(filter(lambda x:isinstance(x, Comparison), items)), default=2)
+
+		distant, local = binner(lambda x:x.left in joinedColumns, comps, default=2)
 		wheres = local + createSubqueries(tables, self.tables, distant)
 		
 		if wheres:
