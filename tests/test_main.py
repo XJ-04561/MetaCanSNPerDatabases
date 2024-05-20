@@ -115,7 +115,7 @@ def test_database():
 	assert sql(NamesTable) == "names_table (\n\tpn INTEGER,\n\tname VARCHAR(100),\n\tage INTEGER,\n\tPRIMARY KEY (pn)\n)"
 	assert sql(PhoneBookTable) == "phone_book_table (\n\tpn INTEGER,\n\tphone_number CHAR(20),\n\tadress VARCHAR(200)\n)"
 
-	###############################################################
+	###############
 
 	database = MyDatabase(":memory:", "w")
 
@@ -142,7 +142,7 @@ def test_database():
 	database(INSERT - INTO - PhoneBookTable - (PN, PhoneNumber, Adress) - VALUES - (1, "+46731234567", "Råttgränd 90"))
 	database(INSERT - INTO - PhoneBookTable - (PN, PhoneNumber, Adress) - VALUES - (1, "+46733025383", "Klintvägen 69"))
 
-	assert list(database[PN][NamesTable]) == [2,1]
-	assert list(database[Name][NamesTable]) == ["Brunhilda Brunson", "Eddrik Reensen"]
-	assert list(database[ALL][PhoneBookTable][Name == "Eddrik Reensen"]) == [(1, "+46731234567", "Råttgränd 90"), (1, "+46733025383", "Klintvägen 69")]
-	assert list(database[Name][NamesTable][PN == 1]) == "Eddrik Reensen"
+	assert set(database[PN, NamesTable]) == {2,1}
+	assert set(database[Name, NamesTable]) == {"Brunhilda Brunson", "Eddrik Reensen"}
+	assert set(database[ALL, PhoneBookTable, Name == "Eddrik Reensen"]) == {(1, "+46731234567", "Råttgränd 90"), (1, "+46733025383", "Klintvägen 69")}
+	assert database[Name, NamesTable, PN == 1] == "Eddrik Reensen"

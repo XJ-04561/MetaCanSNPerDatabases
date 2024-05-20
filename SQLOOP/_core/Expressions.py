@@ -10,7 +10,7 @@ class Expression(Query):
 	startWords : set[type[Word]]
 	startWord : type[Word]
 
-	def __init__(self, startWord, *words: tuple[Word], sep: str = " "):
+	def __init__(self, startWord, *words: tuple[Word], sep: str = None):
 		super().__init__(startWord, *words, sep=sep)
 		self.startWord = type(self.words[0]) if isinstance(self.words[0], Word) else self.words[0] 
 
@@ -20,36 +20,98 @@ class SelectStatement(Expression):
 	startWord = SELECT
 	
 	@property
-	def columns(self):
-		return self.words[0].content
+	def cols(self):
 
-	@cached_property
+		from SQLOOP._core.Schema import ALL
+		n = 0
+		for column in self.columns:
+			if column is ALL:
+				n += sum(map(len, self.tables))
+			else:
+				n += 1
+		return n
+
+	@property
+	def columns(self):
+		"""The columns of a SELECT-statement must be either the content given in the instance creation or if the SELECT
+		is the type object itself, then the only column selected is the second word in the statement."""
+		try:
+			return self.words[0].content if isinstance(self.words[0], SELECT) else (self.words[1], )
+		except IndexError:
+			return ()
+
+	@columns.setter
+	def columns(self, values):
+		if not isinstance(values, tuple):
+			values = (values,)
+		for i, word in enumerate(self.words):
+			if word is SELECT:
+				self.words = (self.words[:i], SELECT(*values), self.words[i+2:])
+				break
+			elif isinstance(word, FROM):
+				self.words = (self.words[:i], SELECT(*values), self.words[i+1:])
+				break
+		else:
+			self.words = self.words + (SELECT(*values),)
+
+	@property
 	def tables(self):
 		for i, word in enumerate(self.words):
 			if isinstance(word, FROM):
 				return word.content
 			elif word is FROM:
-				return tuple(filter(lambda x:not isRelated(x, Word), itertools.takewhile(lambda x:x is not WHERE and not isinstance(x, WHERE),self.words[i:])))
+				try:
+					return (self.words[i+1], )
+				except IndexError:
+					return ()
 	
-	@cached_property
+	@tables.setter
+	def tables(self, values):
+		if not isinstance(values, tuple):
+			values = (values,)
+		for i, word in enumerate(self.words):
+			if word is FROM:
+				self.words = (self.words[:i], FROM(*values), self.words[i+2:])
+				break
+			elif isinstance(word, FROM):
+				self.words = (self.words[:i], FROM(*values), self.words[i+1:])
+				break
+		else:
+			self.words = self.words + (FROM(*values),)
+	
+	@property
 	def wheres(self):
-		tables = self.tables
 		_iter = iter(self.words)
 		for word in _iter:
 			if isinstance(word, WHERE):
-				return [col for comp in word.content for col in comp if any(col in t for t in tables)]
+				return word.content
 			elif word is WHERE:
 				ret = []
 				for comp in itertools.takewhile(lambda x:isinstance(x, Comparison) or x is AND, _iter):
 					if comp is AND:
 						continue
-					for col in comp:
-						if any(col in t for t in tables):
-							ret.append(col)
-				return ret
-		return []
+					ret.append(comp)
+				return tuple(ret)
+		return ()
 	
-	@cached_property
+	@wheres.setter
+	def wheres(self, values):
+		if not isinstance(values, tuple):
+			values = (values,)
+		for i, word in enumerate(self.words):
+			if word is WHERE:
+				for j, word2 in enumerate(self.words[i:]):
+					if word2 is not AND and not isinstance(word2, Comparison):
+						break
+				self.words = (*self.words[:i], WHERE(*values), *self.words[i+j:])
+				break
+			elif isinstance(word, WHERE):
+				self.words = (*self.words[:i], WHERE(values), *self.words[i+1:])
+				break
+		else:
+			self.words = self.words + (WHERE(*values),)
+	
+	@property
 	def singlet(self):
 		from SQLOOP._core.Aggregates import Aggregate
 		for col in self.columns:
@@ -57,18 +119,18 @@ class SelectStatement(Expression):
 				break
 		else:
 			return True
+		conditionalColumns = set(map(*this.left, filter(lambda x:isRelated(x.left, Column) and x.operator != "IN" and isinstance(x.right, SanitizedValue), self.wheres)))
 		for constraint in self.constraints:
 			if not constraint.unique:
 				continue
-			if all(col not in self.wheres for col in constraint.columns):
-				break
+			if conditionalColumns.issuperset(constraint.columns):
+				return True
 		else:
-			return True
-		return False
+			return False
 
-	@cached_property
-	def constraints(self):
-		return set(itertools.chain(*(t.constraints for t in self.tables)))
+	@property
+	def constraints(self) -> set["TableConstraint"]:
+		return set(constraint for t in self.tables for constraint in t.constraints)
 
 class TableConstraint(Expression):
 
@@ -90,52 +152,3 @@ class TableConstraint(Expression):
 				return word.content
 	
 	expression = columns
-
-# class Expression:
-
-# 	word : Word|Query
-# 	contents : tuple["SyntaxNode"]
-# 	def __init__(self, word, contents):
-# 		self.word = word
-# 		self.contents = contents
-# 	def __eq__(self, other):
-# 		return isinstance(other, self.word)
-# 	def __getitem__(self, word):
-# 		if isinstance(word, Query):
-# 			word = word.words[0]
-
-
-# 		for node in self.contents:
-# 			if word == node.word:
-# 				return node
-
-# class SyntaxNode:
-
-# 	word : Word|Query
-# 	nexts = list[Self]
-
-# 	def __init__(self, word):
-# 		self.word = word
-# 		self.nexts = []
-	
-# 	def __rshift__(self, other):
-# 		ret = SyntaxNode(other)
-# 		self.nexts.append(ret)
-# 		return ret
-
-# 	def __getitem__(self, word):
-# 		for node in self.nexts:
-# 			if word == node.word:
-# 				return node
-
-# class SyntaxDict(dict):
-
-# 	def __init__(self, iterable):
-# 		for key, value in iterable:
-# 			if isinstance(key, Union):
-# 				for subKey in key:
-# 					self[subKey] = value
-# 			else:
-# 				self[key] = value
-# 	def __getitem__(self, name):
-	

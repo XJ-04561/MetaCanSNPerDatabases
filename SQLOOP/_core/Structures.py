@@ -31,7 +31,7 @@ class SQLObject(SQLOOP, metaclass=SQLStructure):
 		from SQLOOP._core.Functions import forceHash
 		return hash(self.__sql_name__)+forceHash(vars(self).items())
 
-class Hardcoded:
+class Hardcoded(SQLOOP):
 
 	value : Any
 
@@ -41,10 +41,7 @@ class Hardcoded:
 			self.__doc__ = value.__doc__
 	
 	def __str__(self):
-		if isinstance(self.value, str):
-			return f"'{self.value}'"
-		else:
-			return str(self.value)
+		return str(self.value)
 	
 	def __sub__(self, right):
 		return Query(self, right)
@@ -128,7 +125,7 @@ class SanitizedValue(SQLObject, metaclass=SQLStructure):
 	@property
 	def params(self):
 		if self.value is not None:
-			return [self.value]
+			return [repr(self.value)] if type(self.value) is str else [self.value]
 		else:
 			return []
 
@@ -146,7 +143,7 @@ class Comparison(SQLOOP):
 		else:
 			self.left = SanitizedValue(left)
 		
-		assert operator in ["==", "!=", "<", "<=", ">", ">=", "="], f"Not a valid operator for comparison: {operator=}"
+		assert operator in ["==", "!=", "<", "<=", ">", ">=", "=", "IN"], f"Not a valid operator for comparison: {operator=}"
 		self.operator = operator
 
 		if isinstance(right, SQLOOP):
@@ -160,7 +157,7 @@ class Comparison(SQLOOP):
 		return f"<{type(self).__name__} {str(self)!r}>"
 
 	def __str__(self):
-		return f"{self.right if isinstance(self.right , SQLOOP) else '?'} {self.operator} {self.right if isinstance(self.right , SQLOOP) else '?'}"
+		return f"{self.left if not isinstance(self.left, SanitizedValue) else '?'} {self.operator} {self.right if not isinstance(self.right, SanitizedValue) else '?'}"
 	
 	def __getitem__(self, key):
 		if isinstance(key, int):
@@ -183,14 +180,14 @@ class Comparison(SQLOOP):
 		out = []
 
 		if isinstance(self.left, SanitizedValue):
-			out.append(self.left)
+			out.append(self.left.value)
 		else:
 			out.extend(getReadyAttr(self.left, "params", []))
 		
 		if isinstance(self.right, SanitizedValue):
-			out.append(self.right)
+			out.append(self.right.value)
 		else:
-			out.extend(getReadyAttr(self.left, "params", []))
+			out.extend(getReadyAttr(self.right, "params", []))
 		
 		return out
 
@@ -201,7 +198,7 @@ class Assignment(Comparison):
 	right : Any
 
 	def __init__(self, left : str|Column, right : Any, hardcode=False):
-		super().__init__(left, self.operator, right, forceRight=hardcode)
+		super().__init__(left, self.operator, right, forceLeft=True, forceRight=hardcode)
 
 _NO_KEY_VALUE = object()
 QUERY_CACHE = {}
@@ -265,7 +262,7 @@ class Query(SQLOOP):
 
 	words : tuple[Word|Any] = tuple()
 	startWord : Word
-	sep : str
+	sep : str = " "
 
 	def __new__(cls, *args, **kwargs):
 		
@@ -297,15 +294,13 @@ class Query(SQLOOP):
 	@overload
 	def __init__(self, *words : Word|SQLTuple, sep : str=" "): ...
 
-	def __init__(self, word, *words : tuple[Word], sep : str=" "):
-		self.sep = sep
-		if words:
-			words = (word, *words)
-		elif isinstance(word, Iterable):
-			words = tuple(word)
+	def __init__(self, word, *words : tuple[Word], sep : str|None=None):
+		if sep is not None:
+			self.sep = sep
+		if isinstance(word, Iterable):
+			words = (*word, *words)
 		else:
-			words = (word,)
-		
+			words = (word, *words)
 		self.words = tuple(SQLTuple(word) if isinstance(word, tuple) else word for word in words)
 	
 	def __contains__(self, other):
@@ -402,6 +397,9 @@ class TableMeta(SQLStructure):
 			return self.linkedColumns[str(value)]
 		else:
 			return value
+		
+	def __len__(self):
+		return len(self.columns)
 
 	def __sql__(self):
 		sep = ",\n\t"

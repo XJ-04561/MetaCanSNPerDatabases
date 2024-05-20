@@ -24,16 +24,6 @@ class Aggregate:
 	
 	def __hash__(self):
 		return self.__str__().__hash__()
-	
-	# def __format__(self, format_spec : str):
-	# 	if format_spec.endswith("!sql"):
-	# 		return self.__sql__().__format__(format_spec.rstrip("!sql"))
-	# 	elif format_spec.endswith("!r"):
-	# 		return self.__repr__().__format__(format_spec.rstrip("!r"))
-	# 	elif format_spec.endswith("!s"):
-	# 		return self.__str__().__format__(format_spec.rstrip("!s"))
-	# 	else:
-	# 		return self.__str__().__format__(format_spec)
 
 class AVG(Aggregate): pass
 class COUNT(Aggregate): pass

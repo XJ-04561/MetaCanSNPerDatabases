@@ -210,7 +210,7 @@ def getSmallestFootprint(columns : set["Column"], tables : set["Table"]) -> tupl
 			if all(map(lambda c:any(map(lambda t:c in t, subTables)), columns)):
 				return subTables
 
-def recursiveSubquery(startCol : "Column", tables : SQLDict["Table"], values : list[Union["Comparison", "Query"]]):
+def recursiveSubquery(startCol : "Column", tables : SQLDict["Table"], values : list[Union["Comparison", "Query"]]) -> "Comparison":
 	from SQLOOP._core.Words import IN, SELECT, FROM, WHERE
 	if len(tables) == 0:
 		raise ValueError(f"SubQuerying ran out of tables to subquery! {values=}")
@@ -222,6 +222,8 @@ def recursiveSubquery(startCol : "Column", tables : SQLDict["Table"], values : l
 
 def subqueryPaths(startTables : SQLDict["Table"], columns : SQLDict["Column"], allTables : SQLDict["Table"]) -> list[list[list["Table"], SQLDict["Column"]]]:
 	
+	if not columns:
+		return []
 	visited : set[Table] = set(startTables)
 	paths : list[list[Table]] = [[t] for t in startTables]
 	while paths:
@@ -244,21 +246,22 @@ def subqueryPaths(startTables : SQLDict["Table"], columns : SQLDict["Column"], a
 		paths = nPaths
 	return None
 
-def createSubqueries(startTables : SQLDict["Table"], allTables : SQLDict["Table"], values : "Comparison"):
+def createSubqueries(startTables : SQLDict["Table"], allTables : SQLDict["Table"], values : tuple["Comparison"]):
 	_allTables = allTables.difference(startTables)
 	paths = subqueryPaths(startTables, SQLDict(map(*this.left, values)), _allTables)
 	subqueries = {}
-	for path, targetColumn in reversed(paths):
+	for path, targetColumns in reversed(paths):
 		subValues = []
 		for comp in values:
-			if comp.left is targetColumn:
+			if comp.left in targetColumns:
 				subValues.append(comp)
+		
 		if path[-1] in subqueries:
 			subValues.append(subqueries.pop(path[-1]))
 		subqueries[path[0]] = recursiveSubquery(path[0].columns.intersection(path[1].columns)[0], path[1:], subValues)
 		if subqueries[path[0]] is None:
 			raise ImpossiblePathing(tables=startTables, columns=f"({', '.join(map(lambda x:str(x.left), values))})")
-	return list(subqueries.values())
+	return tuple(subqueries.values())
 
 try:
 	from SQLOOP._core.Structures import Column, Table, Query, Comparison

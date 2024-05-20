@@ -5,7 +5,9 @@ from typing import overload, final, Any
 
 class BEGIN(Word): pass
 class ROLLBACK(Word): pass
-class IN(EnclosedWord): pass
+class IN(EnclosedWord):
+	def __rsub__(self, left):
+		return Comparison(left, "IN", self.content[0] if len(self.content) == 1 else SQLTuple(self.content))
 class TRANSACTION(Word): pass
 class COMMIT(Word): pass
 class CONSTRAINT(Word): pass

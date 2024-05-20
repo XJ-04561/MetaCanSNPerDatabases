@@ -16,7 +16,6 @@ from PseudoPathy.PathShortHands import *
 
 from SQLOOP._core.Exceptions import *
 from This import this
-# from abc import ABC, ABCMeta, abstractmethod
 
 tableCreationCommand = re.compile(r"^\W*CREATE\W+(TEMP|TEMPORARY\W)?\W*(TABLE|INDEX)(\W+IF\W+NOT\W+EXISTS)?\W+(\w[.])?", flags=re.ASCII|re.IGNORECASE)
 
@@ -40,11 +39,21 @@ camelKiller = re.compile(r"(?<=[^A-Z])(?=[A-Z])")
 camelCase = re.compile("^[^_]+$")
 snakeKiller = re.compile(r"[_](\w)")
 
-def binner(key, iterable, outType=list):
+def binner(key : Callable, iterable : Iterable, outType : type=list, default=None):
 	if issubclass(outType, dict):
-		return outType((i,tuple(data)) for i, data in itertools.groupby(sorted(iterable, key=key), key=key))
+		if default is None:
+			return outType((i,tuple(data)) for i, data in itertools.groupby(sorted(iterable, key=key), key=key))
+		ret = {l:() for l in default}
+		for l, data in itertools.groupby(sorted(iterable, key=key), key=key):
+			ret[l] = tuple(data)
+		return outType(ret)
 	else:
-		return outType(tuple(data) for i, data in itertools.groupby(sorted(iterable, key=key), key=key))
+		if default is None:
+			return outType(tuple(data) for i, data in itertools.groupby(sorted(iterable, key=key), key=key))
+		ret = [() for _ in range(default)]
+		for i, data in itertools.groupby(sorted(iterable, key=key), key=key):
+			ret[i] = tuple(data)
+		return outType(ret)
 
 def first(iterator : Iterable[_T]|Iterator[_T]) -> _T|None:
 	try:
@@ -132,13 +141,15 @@ class SQLOOP:
 	
 	def __sub__(self, right):
 		from SQLOOP._core.Structures import Query
+		from SQLOOP._core.Words import IN
+		if isinstance(right, IN): return NotImplemented
 		return Query(self, right)
 	
 	def __rsub__(self, left):
 		from SQLOOP._core.Structures import Query
 		return Query(left, self)
 	
-	def __matmul__(self, other : sqlite3.Connection) -> Any:
+	def __matmul__(self, other : sqlite3.Connection) -> sqlite3.Cursor:
 		from SQLOOP._core.Databases import Fetcher, Query
 		if isinstance(other, sqlite3.Connection):
 			return other.execute(str(self), self.params)
@@ -164,7 +175,7 @@ class SQLTuple(SQLOOP, tuple):
 		return tuple.__new__(cls, map(lambda x:SQLTuple(x) if type(x) is tuple else x, args))
 	
 	def __str__(self):
-		return f"({', '.join(map(lambda x:str(x) if isinstance(x, SQLOOP) else "?", self))})"
+		return f"({', '.join(map(lambda x:format(x) if isinstance(x, SQLOOP) else "?", self))})"
 	
 	@property
 	def params(self):
@@ -379,7 +390,8 @@ OPERATOR_DUNDERS = {
 	"<" : "__lt__",
 	"<=" : "__le__",
 	">" : "__gt__",
-	">=" : "__ge__"
+	">=" : "__ge__",
+	"IN" : "__contains__"
 }
 
 whitespacePattern = re.compile(r"\s+")

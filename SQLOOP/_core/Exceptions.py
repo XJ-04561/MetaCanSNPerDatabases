@@ -31,8 +31,7 @@ class SchemaNotEmpty(Assertion):
 		from SQLOOP._core.Words import SELECT, FROM
 		from SQLOOP._core.Schema import ALL, SQLITE_MASTER
 		from SQLOOP._core.Aggregates import COUNT
-		res = database(SELECT - COUNT (ALL) - FROM - SQLITE_MASTER)
-		return database(SELECT - COUNT (ALL) - FROM - SQLITE_MASTER) != 0
+		return database(SELECT (COUNT (ALL)) - FROM (SQLITE_MASTER)) != 0
 	@classmethod
 	def rectify(self, database : "Database") -> None:
 		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT
@@ -59,7 +58,7 @@ class ValidTablesSchema(Assertion):
 			raise DatabaseError("Could not clear indexes!")
 		database(BEGIN - TRANSACTION)
 		for table in database.tables:
-			database(ALTER - TABLE - table - RENAME - TO - f"{table}2")
+			database(ALTER - TABLE (table) - RENAME - TO - f"{table}2")
 			database(CREATE - TABLE - sql(table))
 			database(INSERT - INTO - table - (SELECT (ALL) - FROM(f"{table}2") ))
 			database(DROP - TABLE - f"{table}2")
