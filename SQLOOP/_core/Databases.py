@@ -301,7 +301,7 @@ class Database(metaclass=DatabaseMeta):
 		"""Drops all* indexes from the database. Returns True if successfull, returns False if unsuccesfull.
 		*Not all, autoincrement indexes can't be removed."""
 		try:
-			for (indexName,) in self(SELECT(NAME) - FROM(SQLITE_MASTER) - WHERE(type = "index")):
+			for indexName in self(SELECT(NAME) - FROM(SQLITE_MASTER) - WHERE(type = "index")):
 				try:
 					self(DROP - INDEX - IF - EXISTS(Hardcoded(indexName)))
 				except:
