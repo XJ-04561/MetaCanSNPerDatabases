@@ -302,7 +302,7 @@ class Database(metaclass=DatabaseMeta):
 		self(BEGIN - TRANSACTION)
 		try:
 			for (indexName,) in self(SELECT(NAME) - FROM(SQLITE_MASTER) - WHERE(type = "index")):
-				self(DROP - INDEX - IF - EXISTS(indexName))
+				self(DROP - INDEX - IF - EXISTS(Hardcoded(indexName)))
 			self(COMMIT)
 			return True
 		except Exception as e:
