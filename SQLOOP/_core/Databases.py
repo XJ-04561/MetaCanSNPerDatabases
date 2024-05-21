@@ -306,7 +306,9 @@ class Database(metaclass=DatabaseMeta):
 				try:
 					self(DROP - INDEX - IF - EXISTS(Hardcoded(indexName)))
 				except sqlite3.OperationalError as e:
-					if not e.args or e.args[0] != "index associated with UNIQUE or PRIMARY KEY constraint cannot be dropped":
+					if e.args and e.args[0] == "index associated with UNIQUE or PRIMARY KEY constraint cannot be dropped":
+						pass
+					else:
 						raise e
 
 			self(COMMIT)
