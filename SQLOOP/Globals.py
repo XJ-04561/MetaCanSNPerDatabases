@@ -167,11 +167,9 @@ class SQLTuple(SQLOOP, tuple):
 	@overload
 	def __new__(cls, *items : Any): ...
 
-	def __new__(cls, arg, *args):
-		if not args and isinstance(arg, Iterable):
-			args = tuple(arg)
-		else:
-			args = (arg, *args)
+	def __new__(cls, *args):
+		if len(args) == 1 and isinstance(args[0], Iterable):
+			args = tuple(args[0])
 		return tuple.__new__(cls, map(lambda x:SQLTuple(x) if type(x) is tuple else x, args))
 	
 	def __str__(self):
