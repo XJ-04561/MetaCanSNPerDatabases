@@ -300,7 +300,6 @@ class Database(metaclass=DatabaseMeta):
 	def clearIndexes(self) -> bool:
 		"""Drops all* indexes from the database. Returns True if successfull, returns False if unsuccesfull.
 		*Not all, autoincrement indexes can't be removed."""
-		self(BEGIN - TRANSACTION)
 		try:
 			for (indexName,) in self(SELECT(NAME) - FROM(SQLITE_MASTER) - WHERE(type = "index")):
 				try:
@@ -310,11 +309,8 @@ class Database(metaclass=DatabaseMeta):
 						pass
 					else:
 						raise e
-
-			self(COMMIT)
 			return True
 		except Exception as e:
-			self(ROLLBACK)
 			return False
 
 	def commit(self):
