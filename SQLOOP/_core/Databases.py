@@ -304,11 +304,8 @@ class Database(metaclass=DatabaseMeta):
 			for (indexName,) in self(SELECT(NAME) - FROM(SQLITE_MASTER) - WHERE(type = "index")):
 				try:
 					self(DROP - INDEX - IF - EXISTS(Hardcoded(indexName)))
-				except sqlite3.OperationalError as e:
-					if e.args and e.args[0] == "index associated with UNIQUE or PRIMARY KEY constraint cannot be dropped":
-						pass
-					else:
-						raise e
+				except:
+					pass
 			return True
 		except Exception as e:
 			return False
