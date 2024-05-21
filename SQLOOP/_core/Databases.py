@@ -298,11 +298,17 @@ class Database(metaclass=DatabaseMeta):
 			return False
 
 	def clearIndexes(self) -> bool:
-		"""Drops all indexes from the database. Returns True if successfull, returns False if unsuccesfull."""
+		"""Drops all* indexes from the database. Returns True if successfull, returns False if unsuccesfull.
+		*Not all, autoincrement indexes can't be removed."""
 		self(BEGIN - TRANSACTION)
 		try:
 			for (indexName,) in self(SELECT(NAME) - FROM(SQLITE_MASTER) - WHERE(type = "index")):
-				self(DROP - INDEX - IF - EXISTS(Hardcoded(indexName)))
+				try:
+					self(DROP - INDEX - IF - EXISTS(Hardcoded(indexName)))
+				except sqlite3.OperationalError as e:
+					if not e.args or e.args[0] != "index associated with UNIQUE or PRIMARY KEY constraint cannot be dropped":
+						raise e
+
 			self(COMMIT)
 			return True
 		except Exception as e:
