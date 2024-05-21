@@ -260,7 +260,7 @@ class EnclosedWord(Word):
 
 class Query(SQLOOP):
 
-	words : tuple[Word|Any] = tuple()
+	words : tuple[Word|Any] = SQLTuple()
 	startWord : Word
 	sep : str = " "
 
@@ -301,7 +301,7 @@ class Query(SQLOOP):
 			words = (*word, *words)
 		else:
 			words = (word, *words)
-		self.words = tuple(SQLTuple(word) if isinstance(word, tuple) else word for word in words)
+		self.words = SQLTuple(SQLTuple(word) if isinstance(word, tuple) else word for word in words)
 	
 	def __contains__(self, other):
 		
@@ -336,8 +336,7 @@ class Query(SQLOOP):
 
 	def __mult__(self, right):
 		from SQLOOP._core.Schema import ALL
-		self.words[-1] = self.words[-1](ALL)
-		return type(self)(self, right)
+		return type(self)((*self.words[:-1], self.words[-1](ALL)), right)
 	
 	@cached_property
 	def startWord(self):
