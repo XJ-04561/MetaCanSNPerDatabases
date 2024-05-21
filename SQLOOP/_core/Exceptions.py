@@ -58,12 +58,16 @@ class ValidTablesSchema(Assertion):
 		if not database.clearIndexes():
 			raise DatabaseError("Could not clear indexes!")
 		database(BEGIN - TRANSACTION)
+		preExistingTables = set(database(SELECT (NAME) - FROM (SQLITE_MASTER) - WHERE (type='table')))
 		for table in database.tables:
-			TempTable = createTempTable(**vars(table))
-			database(ALTER - TABLE (table) - RENAME - TO - TempTable)
-			database(CREATE - TABLE - sql(table))
-			database(INSERT - INTO - table - (SELECT (ALL) - FROM(TempTable) ))
-			database(DROP - TABLE - TempTable)
+			if table in preExistingTables:
+				TempTable = createTempTable(**vars(table))
+				database(ALTER - TABLE (table) - RENAME - TO - TempTable)
+				database(CREATE - TABLE - sql(table))
+				database(INSERT - INTO - table - (SELECT (ALL) - FROM(TempTable) ))
+				database(DROP - TABLE - TempTable)
+			else:
+				database(CREATE - TABLE - sql(table))
 		for index in database.indexes:
 			database(CREATE - INDEX - sql(index))
 		database(COMMIT)
