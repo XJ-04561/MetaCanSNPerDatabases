@@ -60,7 +60,7 @@ class ValidTablesSchema(Assertion):
 		database(BEGIN - TRANSACTION)
 		preExistingTables = set(database(SELECT (NAME) - FROM (SQLITE_MASTER) - WHERE (type='table')))
 		for table in database.tables:
-			if table in preExistingTables:
+			if str(table) in preExistingTables:
 				TempTable = createTempTable(**vars(table))
 				database(ALTER - TABLE (table) - RENAME - TO - TempTable)
 				database(CREATE - TABLE - sql(table))
