@@ -129,9 +129,9 @@ class SQLOOP:
 
 	def __repr__(self):
 		if isinstance(self, type):
-			return f"<{(self.__bases__ or [self.__class__])[0].__name__} {self.__name__!r} at 0x{id(self):0>16X} {' '.join(map(lambda pair : '{}={!r}'.format(*pair), filter(lambda x:not x[0].startswith('_') or x[0] == '__sql_name__', vars(self).items())))}>"
+			return f"<{(self.__bases__ or [self.__class__])[0].__name__} {self.__name__!r} at 0x{id(self):0>16X} {' '.join(map(lambda pair : '{}={}'.format(*pair), filter(lambda x:not x[0].startswith('_') or x[0] == '__sql_name__', vars(self).items())))}>"
 		else:
-			return f"<{self.__class__.__name__} at 0x{id(self):0>16X} {' '.join(map(lambda pair : '{}={!r}'.format(*pair), filter(lambda x:not x[0].startswith('_') or x[0] == '__sql_name__', vars(self).items())))}>"
+			return f"<{self.__class__.__name__} at 0x{id(self):0>16X} {' '.join(map(lambda pair : '{}={}'.format(*pair), filter(lambda x:not x[0].startswith('_') or x[0] == '__sql_name__', vars(self).items())))}>"
 		
 	def __str__(self):
 		return self.__sql_name__
