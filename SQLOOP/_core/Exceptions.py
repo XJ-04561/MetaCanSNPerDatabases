@@ -62,9 +62,9 @@ class ValidTablesSchema(Assertion):
 		for table in database.tables:
 			if str(table) in preExistingTables:
 				TempTable = createTempTable(**vars(table))
-				database(ALTER - TABLE (table) - RENAME - TO - TempTable)
+				database(ALTER - TABLE (table) - RENAME - TO (TempTable))
 				database(CREATE - TABLE - sql(table))
-				database(INSERT - INTO - table - (SELECT (ALL) - FROM(TempTable) ))
+				database(INSERT - INTO (table) - SELECT (ALL) - FROM(TempTable) )
 				database(DROP - TABLE - TempTable)
 			else:
 				database(CREATE - TABLE - sql(table))
