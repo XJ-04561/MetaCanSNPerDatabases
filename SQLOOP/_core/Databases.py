@@ -121,10 +121,10 @@ class Database(metaclass=DatabaseMeta):
 	
 	@ClassProperty
 	def CURRENT_TABLES_HASH(self) -> int:
-		return hash(whitespacePattern.sub(" ", "; ".join(sorted(map(sql, self.tables)))))
+		return int.from_bytes(hashlib.md5(whitespacePattern.sub(" ", "; ".join(sorted(map(sql, self.tables))))).hexdigest(), signed=True)
 	@ClassProperty
 	def CURRENT_INDEXES_HASH(self) -> int:
-		return hash(whitespacePattern.sub(" ", "; ".join(sorted(map(sql, self.indexes)))))
+		return int.from_bytes(hashlib.md5(whitespacePattern.sub(" ", "; ".join(sorted(map(sql, self.indexes))))).hexdigest(), signed=True)
 
 	LOG = logging.Logger(SOFTWARE_NAME, level=logging.FATAL)
 
@@ -282,12 +282,12 @@ class Database(metaclass=DatabaseMeta):
 	@property
 	def indexesHash(self) -> int:
 		"""hash of the original SQL text that created all indexes in the database."""
-		return hash(whitespacePattern.sub(" ", "; ".join(sorted(map(lambda s:tableCreationCommand.sub("",s), self(SELECT (SQL) - FROM - SQLITE_MASTER - WHERE (type='index')))))))
+		return int.from_bytes(hashlib.md5(whitespacePattern.sub(" ", "; ".join(sorted(map(lambda s:tableCreationCommand.sub("",s), self(SELECT (SQL) - FROM - SQLITE_MASTER - WHERE (type='index'))))))).hexdigest(), signed=True)
 
 	@property
 	def tablesHash(self) -> int:
 		"""hash of the original SQL text that created all tables in the database."""
-		return hash(whitespacePattern.sub(" ", "; ".join(sorted(map(lambda s:tableCreationCommand.sub("",s), self(SELECT (SQL) - FROM (SQLITE_MASTER) - WHERE (type='table')))))))
+		return int.from_bytes(hashlib.md5(whitespacePattern.sub(" ", "; ".join(sorted(map(lambda s:tableCreationCommand.sub("",s), self(SELECT (SQL) - FROM (SQLITE_MASTER) - WHERE (type='table'))))))).hexdigest(), signed=True)
 
 	def createIndex(self : Self, index : Index) -> bool:
 		"""Create a given Index-object inside the database. Returns True if succesfull, returns False otherwise."""

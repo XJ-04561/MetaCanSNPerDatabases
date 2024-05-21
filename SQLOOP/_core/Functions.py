@@ -173,7 +173,7 @@ def recursiveWalk(iterable):
 def hashQuery(database : "Database", query : "Query"):
 	"""Converts entries returned into strings via str or repr (if __str__ not implemented) and then replaces whitespace
 	with a simple " " and joines all the entries with "; " before getting the hash of the final `str` object."""
-	return hash(
+	return int.from_bytes(hashlib.md5(
 		whitespacePattern.sub(
 			" ",
 			"; ".join(
@@ -183,9 +183,9 @@ def hashQuery(database : "Database", query : "Query"):
 				)
 			)
 		)
-	)
+	).digest(), signed=True)
 def hashSQL(items : Iterable):
-	return hash(whitespacePattern.sub(" ", "; ".join(map(sql, items))))
+	return int.from_bytes(hashlib.md5(whitespacePattern.sub(" ", "; ".join(map(sql, items)))).hexdigest(), signed=True)
 
 def correctDatabase(cls, filepath):
 	database = cls(filepath, "w")
