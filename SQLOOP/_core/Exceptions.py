@@ -51,24 +51,26 @@ class ValidTablesSchema(Assertion):
 		return database.tablesHash == database.CURRENT_TABLES_HASH
 	@classmethod
 	def rectify(cls, database : "Database") -> None:
-		from SQLOOP._core.Words import BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT, INTO, SELECT, FROM, DROP, INDEX
-		from SQLOOP._core.Schema import ALL
+		from SQLOOP.core import (
+			createTempTable, Hardcoded, BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT,
+			INTO, SELECT, FROM, DROP, INDEX, ALL, WHERE, NAME, SQLITE_MASTER)
 		from SQLOOP.Globals import sql
 		if not database.clearIndexes():
 			raise DatabaseError("Could not clear indexes!")
 		database(BEGIN - TRANSACTION)
 		for table in database.tables:
-			database(ALTER - TABLE (table) - RENAME - TO - f"{table}2")
+			TempTable = createTempTable(**vars(table))
+			database(ALTER - TABLE (table) - RENAME - TO - TempTable)
 			database(CREATE - TABLE - sql(table))
-			database(INSERT - INTO - table - (SELECT (ALL) - FROM(f"{table}2") ))
-			database(DROP - TABLE - f"{table}2")
+			database(INSERT - INTO - table - (SELECT (ALL) - FROM(TempTable) ))
+			database(DROP - TABLE - TempTable)
 		for index in database.indexes:
 			database(CREATE - INDEX - sql(index))
 		database(COMMIT)
 		database(BEGIN - TRANSACTION)
-		for (table,) in database("SELECT name FROM sqlite_master WHERE type='table';"):
+		for table in database(SELECT (NAME) - FROM (SQLITE_MASTER) - WHERE (type='table')):
 			if table not in database.tables:
-				database(DROP - TABLE - table)
+				database(DROP - TABLE - Hardcoded(table))
 		database(PRAGMA (user_version = database.CURRENT_VERSION))
 		database(COMMIT)
 
