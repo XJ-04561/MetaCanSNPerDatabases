@@ -32,7 +32,7 @@ class Fetcher:
 
 		self._connection = connection
 		try:
-			self._cursor = query @ self._connection
+			self._cursor = iter(query @ self._connection)
 		except Exception as e:
 			raise type(e)(f"Query: ({str(query)}, {query.params})\n"+e.args[0], *e.args[1:])
 		self.query = query
