@@ -1,6 +1,10 @@
 
 
-class SQL_TYPE:
+class SQL_TYPE_META(type):
+	def __str__(self):
+		return self.__name__
+
+class SQL_TYPE(metaclass=SQL_TYPE_META):
 	args : tuple
 	def __init__(self, *args):
 		self.args = args
