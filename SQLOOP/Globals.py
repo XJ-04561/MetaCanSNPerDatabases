@@ -189,12 +189,12 @@ class Nothing:
 	def __eq__(self, other):
 		return False
 
-class sql(str):
+class sql(str, SQLOOP):
 	def __new__(cls, obj):
 		if isinstance(obj, type):
-			return type(obj).__sql__(obj)
+			return super().__new__(cls, type(obj).__sql__(obj))
 		else:
-			return obj.__sql__()
+			return super().__new__(cls, obj.__sql__())
 	
 class NoHash:
 	def __eq__(self, other): return True
