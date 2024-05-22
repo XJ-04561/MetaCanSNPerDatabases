@@ -54,7 +54,7 @@ class WHERE(Word): sep : str = " AND "
 class ASC(Word): pass
 class DESC(Word): pass
 class ORDER(Word): pass
-class BY(Word): pass
+class BY(Word): sep : str = " AND "
 class LIMIT(Word): pass
 class CREATE(Word): pass
 class ALTER(Word): pass
