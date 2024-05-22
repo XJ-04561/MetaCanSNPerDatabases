@@ -55,8 +55,9 @@ class Hardcoded(SQLOOP):
 
 class ColumnMeta(SQLStructure):
 
+	type : "SQL_TYPE"
 	table : "Table"
-	type : str
+	constraint : "Query"
 
 	def __str__(self):
 		if self.table is not None:
@@ -65,17 +66,26 @@ class ColumnMeta(SQLStructure):
 			return super().__str__()
 
 	def __sql__(self):
-		return f"{self} {self.type}"
+		if self.constraint is not None:
+			return f"{self} {self.type} {self.constraint}"
+		else:
+			return f"{self} {self.type}"
 
 class Column(SQLObject, metaclass=ColumnMeta):
 
-	type : str = SQL_TYPE_NAMES[None]
-	table : "Table"
+	type : "SQL_TYPE" = SQL_TYPE_NAMES[None]
+	table : "Table" = None
+	constraint : "Query" = None
 
-	def __init_subclass__(cls, *, type : Union[str,ColumnMeta,SQL_TYPE]=None, table=None, **kwargs) -> None:
+	def __init_subclass__(cls, *, type : Union[str,ColumnMeta,SQL_TYPE]=None, table=None, constraint=None, **kwargs) -> None:
 		super().__init_subclass__(**kwargs)
-		cls.table = table
-		if isinstance(type, SQL_TYPE):
+		if table is not None:
+			cls.table = table
+		if constraint is not None:
+			cls.constraint = constraint
+		if type is None:
+			pass
+		elif isinstance(type, SQL_TYPE):
 			cls.type = type
 		elif type in SQL_TYPE_NAMES:
 			cls.type = SQL_TYPE_NAMES[type]

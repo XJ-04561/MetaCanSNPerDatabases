@@ -134,7 +134,7 @@ class SelectStatement(Expression):
 
 class TableConstraint(Expression):
 
-	startWords = {CONSTRAINT, PRIMARY, UNIQUE, CHECK, FOREIGN}
+	startWords = {CONSTRAINT, PRIMARY, UNIQUE, CHECK, FOREIGN, NOT}
 
 	def __init__(self, *words : tuple[Word], sep : str=" "):
 		super().__init__(*words, sep=sep)
