@@ -105,13 +105,17 @@ class Column(SQLObject, metaclass=ColumnMeta):
 
 class ColumnAlias(SQLObject, metaclass=ColumnMeta):
 
-	type : str
+	type : "SQL_TYPE"
+	table : "Table" = None
+	constraint : "Query" = None
 	fullName : str
 
 	def __init_subclass__(cls, *, original, **kwargs) -> None:
 		super().__init_subclass__(**kwargs)
 		cls.fullName = str(original)
 		cls.type = original.type
+		cls.table = original.table
+		cls.constraint = original.constraint
 
 class HasColumns:
 	
