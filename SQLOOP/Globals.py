@@ -19,12 +19,11 @@ from This import this
 class Connection(sqlite3.Connection):
 	filename : str | bytes | os.PathLike[str] | os.PathLike[bytes] = None
 
-	def __init__(self, database: str | bytes | os.PathLike[str] | os.PathLike[bytes], timeout: float = ..., detect_types: int = ..., isolation_level: str | None = ..., check_same_thread: bool = ..., factory: sqlite3.Connection | None = ..., cached_statements: int = ..., uri: bool = ..., autocommit: bool = ...) -> None:
+	@overload
+	def __init__(self, database: str | bytes | os.PathLike[str] | os.PathLike[bytes], timeout: float = ..., detect_types: int = ..., isolation_level: str | None = ..., check_same_thread: bool = ..., factory: sqlite3.Connection | None = ..., cached_statements: int = ..., uri: bool = ..., autocommit: bool = ...) -> None: ...
+	def __init__(self, database: str | bytes | os.PathLike[str] | os.PathLike[bytes], *args, **kwargs) -> None:
 		self.filename = database
-		if autocommit is ...:
-			super().__init__(database, timeout, detect_types, isolation_level, check_same_thread, factory, cached_statements, uri)
-		else:
-			super().__init__(database, timeout, detect_types, isolation_level, check_same_thread, factory, cached_statements, uri, autocommit)
+		super().__init__(database, *args, **kwargs)
 		
 	def __repr__(self):
 		return f"{object.__repr__(self)[:-1]} '{self.filename}'>"
