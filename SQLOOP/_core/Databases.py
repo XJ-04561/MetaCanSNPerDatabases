@@ -202,8 +202,12 @@ class Database(metaclass=DatabaseMeta):
 	def __repr__(self):
 		string = [f"<{self.__class__.__name__} at {hex(id(self))} version={self.__version__} tablesHash={self.tablesHash:X}>"]
 		for table in self.tables:
-			string.append(
-				f"\t<Table.{table.__name__} rows={self(SELECT (COUNT(ALL)) - FROM(table)) if self(SELECT (COUNT(ALL)) - FROM - SQLITE_MASTER - WHERE (type='table', name=str(table))) == 1 else 'N/A'} columns={table.columns}>")
+			try:
+				string.append(
+					f"\t<Table.{table.__name__} rows={self(SELECT (COUNT(ALL)) - FROM(table)) if self(SELECT (COUNT(ALL)) - FROM (SQLITE_MASTER) - WHERE (type='table', name=str(table))) == 1 else 'N/A'} columns={table.columns}>")
+			except Exception as e:
+				self.LOG.exception(e)
+				string.append(f"\t<Table.{table.__name__} rows=N/A columns=N/A>")
 		string.append(f"</{self.__class__.__name__}>")
 		return "\n".join(string)
 
@@ -259,35 +263,58 @@ class Database(metaclass=DatabaseMeta):
 
 	@property
 	def __version__(self):
-		return int(self._connection.execute("PRAGMA user_version;").fetchone()[0])
+		try:
+			return int(self._connection.execute("PRAGMA user_version;").fetchone()[0])
+		except:
+			return None
 
 	@property
 	def valid(self):
 		"""Check if all of the class-specific assertions hold."""
-		return all(map(*this.condition(self), self.assertions))
+		try:
+			return all(map(*this.condition(self), self.assertions))
+		except Exception as e:
+			self.LOG.exception(e)
+			return None
 
 	def fix(self):
 		"""Apply the pre-defined fix for all class-specified assertions."""
-		for assertion in self.assertions:
-			if not assertion.condition(self):
-				assertion.rectify(self)
+		try:
+			for assertion in self.assertions:
+				if not assertion.condition(self):
+					assertion.rectify(self)
+		except Exception as e:
+			self.LOG.exception(e)
 
 	@property
 	def exception(self):
 		"""Return the exception object that represents the problem that breaks the first found assertion."""
-		for assertion in itertools.filterfalse(*this.condition(database=self), self.assertions):
-			return assertion.exception(self)
+		for assertion in self.assertions:
+			try:
+				if not assertion.condition(database=self):
+					return assertion.exception(self)
+			except Exception as e:
+				self.LOG.exception(e)
+				return assertion.exception(self)
 
 	@property
 	def indexesHash(self) -> int:
 		"""hash of the original SQL text that created all indexes in the database."""
-		return int(hashlib.md5(whitespacePattern.sub(" ", "; ".join(sorted(map(lambda s:tableCreationCommand.sub("",s), filter(None, self(SELECT (SQL) - FROM (SQLITE_MASTER) - WHERE (type='index'))))))).encode("utf-8")).hexdigest(), base=16)
+		try:
+			return int(hashlib.md5(whitespacePattern.sub(" ", "; ".join(sorted(map(lambda s:tableCreationCommand.sub("",s), filter(None, self(SELECT (SQL) - FROM (SQLITE_MASTER) - WHERE (type='index'))))))).encode("utf-8")).hexdigest(), base=16)
+		except Exception as e:
+			self.LOG.exception(e)
+			return 0
 
 	@property
 	def tablesHash(self) -> int:
 		"""hash of the original SQL text that created all tables in the database."""
-		return int(hashlib.md5(whitespacePattern.sub(" ", "; ".join(sorted(map(lambda s:tableCreationCommand.sub("",s), filter(None, self(SELECT (SQL) - FROM (SQLITE_MASTER) - WHERE (type='table'))))))).encode("utf-8")).hexdigest(), base=16)
-
+		try:
+			return int(hashlib.md5(whitespacePattern.sub(" ", "; ".join(sorted(map(lambda s:tableCreationCommand.sub("",s), filter(None, self(SELECT (SQL) - FROM (SQLITE_MASTER) - WHERE (type='table'))))))).encode("utf-8")).hexdigest(), base=16)
+		except Exception as e:
+			self.LOG.exception(e)
+			return 0
+		
 	def reopen(self, mode : Mode):
 		self.close()
 		self.__init__(self.filename, mode=mode)
@@ -297,7 +324,8 @@ class Database(metaclass=DatabaseMeta):
 		try:
 			self(CREATE - INDEX - sql(index))
 			return True
-		except:
+		except Exception as e:
+			self.LOG.exception(e)
 			return False
 
 	def clearIndexes(self) -> bool:
@@ -311,6 +339,7 @@ class Database(metaclass=DatabaseMeta):
 					pass
 			return True
 		except Exception as e:
+			self.LOG.exception(e, stacklevel=logging.DEBUG)
 			return False
 
 	def commit(self):
