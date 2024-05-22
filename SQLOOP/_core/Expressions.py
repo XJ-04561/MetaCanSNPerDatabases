@@ -18,7 +18,9 @@ class Expression(Query):
 		super().__init_subclass__(*args, name=name, **kwargs)
 		for word in cls.startWords:
 			word.startWord = word
-			word.words = cached_property(lambda self:SQLTuple([self]))
+			words = cached_property(lambda self:SQLTuple([self]))
+			words.__set_name__(word, "words")
+			word.words = words
 			for attrName, value in vars(cls).items():
 				if not hasattr(word, attrName):
 					setattr(word, attrName, value)
