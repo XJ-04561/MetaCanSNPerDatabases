@@ -282,12 +282,12 @@ class Database(metaclass=DatabaseMeta):
 	@property
 	def indexesHash(self) -> int:
 		"""hash of the original SQL text that created all indexes in the database."""
-		return int(hashlib.md5(whitespacePattern.sub(" ", "; ".join(sorted(map(lambda s:tableCreationCommand.sub("",s), self(SELECT (SQL) - FROM (SQLITE_MASTER) - WHERE (type='index')))))).encode("utf-8")).hexdigest(), base=16)
+		return int(hashlib.md5(whitespacePattern.sub(" ", "; ".join(sorted(map(lambda s:tableCreationCommand.sub("",s), filter(None, self(SELECT (SQL) - FROM (SQLITE_MASTER) - WHERE (type='index'))))))).encode("utf-8")).hexdigest(), base=16)
 
 	@property
 	def tablesHash(self) -> int:
 		"""hash of the original SQL text that created all tables in the database."""
-		return int(hashlib.md5(whitespacePattern.sub(" ", "; ".join(sorted(map(lambda s:tableCreationCommand.sub("",s), self(SELECT (SQL) - FROM (SQLITE_MASTER) - WHERE (type='table')))))).encode("utf-8")).hexdigest(), base=16)
+		return int(hashlib.md5(whitespacePattern.sub(" ", "; ".join(sorted(map(lambda s:tableCreationCommand.sub("",s), filter(None, self(SELECT (SQL) - FROM (SQLITE_MASTER) - WHERE (type='table'))))))).encode("utf-8")).hexdigest(), base=16)
 
 	def createIndex(self : Self, index : Index) -> bool:
 		"""Create a given Index-object inside the database. Returns True if succesfull, returns False otherwise."""
