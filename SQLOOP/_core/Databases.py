@@ -56,6 +56,9 @@ class Fetcher:
 			return (((self.query - LIMIT(rowNumber,rowNumber)) @ self._connection).fetchone() or [None])[0]
 		else:
 			return ((self.query - LIMIT(rowNumber,rowNumber)) @ self._connection).fetchone()
+	
+	def __len__(self):
+		return sum(map(lambda x:1, self._cursor))
 
 class DatabaseMeta(type):
 	
