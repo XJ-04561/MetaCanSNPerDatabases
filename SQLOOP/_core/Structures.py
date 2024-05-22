@@ -427,7 +427,7 @@ class TableMeta(SQLStructure):
 
 	def __getattribute__(self, name: str) -> Any:
 		value = super().__getattribute__(name)
-		if isRelated(value, Column):
+		if isRelated(value, Column) and not isRelated(value, LinkedColumn):
 			return self.linkedColumns[str(value)]
 		else:
 			return value
