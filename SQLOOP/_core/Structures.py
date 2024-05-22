@@ -87,10 +87,17 @@ class Column(SQLObject, metaclass=ColumnMeta):
 			pass
 		elif isinstance(type, SQL_TYPE):
 			cls.type = type
-		elif type in SQL_TYPE_NAMES:
-			cls.type = SQL_TYPE_NAMES[type]
-		elif isinstance(type, str) and any(type.upper().startswith(name) for name in SQL_TYPES):
-			cls.type = type
+		elif type in SQL_TYPE_NAMES and SQL_TYPE_NAMES[type] in map(*this.__name__, SQL_TYPE.__subclasses__()):
+			string = SQL_TYPE_NAMES[type]
+			for subClass in SQL_TYPE.__subclasses__():
+				if subClass.__name__ == string:
+					cls.type = subClass
+					break
+		elif isinstance(type, str) and type in map(*this.__name__, SQL_TYPE.__subclasses__()):
+			for subClass in SQL_TYPE.__subclasses__():
+				if subClass.__name__ == type:
+					cls.type = subClass
+					break
 		else:
 			raise TypeError(f"Column type must either be a string or a python type mapped to sql type names in {SQL_TYPES=}." "\n" f"It was instead: {type!r}")
 
