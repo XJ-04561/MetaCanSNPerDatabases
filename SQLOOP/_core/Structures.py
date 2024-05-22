@@ -137,6 +137,18 @@ class SanitizedValue(SQLObject, metaclass=SQLStructure):
 	
 	__sql_name__ : str = "SanitizedValue"
 	value : Any
+	@overload
+	def __new__(cls, value : None|SQLOOP) -> SQLOOP: ...
+	@overload
+	def __new__(cls, value : Any) -> Self: ...
+	def __new__(cls, value):
+		from SQLOOP._core.Words import NULL
+		if value is None:
+			return NULL
+		elif isinstance(value, SQLOOP):
+			return value
+		else:
+			return super().__new__(cls)
 
 	def __init__(self, value : Any):
 		self.value = value
