@@ -188,14 +188,14 @@ def hashSQL(items : Iterable):
 
 def correctDatabase(cls, filepath):
 	database = cls(filepath, "w")
-			
-	for _ in range(len(database.assertions)):
-		if database.valid:
-			break
-		database.fix()
-	else:
+	
+	database.fix()
+
+	if not database.valid:
 		raise database.exception
-		# Will raise exception, since database was still faulty after 10 attempts at fixing it.
+		# Will raise exception, since database was still faulty
+	
+	database.close()
 
 def verifyDatabase(cls, filepath):
 	return cls(filepath, "r").valid
