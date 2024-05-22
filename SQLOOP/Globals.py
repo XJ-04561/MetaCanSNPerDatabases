@@ -21,7 +21,10 @@ class Connection(sqlite3.Connection):
 
 	def __init__(self, database: str | bytes | os.PathLike[str] | os.PathLike[bytes], timeout: float = ..., detect_types: int = ..., isolation_level: str | None = ..., check_same_thread: bool = ..., factory: sqlite3.Connection | None = ..., cached_statements: int = ..., uri: bool = ..., autocommit: bool = ...) -> None:
 		self.filename = database
-		super().__init__(database, timeout, detect_types, isolation_level, check_same_thread, factory, cached_statements, uri, autocommit)
+		if sys.version_info >= (3, 12):
+			super().__init__(database, timeout, detect_types, isolation_level, check_same_thread, factory, cached_statements, uri, autocommit)
+		else:
+			super().__init__(database, timeout, detect_types, isolation_level, check_same_thread, factory, cached_statements, uri)
 		
 	def __repr__(self):
 		return f"{object.__repr__(self)[:-1]} '{self.filename}'>"
