@@ -58,6 +58,7 @@ class BY(Word): sep : str = " AND "
 class LIMIT(Word): pass
 class CREATE(Word): pass
 class ALTER(Word): pass
+class DELETE(Word): pass
 class AND(Word): pass
 class RENAME(Word): pass
 class DROP(Word): pass
