@@ -4,3 +4,4 @@ tree_multinode copy.txt
 testScript.py
 testScript.py
 testScript.py
+*__pycache__*

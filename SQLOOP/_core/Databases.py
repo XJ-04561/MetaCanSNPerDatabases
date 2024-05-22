@@ -301,7 +301,7 @@ class Database(metaclass=DatabaseMeta):
 	def indexesHash(self) -> int:
 		"""hash of the original SQL text that created all indexes in the database."""
 		try:
-			return int(hashlib.md5(" ".join("; ".join(sorted(map(lambda x:f"{x[0]} {x[x.index('ON'):]}".strip(), filter(lambda x:x[1] != "", map(lambda x:(x[0], x[1].strip()), self(SELECT (NAME, SQL) - FROM (SQLITE_MASTER) - WHERE (type='index'))))))).strip().split()).encode("utf-8")).hexdigest(), base=16)
+			return int(hashlib.md5(" ".join("; ".join(sorted(map(lambda x:f"{x[0]} {x[1][x[1].index('ON'):]}".strip(), filter(lambda x:x[1] != "", map(lambda x:(x[0], x[1].strip()), self(SELECT (NAME, SQL) - FROM (SQLITE_MASTER) - WHERE (type='index'))))))).strip().split()).encode("utf-8")).hexdigest(), base=16)
 		except Exception as e:
 			self.LOG.exception(e)
 			return 0
@@ -310,7 +310,7 @@ class Database(metaclass=DatabaseMeta):
 	def tablesHash(self) -> int:
 		"""hash of the original SQL text that created all tables in the database."""
 		try:
-			return int(hashlib.md5(" ".join("; ".join(sorted(map(lambda x:f"{x[0]} {x[x.index('('):]}".strip(), filter(lambda x:x[1] != "", map(lambda x:(x[0], x[1].strip()), self(SELECT (NAME, SQL) - FROM (SQLITE_MASTER) - WHERE (type='table'))))))).strip().split()).encode("utf-8")).hexdigest(), base=16)
+			return int(hashlib.md5(" ".join("; ".join(sorted(map(lambda x:f"{x[0]} {x[1][x[1].index('('):]}".strip(), filter(lambda x:x[1] != "", map(lambda x:(x[0], x[1].strip()), self(SELECT (NAME, SQL) - FROM (SQLITE_MASTER) - WHERE (type='table'))))))).strip().split()).encode("utf-8")).hexdigest(), base=16)
 		except Exception as e:
 			self.LOG.exception(e)
 			return 0
