@@ -12,7 +12,17 @@ class Expression(Query):
 
 	def __init__(self, startWord, *words: tuple[Word], sep: str = None):
 		super().__init__(startWord, *words, sep=sep)
-		self.startWord = type(self.words[0]) if isinstance(self.words[0], Word) else self.words[0] 
+		self.startWord = type(self.words[0]) if isinstance(self.words[0], Word) else self.words[0]
+	
+	def __init_subclass__(cls, *args, name: str | None = None, **kwargs) -> None:
+		super().__init_subclass__(*args, name=name, **kwargs)
+		for word in cls.startWords:
+			word.startWord = word
+			word.words = cached_property(lambda self:SQLTuple([self]))
+			for attrName, value in vars(cls).items():
+				if not hasattr(word, attrName):
+					setattr(word, attrName, value)
+			
 
 class SelectStatement(Expression):
 
