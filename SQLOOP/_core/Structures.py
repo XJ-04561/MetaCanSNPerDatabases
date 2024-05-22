@@ -73,7 +73,7 @@ class ColumnMeta(SQLStructure):
 
 class Column(SQLObject, metaclass=ColumnMeta):
 
-	type : "SQL_TYPE" = SQL_TYPE_NAMES[None]
+	type : "SQL_TYPE"
 	table : "Table" = None
 	constraint : "Query" = None
 
@@ -85,7 +85,8 @@ class Column(SQLObject, metaclass=ColumnMeta):
 		if constraint is not None:
 			cls.constraint = constraint
 		if type is None:
-			pass
+			if not hasattr(cls, "type"):
+				cls.type = NULL
 		elif isinstance(type, SQL_TYPE) or isRelated(type, SQL_TYPE) or type is NULL:
 			cls.type = type
 		elif type in SQL_TYPE_NAMES and SQL_TYPE_NAMES[type] in map(*this.__name__, SQL_TYPE.__subclasses__()):
