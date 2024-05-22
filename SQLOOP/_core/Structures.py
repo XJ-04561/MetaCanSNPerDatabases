@@ -439,7 +439,13 @@ class Table(SQLObject, HasColumns, metaclass=TableMeta):
 
 	def __init_subclass__(cls, **kwargs):
 		
+		
+		from SQLOOP._core.Expressions import TableConstraint
+		if not all(map(lambda x:isinstance(x, TableConstraint), cls.constraints)):
+			cls.constraints = tuple(map(lambda x:x if isinstance(x, TableConstraint) else TableConstraint(x), cls.constraints))
+
 		super().__init_subclass__(**kwargs)
+
 		numberOfColumns = sum(map(lambda x:1, filter(lambda x:isRelated(x, Column), vars(cls).values())))
 		for i in range(numberOfColumns):
 			if hasattr(cls, alphabetize(i)):
