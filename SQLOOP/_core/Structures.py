@@ -142,8 +142,8 @@ class SanitizedValue(SQLObject, metaclass=SQLStructure):
 	@overload
 	def __new__(cls, value : Any) -> Self: ...
 	def __new__(cls, value):
-		from SQLOOP._core.Words import NULL
 		if value is None:
+			from SQLOOP._core.Words import NULL
 			return NULL
 		elif isinstance(value, SQLOOP):
 			return value
@@ -257,7 +257,7 @@ class Word(SQLOOP, metaclass=Prefix):
 	content : tuple
 	sep : str = ", "
 
-	def __init__(self, *args : tuple[Union["Table", Column, "Index", Comparison]], **kwargs : dict[str,Any]):
+	def __init__(self, *args : Any, **kwargs : Any):
 		self.content = args + tuple(map(lambda keyVal : Comparison(keyVal[0], "==", keyVal[1], forceLeft=True), kwargs.items()))
 
 	def __sub__(self, other):
