@@ -1,5 +1,4 @@
 
-from sqlite3 import Connection
 from SQLOOP.Globals import *
 import SQLOOP.Globals as Globals
 from SQLOOP._core.Structures import *
@@ -12,11 +11,11 @@ from SQLOOP._core.Aggregates import *
 class Fetcher:
 	"""Fetches data from a cursor. Consumes the cursor object during iteration/indexation."""
 	query : SelectStatement
-	_connection : sqlite3.Connection
+	_connection : Connection
 	cols : int
 	resultsLength : int
 
-	def __new__(cls, connection : sqlite3.Connection, query : SelectStatement, *args, **kwargs):
+	def __new__(cls, connection : Connection, query : SelectStatement, *args, **kwargs):
 		
 		assert isinstance(query, SelectStatement), "Fetcher must be given a SelectStatement."
 		
@@ -28,7 +27,7 @@ class Fetcher:
 				return None
 		return super().__new__(cls)
 
-	def __init__(self, connection : sqlite3.Connection, query : SelectStatement):
+	def __init__(self, connection : Connection, query : SelectStatement):
 
 		self._connection = connection
 		try:
@@ -128,7 +127,7 @@ class Database(metaclass=DatabaseMeta):
 
 	LOG = logging.Logger(SOFTWARE_NAME, level=logging.FATAL)
 
-	_connection : sqlite3.Connection
+	_connection : Connection
 	mode : str
 	filename : str
 	columns : SQLDict[Column] = SQLDict()
@@ -151,7 +150,7 @@ class Database(metaclass=DatabaseMeta):
 		self.filename = filename if os.path.isabs(filename) or filename == ":memory:" else os.path.realpath(os.path.expanduser(filename))
 		match mode:
 			case "w":
-				self._connection = sqlite3.connect(filename)
+				self._connection = sqlite3.connect(filename, factory=Connection)
 			case "r":
 				if not os.path.exists(filename):
 					raise FileNotFoundError(f"Database file {filename} not found on the system.")
@@ -161,7 +160,7 @@ class Database(metaclass=DatabaseMeta):
 				if not cDatabase.startswith("/"): # Path has to be absolute already, and windows paths need a prepended '/'
 					cDatabase = "/"+cDatabase
 				
-				self._connection = sqlite3.connect(cDatabase)
+				self._connection = sqlite3.connect(filename, factory=Connection)
 			case _:
 				raise ValueError(f"{mode!r} is not a recognized file-stream mode. Only 'w'/'r' allowed.")
 	

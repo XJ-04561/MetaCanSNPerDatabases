@@ -16,6 +16,12 @@ from PseudoPathy.PathShortHands import *
 
 from SQLOOP._core.Exceptions import *
 from This import this
+class Connection(sqlite3.Connection):
+	def __init__(self, database: str | bytes | os.PathLike[str] | os.PathLike[bytes], timeout: float = ..., detect_types: int = ..., isolation_level: str | None = ..., check_same_thread: bool = ..., factory: sqlite3.Connection | None = ..., cached_statements: int = ..., uri: bool = ..., autocommit: bool = ...) -> None:
+		super().__init__(database, timeout, detect_types, isolation_level, check_same_thread, factory, cached_statements, uri, autocommit)
+		self.filename = database
+	def __repr__(self):
+		return f"{object.__repr__(self)[:-1]} '{self.filename}'>"
 
 tableCreationCommand = re.compile(r"^\W*CREATE\W+(TEMP|TEMPORARY\W)?\W*(TABLE|INDEX)(\W+IF\W+NOT\W+EXISTS)?\W+(\w[.])?", flags=re.ASCII|re.IGNORECASE)
 
