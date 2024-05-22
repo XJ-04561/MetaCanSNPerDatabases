@@ -80,8 +80,6 @@ class REFERENCES(Word):
 		match len(self.content):
 			case 1:
 				return f"{self.__class__.__name__} {self.content[0]}"
-			case 2:
-				return f"{self.__class__.__name__} {self.content[0]}({', '.join(map(str, self.content[1]))})"
 			case _:
 				return f"{self.__class__.__name__} {self.content[0]}({', '.join(map(str, self.content[1:]))})"
 
