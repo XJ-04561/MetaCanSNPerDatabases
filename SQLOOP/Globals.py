@@ -163,7 +163,7 @@ class SQLOOP:
 	
 	def __matmul__(self, other : sqlite3.Connection) -> sqlite3.Cursor:
 		from SQLOOP._core.Databases import Fetcher, Query
-		if isinstance(other, sqlite3.Connection):
+		if hasattr(other, "execute"):
 			return other.execute(str(self), self.params)
 		return NotImplemented
 
