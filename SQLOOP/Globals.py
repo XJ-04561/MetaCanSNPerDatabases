@@ -61,10 +61,7 @@ def binner(key : Callable, iterable : Iterable, outType : type=list, default=Non
 	else:
 		if default is None:
 			return outType(tuple(data) for i, data in itertools.groupby(sorted(iterable, key=key), key=key))
-		ret = [() for _ in range(default)]
-		for i, data in itertools.groupby(sorted(iterable, key=key), key=key):
-			ret[i] = tuple(data)
-		return outType(ret)
+		return outType(map(lambda x:tuple(x[1]), itertools.groupby(sorted(iterable, key=key), key=key)))
 
 def first(iterator : Iterable[_T]|Iterator[_T]) -> _T|None:
 	try:
