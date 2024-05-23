@@ -153,8 +153,8 @@ class SQLOOP:
 	
 	def __sub__(self, right):
 		from SQLOOP._core.Structures import Query
-		from SQLOOP._core.Words import IN, NOT
-		if isinstance(right, (IN, NOT)): return NotImplemented
+		from SQLOOP._core.Words import IN, NOT, IS
+		if isinstance(right, (IN, NOT, IS)): return NotImplemented
 		return Query(self, right)
 	
 	def __rsub__(self, left):

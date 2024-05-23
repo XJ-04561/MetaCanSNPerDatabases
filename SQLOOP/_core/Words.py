@@ -2,12 +2,14 @@
 from SQLOOP._core.Structures import *
 from typing import overload, final, Any
 
+class Comparators(Word):
+	@final
+	def __rsub__(self, left):
+		return Comparison(left, self.__class__.__name__, self.content[0] if len(self.content) == 1 else SQLTuple(self.content))
 
 class BEGIN(Word): pass
 class ROLLBACK(Word): pass
-class IN(EnclosedWord):
-	def __rsub__(self, left):
-		return Comparison(left, "IN", self.content[0] if len(self.content) == 1 else SQLTuple(self.content))
+class IN(EnclosedWord, Comparators): pass
 class TRANSACTION(Word): pass
 class COMMIT(Word): pass
 class CONSTRAINT(Word): pass
@@ -68,9 +70,8 @@ class TABLE(Word): pass
 class TRIGGER(Word): pass
 class VIEW(Word): pass
 class IF(Word): pass
-class NOT(Word):
-	def __rsub__(self, left):
-		return Comparison(left, "NOT", self.content[0] if len(self.content) == 1 else SQLTuple(self.content))
+class NOT(Comparators): pass
+class IS(Comparators): pass
 class PRIMARY(Word): pass
 class FOREIGN(Word): pass
 class EXISTS(Word): pass
