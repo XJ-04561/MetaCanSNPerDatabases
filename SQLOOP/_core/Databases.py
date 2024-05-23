@@ -146,7 +146,7 @@ class Database(metaclass=DatabaseMeta):
 	assertions : list[Assertion] = Globals.ASSERTIONS
 	"""A look-up list of assertions and the exceptions to be raised should the assertion fail. Assertions are checked last to first."""
 
-	def __init__(self, filename : str, mode : Mode):
+	def __init__(self, filename : str, mode : Mode, factory : type[sqlite3.Connection]=Connection, factoryFunc : Callable=sqlite3.connect):
 
 		if type(self) is Database:
 			raise NotImplementedError("The base Database class is not to be used, please subclass `Database` with your own appropriate tables and indexes.")
@@ -154,7 +154,7 @@ class Database(metaclass=DatabaseMeta):
 		self.filename = filename if os.path.isabs(filename) or filename == ":memory:" else os.path.realpath(os.path.expanduser(filename))
 		match mode:
 			case "w":
-				self._connection = sqlite3.connect(filename, factory=Connection)
+				self._connection = factoryFunc(filename, factory=factory)
 			case "r":
 				if not os.path.exists(filename):
 					raise FileNotFoundError(f"Database file {filename} not found on the system.")
@@ -164,7 +164,7 @@ class Database(metaclass=DatabaseMeta):
 				if not cDatabase.startswith("/"): # Path has to be absolute already, and windows paths need a prepended '/'
 					cDatabase = "/"+cDatabase
 				
-				self._connection = sqlite3.connect(filename, factory=Connection)
+				self._connection = factoryFunc(filename, factory=factory)
 			case _:
 				raise ValueError(f"{mode!r} is not a recognized file-stream mode. Only 'w'/'r' allowed.")
 	
