@@ -79,6 +79,8 @@ class INSERT(Word): pass
 class INTO(Word): pass
 class NULL(EnclosedWord): pass
 class KEY(EnclosedWord): pass
+class OR(Word): pass
+class REPLACE(Word): pass
 class REFERENCES(Word):
 	def __str__(self : Word):
 		match len(self.content):
