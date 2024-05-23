@@ -40,8 +40,12 @@ class Fetcher:
 		return f"{object.__repr__(self)[:-1]} query={str(self.query)} params={self.query.params}>"
 
 	def __iter__(self):
-		for entry in self._cursor:
-			yield entry
+		if self.query.cols == 1:
+			for (entry,) in self._cursor:
+				yield entry
+		else:
+			for entry in self._cursor:
+				yield entry
 
 	def __next__(self):
 		match self.query.cols:
