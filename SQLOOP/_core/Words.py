@@ -68,7 +68,9 @@ class TABLE(Word): pass
 class TRIGGER(Word): pass
 class VIEW(Word): pass
 class IF(Word): pass
-class NOT(Word): pass
+class NOT(Word):
+	def __rsub__(self, left):
+		return Comparison(left, "NOT", self.content[0] if len(self.content) == 1 else SQLTuple(self.content))
 class PRIMARY(Word): pass
 class FOREIGN(Word): pass
 class EXISTS(Word): pass

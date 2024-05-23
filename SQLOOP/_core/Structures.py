@@ -178,7 +178,7 @@ class Comparison(SQLOOP):
 		else:
 			self.left = SanitizedValue(left)
 		
-		assert operator in ["==", "!=", "<", "<=", ">", ">=", "=", "IN"], f"Not a valid operator for comparison: {operator=}"
+		assert operator in ["==", "!=", "<", "<=", ">", ">=", "=", "IN", "NOT"], f"Not a valid operator for comparison: {operator=}"
 		self.operator = operator
 
 		if isinstance(right, SQLOOP):
