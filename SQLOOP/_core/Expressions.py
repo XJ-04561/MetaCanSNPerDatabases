@@ -83,10 +83,10 @@ class SelectStatement(Expression):
 			values = (values,)
 		for i, word in enumerate(self.words):
 			if word is FROM:
-				self.words = (self.words[:i], FROM(*values), self.words[i+2:])
+				self.words = (*self.words[:i], FROM(*values), *self.words[i+2:])
 				break
 			elif isinstance(word, FROM):
-				self.words = (self.words[:i], FROM(*values), self.words[i+1:])
+				self.words = (*self.words[:i], FROM(*values), *self.words[i+1:])
 				break
 		else:
 			self.words = self.words + (FROM(*values),)
