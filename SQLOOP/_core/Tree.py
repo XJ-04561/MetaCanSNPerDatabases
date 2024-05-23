@@ -20,7 +20,7 @@ class Branch:
 	@property
 	def parent(self) -> Union["Branch", None]:
 		try:
-			return self.__class__(self.database, next(self.database(SELECT(self.parentCol) - FROM(self.table) - WHERE(self.childCol == self.node))))
+			return self.__class__(self.database, self.database(SELECT(self.parentCol) - FROM(self.table) - WHERE(self.childCol == self.node)))
 		except StopIteration:
 			return None
 

@@ -257,7 +257,10 @@ class Database(metaclass=DatabaseMeta):
 		joinedColumns = {col for t in tables for col in t.columns}
 
 		distant, local = binner(lambda x:x.left in joinedColumns, comps, default=2)
-		wheres = local + createSubqueries(tables, self.tables, distant)
+		if distant:
+			wheres = local + createSubqueries(tables, self.tables, distant)
+		else:
+			wheres = local
 		
 		if wheres:
 			return self(SELECT (*columns) - FROM (*tables) - WHERE (*wheres))
