@@ -67,15 +67,16 @@ def binner(key : Callable, iterable : Iterable, outType : type=list, default=Non
 		return outType(ret)
 
 def first(iterator : Iterable[_T]|Iterator[_T]) -> _T|None:
-	try:
-		return next(iterator)
-	except TypeError:
+	if hasattr(iterator, "__next__"):
+		try:
+			return next(iterator)
+		except StopIteration:
+			return None
+	else:
 		try:
 			return next(iter(iterator))
-		except:
-			pass
-	finally:
-		return None
+		except StopIteration:
+			return None
 
 def camel2snake(string : str):
 	if allCapsSnakecase.fullmatch(string) or snakeCase.fullmatch(string):
