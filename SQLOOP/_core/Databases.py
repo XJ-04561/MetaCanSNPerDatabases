@@ -40,7 +40,8 @@ class Fetcher:
 		return f"{object.__repr__(self)[:-1]} query={str(self.query)} params={self.query.params}>"
 
 	def __iter__(self):
-		return self
+		for entry in self._cursor:
+			yield entry
 
 	def __next__(self):
 		match self.query.cols:
@@ -51,11 +52,11 @@ class Fetcher:
 			case _:
 				return next(self._cursor)
 	
-	def __getitem__(self, rowNumber) -> Any|tuple[Any]:
-		if self.query.cols == 1:
-			return (((self.query - LIMIT(rowNumber,rowNumber)) @ self._connection).fetchone() or [None])[0]
-		else:
-			return ((self.query - LIMIT(rowNumber,rowNumber)) @ self._connection).fetchone()
+	# def __getitem__(self, rowNumber) -> Any|tuple[Any]:
+	# 	if self.query.cols == 1:
+	# 		return (((self.query - LIMIT(rowNumber+1,rowNumber+1)) @ self._connection).fetchone() or [None])[0]
+	# 	else:
+	# 		return ((self.query - LIMIT(rowNumber+1,rowNumber+1)) @ self._connection).fetchone()
 	
 	def __len__(self):
 		return sum(map(lambda x:1, self._cursor))
