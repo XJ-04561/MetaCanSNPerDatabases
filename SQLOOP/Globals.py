@@ -185,7 +185,7 @@ class SQLTuple(SQLOOP, tuple):
 		return tuple.__new__(cls, map(lambda x:SQLTuple(x) if type(x) is tuple else x, args))
 	
 	def __str__(self):
-		return f"({', '.join(map(lambda x:format(x) if isinstance(x, SQLOOP) else "?", self))})"
+		return f"({', '.join(map(lambda x:format(x) if isinstance(x, SQLOOP) else '?', self))})"
 	
 	@property
 	def params(self):
