@@ -89,7 +89,8 @@ class DatabaseMeta(type):
 		return False
 	
 	def __repr__(self):
-		return f"{object.__repr__(self)}\n\t<columns>\n\t\t{'\n\t\t'.join(map(repr, self.columns))}\n\t</columns>\n\t<tables>\n\t\t{'\n\t\t'.join(map(repr, self.tables))}\n\t</tables>\n\t<indexes>\n\t\t{'\n\t\t'.join(map(repr, self.indexes))}\n\t</indexes>\n</{self.__name__}>"
+		ntt = "\n\t\t"
+		return f"{object.__repr__(self)}\n\t<columns>\n\t\t{ntt.join(map(repr, self.columns))}\n\t</columns>\n\t<tables>\n\t\t{ntt.join(map(repr, self.tables))}\n\t</tables>\n\t<indexes>\n\t\t{ntt.join(map(repr, self.indexes))}\n\t</indexes>\n</{self.__name__}>"
 
 class Database(metaclass=DatabaseMeta):
 	"""Usage:
