@@ -1,5 +1,6 @@
 
 from SQLOOP.Globals import *
+from SQLOOP.Globals import Any
 from SQLOOP._core.Types import *
 
 class SQLStructure(SQLOOP, type):
@@ -160,7 +161,7 @@ class SanitizedValue(SQLObject, metaclass=SQLStructure):
 	@property
 	def params(self):
 		if self.value is not None:
-			return [repr(self.value)] if type(self.value) is str else [self.value]
+			return [self.value]# if type(self.value) is not str else [repr(self.value)]
 		else:
 			return []
 
@@ -258,7 +259,7 @@ class Word(SQLOOP, metaclass=Prefix):
 	sep : str = ", "
 
 	def __init__(self, *args : Any, **kwargs : Any):
-		self.content = args + tuple(map(lambda keyVal : Comparison(keyVal[0], "==", keyVal[1], forceLeft=True), kwargs.items()))
+		self.content = tuple(arg if isinstance(arg, SQLOOP) else SanitizedValue(arg) for arg in args) + tuple(map(lambda keyVal : Comparison(keyVal[0], "==", keyVal[1], forceLeft=True), kwargs.items()))
 
 	def __sub__(self, other):
 		return Query(self, other)
@@ -283,15 +284,20 @@ class Word(SQLOOP, metaclass=Prefix):
 	def params(self):
 		out = []
 		for item in self.content:
-			if hasattr(item, "params") and isinstance(item, object):
+			if isinstance(item, SQLOOP):
 				value = item.params
 				if not isinstance(value, (property, cached_property)):
 					out.extend(value)
+			else:
+				out.append(item)
 		return out
 		
 class EnclosedWord(Word):
+	def __init__(self, *args: Any, **kwargs: Any):
+		super().__init__(*args, **kwargs)
+		self.content = SQLTuple(self.content)
 	def __str__(self):
-		return f"{self.__class__.__name__} ({self.sep.join(map(str, self.content))})"
+		return f"{self.__class__.__name__} {self.content}"
 
 class Query(SQLOOP):
 

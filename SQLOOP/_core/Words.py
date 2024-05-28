@@ -34,9 +34,7 @@ class PRAGMA(Word, metaclass=PragmaMeta):
 			self.content = tuple(content)
 		else:
 			raise ValueError("PRAGMA what? Nothing provided to PRAGMA.")
-class VALUES(EnclosedWord):
-	def __init__(self, *args):
-		self.content = tuple(map(SanitizedValue, args))
+class VALUES(EnclosedWord): pass
 class UPDATE(Word): pass
 class SET(Word):
 	def __init__(self, *comparisons, **assignments):
