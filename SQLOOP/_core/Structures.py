@@ -47,8 +47,8 @@ class Operable(SQLOOP):
 
 	def __add__(self, other):			return Operation(self, "+", other)
 	def __radd__(self, other):			return Operation(other, "+", self)
-	def __sub__(self, other):			return Operation(self, "-", other) if not isRelated(other, (Prefix, Word)) else NotImplemented
-	def __rsub__(self, other):			return Operation(other, "-", self) if not isRelated(other, (Prefix, Word)) else NotImplemented
+	def __sub__(self, other):			return Operation(self, "-", other) if not isinstance(other, (Prefix, Word)) else NotImplemented
+	def __rsub__(self, other):			return Operation(other, "-", self) if not isinstance(other, (Prefix, Word)) else NotImplemented
 	def __mul__(self, other):			return Operation(self, "*", other)
 	def __rmul__(self, other):			return Operation(other, "*", self)
 	def __matmul__(self, other):		return Operation(self, "@", other)
