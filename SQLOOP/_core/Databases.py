@@ -136,6 +136,8 @@ class Database(metaclass=DatabaseMeta):
 
 	LOG = logging.Logger(SOFTWARE_NAME, level=logging.FATAL)
 
+	factory : type = Connection
+	factoryFunc : Callable = sqlite3.connect
 	_connection : Connection
 	mode : str
 	filename : str
@@ -150,16 +152,21 @@ class Database(metaclass=DatabaseMeta):
 	in-sql name (Index.__sql_name__). When iterated, returns dict.values() instead of the usual dict.keys()."""
 	assertions : list[Assertion] = Globals.ASSERTIONS
 	"""A look-up list of assertions and the exceptions to be raised should the assertion fail. Assertions are checked last to first."""
-
-	def __init__(self, filename : str, mode : Mode, factory : type[sqlite3.Connection]=Connection, factoryFunc : Callable=sqlite3.connect):
+	@overload
+	def __init__(self, filename : str, mode : Mode, factory : type=Connection, factoryFunc : Callable=sqlite3.connect): ...
+	def __init__(self, filename : str, mode : Mode, factory : type=None, factoryFunc : Callable=None):
 
 		if type(self) is Database:
 			raise NotImplementedError("The base Database class is not to be used, please subclass `Database` with your own appropriate tables and indexes.")
 		self.mode = mode
 		self.filename = filename if os.path.isabs(filename) or filename == ":memory:" else os.path.realpath(os.path.expanduser(filename))
+		if factory:
+			self.factory = factory
+		if factoryFunc:
+			self.factoryFunc = factoryFunc
 		match mode:
 			case "w":
-				self._connection = factoryFunc(filename, factory=factory)
+				self._connection = self.factoryFunc(filename, factory=self.factory)
 			case "r":
 				if not os.path.exists(filename):
 					raise FileNotFoundError(f"Database file {filename} not found on the system.")
@@ -169,7 +176,7 @@ class Database(metaclass=DatabaseMeta):
 				if not cDatabase.startswith("/"): # Path has to be absolute already, and windows paths need a prepended '/'
 					cDatabase = "/"+cDatabase
 				
-				self._connection = factoryFunc(filename, factory=factory)
+				self._connection = self.factoryFunc(filename, factory=self.factory)
 			case _:
 				raise ValueError(f"{mode!r} is not a recognized file-stream mode. Only 'w'/'r' allowed.")
 	
