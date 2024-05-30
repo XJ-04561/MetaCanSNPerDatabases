@@ -23,7 +23,7 @@ class CursorLike:
 
 class ThreadConnection:
 
-	LOG : logging.Logger = logging.getLogger(f"{Globals.SOFTWARE_NAME}.ThreadConnection", level=logging.FATAL)
+	LOG : logging.Logger = logging.getLogger(f"{Globals.SOFTWARE_NAME}.ThreadConnection")
 
 	OPEN_DATABASES = {}
 	queue : Queue[list[str,list,Lock, list]]
