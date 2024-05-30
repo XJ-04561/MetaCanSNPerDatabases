@@ -7,19 +7,6 @@ class SQLStructure(SQLOOP, type):
 
 	__name__ : str
 	__sql_name__ : str
-	
-	def __eq__(self, right):
-		return Comparison(self, "==", right)
-	def __ne__(self, right):
-		return Comparison(self, "!=", right)
-	def __lt__(self, right):
-		return Comparison(self, "<", right)
-	def __le__(self, right):
-		return Comparison(self, "<=", right)
-	def __gt__(self, right):
-		return Comparison(self, ">", right)
-	def __ge__(self, right):
-		return Comparison(self, ">=", right)
 
 	def __or__(self, other):
 		return Union[self, other]
@@ -54,24 +41,10 @@ class Hardcoded(SQLOOP):
 	def params(self):
 		return []
 
-class ColumnMeta(SQLStructure):
-
-	type : "SQL_TYPE"
-	table : "Table"
-	constraint : "Query"
-
-	def __str__(self):
-		if self.table is not None:
-			return f"{self.table}.{self.__sql_name__}"
-		else:
-			return super().__str__()
-
-	def __sql__(self):
-		if self.constraint is not None:
-			return f"{self} {self.type} {self.constraint}"
-		else:
-			return f"{self} {self.type}"
+class Operable(SQLOOP):
 	
+	"""Math-Operations"""
+
 	def __add__(self, other):			return Operation(self, "+", other)
 	def __radd__(self, other):			return Operation(other, "+", self)
 	def __sub__(self, other):			return Operation(self, "-", other)
@@ -96,8 +69,35 @@ class ColumnMeta(SQLStructure):
 	def __rand__(self, other):			return Operation(other, "&", self)
 	def __xor__(self, other):			return Operation(self, "^", other)
 	def __rxor__(self, other):			return Operation(other, "^", self)
-	def __or__(self, other):			return Operation(self, "|", other) if not isinstance(other, type) or isRelated(other, Column) else super().__or__(other)
-	def __ror__(self, other):			return Operation(other, "|", self) if not isinstance(other, type) or isRelated(other, Column) else super().__ror__(other)
+	def __or__(self, other):			return Operation(self, "|", other) if self is not Column and self is not Operation and self is not Comparison else super().__or__(other)
+	def __ror__(self, other):			return Operation(other, "|", self) if self is not Column and self is not Operation and self is not Comparison else super().__ror__(other)
+
+	"""Logic-Operations"""
+
+	def __eq__(self, right):			return Comparison(self, "==", right)
+	def __ne__(self, right):			return Comparison(self, "!=", right)
+	def __lt__(self, right):			return Comparison(self, "<", right)
+	def __le__(self, right):			return Comparison(self, "<=", right)
+	def __gt__(self, right):			return Comparison(self, ">", right)
+	def __ge__(self, right):			return Comparison(self, ">=", right)
+
+class ColumnMeta(SQLStructure, Operable):
+
+	type : "SQL_TYPE"
+	table : "Table"
+	constraint : "Query"
+
+	def __str__(self):
+		if self.table is not None:
+			return f"{self.table}.{self.__sql_name__}"
+		else:
+			return super().__str__()
+
+	def __sql__(self):
+		if self.constraint is not None:
+			return f"{self} {self.type} {self.constraint}"
+		else:
+			return f"{self} {self.type}"
 
 class Column(SQLObject, metaclass=ColumnMeta):
 
@@ -192,7 +192,7 @@ class SanitizedValue(SQLObject, metaclass=SQLStructure):
 		else:
 			return []
 
-class Comparison(SQLOOP):
+class Comparison(SQLOOP, Operable):
 	
 	OPERATORS = ["==", "!=", "<", "<=", ">", ">=", "=", "IN", "NOT", "IS"]
 	
@@ -208,7 +208,7 @@ class Comparison(SQLOOP):
 		else:
 			self.left = SanitizedValue(left)
 		
-		assert operator in self.OPERATORS, f"Not a valid operator for comparison: {operator=}"
+		assert not isRelated(operator, SQLOOP) and operator in self.OPERATORS, f"Not a valid operator for comparison: {operator=}"
 		self.operator = operator
 
 		if isinstance(right, SQLOOP):
@@ -224,6 +224,9 @@ class Comparison(SQLOOP):
 	def __str__(self):
 		return f"{self.left if not isinstance(self.left, SanitizedValue) else '?'} {self.operator} {self.right if not isinstance(self.right, SanitizedValue) else '?'}"
 	
+	def __format__(self, fs):
+		return f"({format(str(self), fs)})"
+
 	def __getitem__(self, key):
 		if isinstance(key, int):
 			if key == 0:
