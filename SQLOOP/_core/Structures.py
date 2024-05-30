@@ -96,8 +96,8 @@ class ColumnMeta(SQLStructure):
 	def __rand__(self, other):			return Operation(other, "&", self)
 	def __xor__(self, other):			return Operation(self, "^", other)
 	def __rxor__(self, other):			return Operation(other, "^", self)
-	def __or__(self, other):			return Operation(self, "|", other)
-	def __ror__(self, other):			return Operation(other, "|", self)
+	def __or__(self, other):			return Operation(self, "|", other) if not isinstance(other, type) or isRelated(other, Column) else super().__or__(other)
+	def __ror__(self, other):			return Operation(other, "|", self) if not isinstance(other, type) or isRelated(other, Column) else super().__ror__(other)
 
 class Column(SQLObject, metaclass=ColumnMeta):
 
