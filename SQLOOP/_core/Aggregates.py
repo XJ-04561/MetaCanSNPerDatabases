@@ -5,7 +5,7 @@ from SQLOOP.Globals import *
 from SQLOOP._core.Structures import *
 from SQLOOP._core.Words import *
 
-class Aggregate(SQLOOP, Operable):
+class Aggregate(Operable):
 	
 	X : Column
 
