@@ -41,7 +41,7 @@ class Hardcoded(SQLOOP):
 	def params(self):
 		return []
 
-class Operable(SQLOOP):
+class Operable:
 	
 	"""Math-Operations"""
 
