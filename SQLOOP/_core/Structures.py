@@ -41,7 +41,7 @@ class Hardcoded(SQLOOP):
 	def params(self):
 		return []
 
-class Operable:
+class Operable(SQLOOP):
 	
 	"""Math-Operations"""
 
@@ -192,7 +192,7 @@ class SanitizedValue(SQLObject, metaclass=SQLStructure):
 		else:
 			return []
 
-class Comparison(SQLOOP, Operable):
+class Comparison(Operable):
 	
 	OPERATORS = ["==", "!=", "<", "<=", ">", ">=", "=", "IN", "NOT", "IS"]
 	
