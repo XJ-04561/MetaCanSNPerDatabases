@@ -71,6 +71,33 @@ class ColumnMeta(SQLStructure):
 			return f"{self} {self.type} {self.constraint}"
 		else:
 			return f"{self} {self.type}"
+	
+	def __add__(self, other):			return Operation(self, "+", other)
+	def __radd__(self, other):			return Operation(other, "+", self)
+	def __sub__(self, other):			return Operation(self, "-", other)
+	def __rsub__(self, other):			return Operation(other, "-", self)
+	def __mul__(self, other):			return Operation(self, "*", other)
+	def __rmul__(self, other):			return Operation(other, "*", self)
+	def __matmul__(self, other):		return Operation(self, "@", other)
+	def __rmatmul__(self, other):		return Operation(other, "@", self)
+	def __truediv__(self, other):		return Operation(self, "/", other)
+	def __rtruediv__(self, other):		return Operation(other, "/", self)
+	def __floordiv__(self, other):		return Operation(self, "//", other)
+	def __rfloordiv__(self, other):		return Operation(other, "//", self)
+	def __mod__(self, other):			return Operation(self, "%", other)
+	def __rmod__(self, other):			return Operation(other, "%", self)
+	def __pow__(self, other):			return Operation(self, "**", other)
+	def __rpow__(self, other):			return Operation(other, "**", self)
+	def __lshift__(self, other):		return Operation(self, "<<", other)
+	def __rlshift__(self, other):		return Operation(other, "<<", self)
+	def __rshift__(self, other):		return Operation(self, ">>", other)
+	def __rrshift__(self, other):		return Operation(other, ">>", self)
+	def __and__(self, other):			return Operation(self, "&", other)
+	def __rand__(self, other):			return Operation(other, "&", self)
+	def __xor__(self, other):			return Operation(self, "^", other)
+	def __rxor__(self, other):			return Operation(other, "^", self)
+	def __or__(self, other):			return Operation(self, "|", other)
+	def __ror__(self, other):			return Operation(other, "|", self)
 
 class Column(SQLObject, metaclass=ColumnMeta):
 
@@ -167,6 +194,8 @@ class SanitizedValue(SQLObject, metaclass=SQLStructure):
 
 class Comparison(SQLOOP):
 	
+	OPERATORS = ["==", "!=", "<", "<=", ">", ">=", "=", "IN", "NOT", "IS"]
+	
 	left : Any
 	operator : str
 	right : Any
@@ -179,7 +208,7 @@ class Comparison(SQLOOP):
 		else:
 			self.left = SanitizedValue(left)
 		
-		assert operator in ["==", "!=", "<", "<=", ">", ">=", "=", "IN", "NOT", "IS"], f"Not a valid operator for comparison: {operator=}"
+		assert operator in self.OPERATORS, f"Not a valid operator for comparison: {operator=}"
 		self.operator = operator
 
 		if isinstance(right, SQLOOP):
@@ -226,6 +255,32 @@ class Comparison(SQLOOP):
 			out.extend(getReadyAttr(self.right, "params", []))
 		
 		return out
+
+class Operation(Comparison):
+
+	OPERATORS = {
+		"+" : "{left} + {right}",
+		"-" : "{left} - {right}",
+		"*" : "{left} * {right}",
+		"@" : "{left} @ {right}",
+		"/" : "{left} / {right}",
+		"//" : "floor({left} / {right})",
+		"%" : "{left} % {right}",
+		"**" : "power({left}, {right})",
+		"&" : "{left} & {right}",
+		"^" : "({left} | {right}) - ({left} & {right})",
+		"|" : "{left} | {right}"
+	}
+	
+	def __bool__(self):
+		return True
+
+	def __str__(self):
+		return self.OPERATORS[self.operator].format(left=self.left, right=self.right)
+
+	@property
+	def params(self):
+		return []
 
 class Assignment(Comparison):
 	
