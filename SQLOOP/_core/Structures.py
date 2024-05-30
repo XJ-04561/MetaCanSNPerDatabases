@@ -36,10 +36,6 @@ class Hardcoded(SQLOOP):
 	
 	def __rsub__(self, left):
 		return Query(left, self)
-	
-	@property
-	def params(self):
-		return []
 
 class Operable(SQLOOP):
 	
@@ -188,7 +184,7 @@ class SanitizedValue(SQLObject, metaclass=SQLStructure):
 	@property
 	def params(self):
 		if self.value is not None:
-			return [self.value]# if type(self.value) is not str else [repr(self.value)]
+			return [self.value if not isinstance(self.value, list) else tuple(self.value)]# if type(self.value) is not str else [repr(self.value)]
 		else:
 			return []
 
@@ -247,15 +243,9 @@ class Comparison(Operable):
 
 		out = []
 
-		if isinstance(self.left, SanitizedValue):
-			out.append(self.left.value)
-		else:
-			out.extend(getReadyAttr(self.left, "params", []))
+		out.extend(getReadyAttr(self.left, "params", []))
 		
-		if isinstance(self.right, SanitizedValue):
-			out.append(self.right.value)
-		else:
-			out.extend(getReadyAttr(self.right, "params", []))
+		out.extend(getReadyAttr(self.right, "params", []))
 		
 		return out
 
@@ -280,6 +270,16 @@ class Operation(Comparison):
 
 	def __str__(self):
 		return self.OPERATORS[self.operator].format(left=self.left, right=self.right)
+	
+	@property
+	def params(self):
+		out = Comparison.params.fget(self)
+		if self.operator == "^":
+			out.extend(getReadyAttr(self.left, "params", []))
+			
+			out.extend(getReadyAttr(self.right, "params", []))
+		
+		return out
 
 class Assignment(Comparison):
 	
@@ -338,12 +338,7 @@ class Word(SQLOOP, metaclass=Prefix):
 	def params(self):
 		out = []
 		for item in self.content:
-			if isinstance(item, SQLOOP):
-				value = item.params
-				if not isinstance(value, (property, cached_property)):
-					out.extend(value)
-			else:
-				out.append(item)
+			out.extend(getReadyAttr(item, "params", []))
 		return out
 		
 class EnclosedWord(Word):
@@ -472,8 +467,7 @@ class Query(SQLOOP):
 	def params(self):
 		params = []
 		for word in self.words:
-			if isinstance(word, SQLOOP):
-				params.extend(getReadyAttr(word, "params", []))
+			params.extend(getReadyAttr(word, "params", []))
 		return params
 
 class TableMeta(SQLStructure):

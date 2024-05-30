@@ -182,19 +182,17 @@ class SQLTuple(SQLOOP, tuple):
 	def __new__(cls, *args):
 		if len(args) == 1 and isinstance(args[0], Iterable):
 			args = tuple(args[0])
-		return tuple.__new__(cls, map(lambda x:SQLTuple(x) if type(x) is tuple else x, args))
+		from SQLOOP._core.Structures import SanitizedValue
+		return tuple.__new__(cls, map(lambda x:x if isinstance(x, SQLOOP) else SQLTuple(x) if isinstance(x, Iterable) else SanitizedValue(x), args))
 	
 	def __str__(self):
-		return f"({', '.join(map(lambda x:format(x) if isinstance(x, SQLOOP) else '?', self))})"
+		return f"({', '.join(map(format, self))})"
 	
 	@property
 	def params(self):
 		out = []
 		for item in self:
-			if not isinstance(item, SQLOOP):
-				out.append(item)
-			elif hasattr(item, "params"):
-				out.extend(item.params)
+			out.extend(getReadyAttr(item, "params", []))
 		return out
 
 class Nothing:
