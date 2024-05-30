@@ -7,6 +7,7 @@ from SQLOOP._core.Types import *
 from SQLOOP._core.Expressions import *
 from SQLOOP._core.Words import *
 from SQLOOP._core.Aggregates import *
+from SQLOOP._core.ThreadConnection import ThreadConnection
 
 class Fetcher:
 	"""Fetches data from a cursor. Consumes the cursor object during iteration/indexation."""
@@ -138,7 +139,7 @@ class Database(metaclass=DatabaseMeta):
 
 	factory : type = Connection
 	factoryFunc : Callable = sqlite3.connect
-	_connection : Connection
+	_connection : ThreadConnection
 	mode : str
 	filename : str
 	columns : SQLDict[Column] = SQLDict()
@@ -153,8 +154,8 @@ class Database(metaclass=DatabaseMeta):
 	assertions : list[Assertion] = Globals.ASSERTIONS
 	"""A look-up list of assertions and the exceptions to be raised should the assertion fail. Assertions are checked last to first."""
 	@overload
-	def __init__(self, filename : str, mode : Mode, factory : type=Connection, factoryFunc : Callable=sqlite3.connect): ...
-	def __init__(self, filename : str, mode : Mode, factory : type=None, factoryFunc : Callable=None):
+	def __init__(self, filename : str, mode : Mode, factory : type=Connection): ...
+	def __init__(self, filename : str, mode : Mode, factory : type=None):
 
 		if type(self) is Database:
 			raise NotImplementedError("The base Database class is not to be used, please subclass `Database` with your own appropriate tables and indexes.")
@@ -162,11 +163,9 @@ class Database(metaclass=DatabaseMeta):
 		self.filename = filename if os.path.isabs(filename) or filename == ":memory:" else os.path.realpath(os.path.expanduser(filename))
 		if factory:
 			self.factory = factory
-		if factoryFunc:
-			self.factoryFunc = factoryFunc
 		match mode:
 			case "w":
-				self._connection = self.factoryFunc(filename, factory=self.factory)
+				self._connection = ThreadConnection(filename, factory=self.factory)
 			case "r":
 				if not os.path.exists(filename):
 					raise FileNotFoundError(f"Database file {filename} not found on the system.")
@@ -176,7 +175,7 @@ class Database(metaclass=DatabaseMeta):
 				if not cDatabase.startswith("/"): # Path has to be absolute already, and windows paths need a prepended '/'
 					cDatabase = "/"+cDatabase
 				
-				self._connection = self.factoryFunc(filename, factory=self.factory)
+				self._connection = ThreadConnection(filename, factory=self.factory)
 			case _:
 				raise ValueError(f"{mode!r} is not a recognized file-stream mode. Only 'w'/'r' allowed.")
 	
@@ -369,3 +368,4 @@ class Database(metaclass=DatabaseMeta):
 			self._connection.close()
 		except:
 			pass
+		
