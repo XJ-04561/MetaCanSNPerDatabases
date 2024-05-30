@@ -281,10 +281,6 @@ class Operation(Comparison):
 	def __str__(self):
 		return self.OPERATORS[self.operator].format(left=self.left, right=self.right)
 
-	@property
-	def params(self):
-		return []
-
 class Assignment(Comparison):
 	
 	left : str|Column
