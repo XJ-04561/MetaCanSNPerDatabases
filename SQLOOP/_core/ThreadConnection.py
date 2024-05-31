@@ -135,10 +135,9 @@ class ThreadConnection:
 		return results
 
 	def close(self):
-		try:
-			raise Exception("Getting Traceback of .close() call.")
-		except Exception as e:
-			self.LOG.exception(e, stacklevel=logging.INFO)
+		import inspect
+		from pprint import pformat
+		self.LOG.info(f"Database thread at 0x{id(self):X} was close in stack:\n{pformat(inspect.stack())}")
 		self.running = False
 		self.queue.put([None, None, None, None])
 		self._thread.join()
