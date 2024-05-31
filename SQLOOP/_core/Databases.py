@@ -281,7 +281,7 @@ class Database(metaclass=DatabaseMeta):
 		else:
 			wheres = connections + local
 		
-		order = tuple(filter(lambda x:isinstance(x, Query) and len(x) == 2 and isRelated(x.words[0]) and (x.words[1] is DESC or x.words[1] is ASC), items))
+		order = tuple(filter(lambda x:isinstance(x, Query) and len(x.words) == 2 and isRelated(x.words[0]) and (x.words[1] is DESC or x.words[1] is ASC), items))
 
 		query = SELECT (*columns) - FROM (*tables)
 		if wheres:
