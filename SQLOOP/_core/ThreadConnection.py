@@ -48,7 +48,6 @@ class ThreadConnection:
 		self.running = True
 		self.queue = Queue()
 		self.queueLock = Lock()
-		self.queueLock.acquire()
 		self.filename = filename
 		self._factory = factory
 		self._thread = Thread(target=self.mainLoop, daemon=True)
