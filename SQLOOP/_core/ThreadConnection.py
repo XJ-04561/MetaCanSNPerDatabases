@@ -65,7 +65,7 @@ class ThreadConnection:
 			self._thread.start()
 
 	def __getattr__(self, name):
-		return getattr(self.REFERENCE, "name")
+		return getattr(self.REFERENCE, name)
 
 	def mainLoop(self):
 		try:
