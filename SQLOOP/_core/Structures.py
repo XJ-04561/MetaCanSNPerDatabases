@@ -94,6 +94,14 @@ class ColumnMeta(SQLStructure, Operable):
 			return f"{self} {self.type} {self.constraint}"
 		else:
 			return f"{self} {self.type}"
+	
+	def __pos__(self):
+		from SQLOOP._core.Words import ASC
+		return self - ASC
+	
+	def __neg__(self):
+		from SQLOOP._core.Words import DESC
+		return self - DESC
 
 class Column(SQLObject, metaclass=ColumnMeta):
 

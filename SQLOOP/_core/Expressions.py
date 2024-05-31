@@ -144,6 +144,12 @@ class SelectStatement(Expression):
 			return False
 
 	@property
+	def order(self):
+		for word in self.words:
+			if isinstance(word, BY):
+				return [order for order in word]
+
+	@property
 	def constraints(self) -> set["TableConstraint"]:
 		return set(constraint for t in self.tables for constraint in t.constraints)
 

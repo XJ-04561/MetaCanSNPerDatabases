@@ -280,10 +280,15 @@ class Database(metaclass=DatabaseMeta):
 			wheres = connections + local + createSubqueries(tables, self.tables, distant)
 		else:
 			wheres = connections + local
+		
+		order = tuple(filter(lambda x:isinstance(x, Query) and len(x) == 2 and isRelated(x.words[0]) and (x.words[1] is DESC or x.words[1] is ASC), items))
+
+		query = SELECT (*columns) - FROM (*tables)
 		if wheres:
-			return self(SELECT (*columns) - FROM (*tables) - WHERE (*wheres))
-		else:
-			return self(SELECT (*columns) - FROM (*tables))
+			query = query - WHERE (*wheres)
+		if order:
+			query = query - ORDER - BY (*order)
+		return self(query)
 
 	@property
 	def __version__(self):
