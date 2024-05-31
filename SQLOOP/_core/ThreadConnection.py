@@ -49,9 +49,11 @@ class ThreadConnection:
 				self.REFERENCE = ref
 				if ref.running:
 					return
+				else:
+					del self.REFERENCE
 			
 			self.OPEN_DATABASES[filename, factory] = self
-			self.INSTANCES = []
+			self.INSTANCES = [self]
 			
 			self.running = True
 			self.CLOSED = False
