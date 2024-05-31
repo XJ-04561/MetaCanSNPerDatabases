@@ -260,28 +260,26 @@ class Database(metaclass=DatabaseMeta):
 	def __getitem__(self, items : tuple[Column|Table|Comparison]):
 		if not isinstance(items, tuple):
 			items = (items, )
-		from SQLOOP._core.Functions import getSmallestFootprint, createSubqueries
-		columns = tuple(filter(lambda x:isRelated(x, Column) or isinstance(x, Aggregate), items)) or (ALL)
+		from SQLOOP._core.Functions import getSmallestFootprint, createSubqueries, recursiveWalk
+		columns = tuple(filter(lambda x:isRelated(x, Column) or isinstance(x, Aggregate) or isinstance(x, Operation), items)) or (ALL)
 
 		comps = tuple(filter(lambda x:isinstance(x, Comparison), items))
 
 		realColumns = set()
-		for col in columns:
-			if isinstance(col, Aggregate):
-				for subCol in col:
-					realColumns.add(subCol)
-			elif col is not ALL:
+		for col in recursiveWalk(columns):
+			if isRelated(col, Column) and col is not ALL:
 				realColumns.add(col)
-		tables = tuple(filter(lambda x:isRelated(x, Table), items)) or getSmallestFootprint(self.tables, realColumns, secondaryColumns=set(map(*this.left, comps)))
+		tables = tuple(filter(lambda x:isRelated(x, Table), items)) or getSmallestFootprint(set(self.tables), realColumns, secondaryColumns=set(map(*this.left, comps)))
 		
+		connections = tuple(table[col] == otherTable[col] for i, table in enumerate(tables) for col in table for otherTable in tables[i+1:] if col in otherTable)
+
 		joinedColumns = {col for t in tables for col in t.columns}
 
 		distant, local = binner(lambda x:x.left in joinedColumns, comps, default=2)
 		if distant:
-			wheres = local + createSubqueries(tables, self.tables, distant)
+			wheres = connections + local + createSubqueries(tables, self.tables, distant)
 		else:
-			wheres = local
-		
+			wheres = connections + local
 		if wheres:
 			return self(SELECT (*columns) - FROM (*tables) - WHERE (*wheres))
 		else:

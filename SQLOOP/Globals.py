@@ -287,19 +287,19 @@ class SQLDict(dict):
 			if all(map(lambda x:hasattr(x, "__len__"), data)) and all(map(lambda x:len(x) == 2, data)):
 				super().__init__(data, *args, **kwargs)
 			else:
-				super().__init__(list(map(lambda x:(str(x),x), data)), *args, **kwargs)
+				super().__init__(list(map(lambda x:(getattr(x, "__sql_name__", None) or str(x),x), data)), *args, **kwargs)
 		self.valueSet = set(self)
 	
 	def __iter__(self):
 		return iter(self.values())
 	
 	def __contains__(self, item):
-		from SQLOOP._core.Structures import ColumnAlias, LinkedColumn
+		from SQLOOP._core.Structures import ColumnAlias, Column
 		if isinstance(item, str):
 			return super().__contains__(item)
 		elif isRelated(item, ColumnAlias):
 			return super().__contains__(item.fullName)
-		elif isRelated(item, LinkedColumn):
+		elif isRelated(item, Column):
 			return super().__contains__(item.__sql_name__)
 		elif isinstance(item, SQLOOP):
 			return super().__contains__(str(item))
@@ -322,10 +322,15 @@ class SQLDict(dict):
 	
 	def __setitem__(self, key, value):
 		self.valueSet.add(value)
-		super().__setitem__(key, value)
+		if hasattr(key, "__sql_name__"):
+			super().__setitem__(key.__sql_name__, value)
+		else:
+			super().__setitem__(key, value)
 	
 	def __getitem__(self, key):
-		if isinstance(key, str):
+		if hasattr(key, "__sql_name__"):
+			return super().__getitem__(key.__sql_name__)
+		elif isinstance(key, str):
 			return super().__getitem__(key)
 		elif isinstance(key, int) and key < len(self):
 			for i,v in zip(range(key+1), self.values()): pass

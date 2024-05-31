@@ -530,7 +530,7 @@ class Table(SQLObject, HasColumns, metaclass=TableMeta):
 			cls.__doc__ += "\n".join(["```python", *(f"{cls.__name__}.{name} = {col.__name__} # {col}" for name, col in vars(cls).items() if isRelated(col, Column)), "```"])
 		else:
 			cls.__doc__ = "\n".join(["```python", *(f"{cls.__name__}.{name} = {col.__name__} # {col}" for name, col in vars(cls).items() if isRelated(col, Column)), "```"])
-		cls.linkedColumns = {str(col):SQLStructure(str(col), (LinkedColumn,), {}, type=col.type, table=cls) for col in cls.columns}
+		cls.linkedColumns = SQLDict(SQLStructure(str(col), (LinkedColumn,), {}, type=col.type, table=cls) for col in cls.columns)
 
 	def __init__(self, database):
 		self.database = database
