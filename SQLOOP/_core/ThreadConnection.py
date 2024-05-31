@@ -50,7 +50,7 @@ class ThreadConnection:
 				if ref.running:
 					return
 				else:
-					del self.REFERENCE
+					self.__dict__.pop("REFERENCE", None)
 			
 			self.OPEN_DATABASES[filename, factory] = self
 			self.INSTANCES = [self]
@@ -154,13 +154,13 @@ class ThreadConnection:
 		import inspect
 		from pprint import pformat
 		self.LOG.info(f"Database thread at 0x{id(self):X} was closed in stack:\n{pformat(inspect.stack())}")
-		
-		self.INSTANCES.remove(self)
-		try:
-			self.INSTANCES[0]
-		except:
-			self.queue.put([None, None, None, None])
-			self._thread.join()
+		with self.CACHE_LOCK:
+			self.INSTANCES.remove(self)
+			try:
+				self.INSTANCES[0]
+			except:
+				self.queue.put([None, None, None, None])
+				self._thread.join()
 	
 	def commit(self):
 		self.execute("COMMIT;")
