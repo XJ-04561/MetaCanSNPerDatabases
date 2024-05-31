@@ -25,7 +25,10 @@ class CursorLike:
 class ThreadConnection:
 
 	LOG : logging.Logger = logging.getLogger(f"{Globals.SOFTWARE_NAME}.ThreadConnection")
-	OPEN_DATABASES = {}
+	OPEN_DATABASES : dict[tuple[str, type],"ThreadConnection"]= {}
+	INSTANCES : list
+	REFERENCE : "ThreadConnection"
+	CACHE_LOCK = Lock()
 	CLOSED : bool
 
 	queue : Queue[list[str,list,Lock, list]]
@@ -38,27 +41,38 @@ class ThreadConnection:
 	def _connection(self) -> "ThreadConnection":
 		return self
 
-	def __new__(cls, filename : str, factory=sqlite3.Connection):
-		if (filename, factory) in cls.OPEN_DATABASES and cls.OPEN_DATABASES[filename, factory]._thread.is_alive() and cls.OPEN_DATABASES[filename, factory].running:
-			return cls.OPEN_DATABASES[filename, factory]
-		else:
-			cls.OPEN_DATABASES[filename, factory] = super().__new__(cls)
-			return cls.OPEN_DATABASES[filename, factory]
-
 	def __init__(self, filename : str, factory=sqlite3.Connection):
-		self.running = True
-		self.CLOSED = False
-		self.queue = Queue()
-		self.queueLock = Lock()
-		self.filename = filename
-		self._factory = factory
-		self._thread = Thread(target=self.mainLoop, daemon=True)
-		self._thread.start()
+		with self.CACHE_LOCK:
+			if (filename, factory) in self.OPEN_DATABASES and self.OPEN_DATABASES[filename, factory].running:
+				ref = self.OPEN_DATABASES[filename, factory]
+				ref.INSTANCES.append(self)
+				self.REFERENCE = ref
+				if ref.running:
+					return
+			
+			self.OPEN_DATABASES[filename, factory] = self
+			self.INSTANCES = []
+			
+			self.running = True
+			self.CLOSED = False
+			self.queue = Queue()
+			self.queueLock = Lock()
+			self.filename = filename
+			self._factory = factory
+			self._thread = Thread(target=self.mainLoop, daemon=True)
+			self._thread.start()
+
+	def __getattr__(self, name):
+		return getattr(self.REFERENCE, "name")
 
 	def mainLoop(self):
 		try:
 			_connection = sqlite3.connect(self.filename, factory=self._factory)
 			while self.running:
+				try:
+					self.INSTANCES[0] # Exits loop if all instances have called '.close()'
+				except:
+					break
 				try:
 					string, params, lock, results = self.queue.get(timeout=15)
 					if string is None and lock is None:
@@ -137,14 +151,17 @@ class ThreadConnection:
 	def close(self):
 		import inspect
 		from pprint import pformat
-		self.LOG.info(f"Database thread at 0x{id(self):X} was close in stack:\n{pformat(inspect.stack())}")
-		self.running = False
-		self.queue.put([None, None, None, None])
-		self._thread.join()
+		self.LOG.info(f"Database thread at 0x{id(self):X} was closed in stack:\n{pformat(inspect.stack())}")
+		
+		self.INSTANCES.remove(self)
+		try:
+			self.INSTANCES[0]
+		except:
+			self.queue.put([None, None, None, None])
+			self._thread.join()
 	
 	def commit(self):
 		self.execute("COMMIT;")
 
-	## CAUSES PROBLEMS WITH 'AST', AST-COMPILED FUNCTIONS CALL __DEL__ REGARDLESS OF GARBAGE COLLECTION.
-	# def __del__(self):
-	# 	self.close()
+	def __del__(self):
+		self.close()
