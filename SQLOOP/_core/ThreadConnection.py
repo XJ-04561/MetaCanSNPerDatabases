@@ -91,7 +91,12 @@ class ThreadConnection:
 		lock = Lock()
 		lock.acquire()
 		results = []
-		self.queue.put([string, params, lock, results])
+		with self.queueLock:
+			self.queue.put([string, params, lock, results])
+		
+		if not self._thread.is_alive() or not self.running:
+			raise sqlite3.ProgrammingError("Cannot operate on a closed database.")
+		
 		lock.acquire()
 		
 		if results and isinstance(results[-1], Exception):
@@ -110,6 +115,9 @@ class ThreadConnection:
 			lock = Lock()
 			lock.acquire()
 			self.queue.put([*statements[-1], lock, results[-1]])
+		
+		if not self._thread.is_alive() or not self.running:
+			raise sqlite3.ProgrammingError("Cannot operate on a closed database.")
 		lock.acquire()
 		
 		if any(r and isinstance(r[-1], Exception) for r in results):
