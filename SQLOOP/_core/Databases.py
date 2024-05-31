@@ -261,11 +261,18 @@ class Database(metaclass=DatabaseMeta):
 		if not isinstance(items, tuple):
 			items = (items, )
 		from SQLOOP._core.Functions import getSmallestFootprint, createSubqueries
-		columns = tuple(filter(lambda x:isRelated(x, Column), items)) or (ALL)
+		columns = tuple(filter(lambda x:isRelated(x, Column) or isinstance(x, Aggregate), items)) or (ALL)
 
-		comps = tuple(filter(lambda x:isinstance(x, Comparison), items))
-		tables = tuple(filter(lambda x:isRelated(x, Table), items)) or getSmallestFootprint(self.tables, set(filter(lambda x:x is not ALL, itertools.chain(*map(lambda x:(x,) if not isinstance(x, Aggregate) else x.content, columns)))), secondaryColumns=tuple(map(*this.left, comps)))
+		realColumns = set()
+		for col in columns:
+			if isinstance(col, Aggregate):
+				for subCol in col:
+					realColumns.add(subCol)
+			elif col is not ALL:
+				realColumns.add(col)
+		tables = tuple(filter(lambda x:isRelated(x, Table), items)) or getSmallestFootprint(self.tables, realColumns, secondaryColumns=set(map(*this.left, comps)))
 		
+		comps = tuple(filter(lambda x:isinstance(x, Comparison), items))
 		joinedColumns = {col for t in tables for col in t.columns}
 
 		distant, local = binner(lambda x:x.left in joinedColumns, comps, default=2)
