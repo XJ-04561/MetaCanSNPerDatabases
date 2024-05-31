@@ -25,8 +25,7 @@ class CursorLike:
 class ThreadConnection:
 
 	LOG : logging.Logger = logging.getLogger(f"{Globals.SOFTWARE_NAME}.ThreadConnection")
-	OPEN_DATABASES : dict[tuple[str, type],"ThreadConnection"]= {}
-	INSTANCES : set
+	OPEN_DATABASES : dict[tuple[str, type],list["ThreadConnection",set[int]]]= {}
 	REFERENCE : "ThreadConnection"
 	CACHE_LOCK = Lock()
 	CLOSED : bool
@@ -154,8 +153,8 @@ class ThreadConnection:
 		from pprint import pformat
 		self.LOG.info(f"Database thread at 0x{id(self):X} was closed in stack:\n{pformat(inspect.stack())}")
 		with self.CACHE_LOCK:
-			self.INSTANCES.discard(identifier)
-			if not self.INSTANCES:
+			self.OPEN_DATABASES[self.filename, self._factory][1].discard(identifier)
+			if not self.OPEN_DATABASES[self.filename, self._factory][1]:
 				self.queue.put([None, None, None, None])
 				self._thread.join()
 	
