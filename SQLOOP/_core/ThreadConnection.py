@@ -70,10 +70,6 @@ class ThreadConnection:
 			_connection = sqlite3.connect(self.filename, factory=self._factory)
 			while self.running:
 				try:
-					self.INSTANCES[0] # Exits loop if all instances have called '.close()'
-				except:
-					break
-				try:
 					string, params, lock, results = self.queue.get(timeout=15)
 					if string is None and lock is None:
 						continue
@@ -155,6 +151,10 @@ class ThreadConnection:
 		with self.CACHE_LOCK:
 			self.OPEN_DATABASES[self.filename, self._factory][1].discard(identifier)
 			if not self.OPEN_DATABASES[self.filename, self._factory][1]:
+				if hasattr(self, "REFERENCE"):
+					self.REFERENCE.running = False
+				else:
+					self.running = False
 				self.queue.put([None, None, None, None])
 				self._thread.join()
 	
