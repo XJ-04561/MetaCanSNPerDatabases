@@ -271,7 +271,7 @@ class Database(metaclass=DatabaseMeta):
 				realColumns.add(col)
 		tables = tuple(filter(lambda x:isRelated(x, Table), items)) or getSmallestFootprint(set(self.tables), realColumns, secondaryColumns=set(map(*this.left, comps)))
 		
-		connections = tuple(table[col] == otherTable[col] for i, table in enumerate(tables) for col in table for otherTable in tables[i+1:] if col in otherTable)
+		connections = tuple(table.linkedColumns[col] == otherTable.linkedColumns[col] for i, table in enumerate(tables) for col in table for otherTable in tables[i+1:] if col in otherTable)
 
 		joinedColumns = {col for t in tables for col in t.columns}
 
