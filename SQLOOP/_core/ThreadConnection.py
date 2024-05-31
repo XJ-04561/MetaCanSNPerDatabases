@@ -60,12 +60,16 @@ class ThreadConnection:
 			while self.running:
 				try:
 					string, params, lock, results = self.queue.get(timeout=15)
-					if string is None: continue
+					if string is None and lock is None:
+						continue
 					try:
 						results.extend(_connection.execute(string, params).fetchall())
 					except Exception as e:
 						self.LOG.exception(e)
-						results.append(e)
+						try:
+							results.append(e)
+						except:
+							pass
 					try:
 						lock.release()
 					except:
