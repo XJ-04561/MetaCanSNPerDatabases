@@ -145,5 +145,6 @@ class ThreadConnection:
 	def commit(self):
 		self.execute("COMMIT;")
 
-	def __del__(self):
-		self.close()
+	## CAUSES PROBLEMS WITH 'AST', AST-COMPILED FUNCTIONS CALL __DEL__ REGARDLESS OF GARBAGE COLLECTION.
+	# def __del__(self):
+	# 	self.close()
