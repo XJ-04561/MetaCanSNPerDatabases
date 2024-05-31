@@ -12,7 +12,7 @@ from SQLOOP._core.ThreadConnection import ThreadConnection
 from SQLOOP._core.Tree import Branch
 from SQLOOP._core.Types import *
 from SQLOOP._core.Words import *
-from SQLOOP.Globals import SQLOOP, first
+from SQLOOP.Globals import SQLOOP, first, sql, SQLDict
 
 def newColumn(name : str|Column, table : type[Table]=None):
 	from SQLOOP._core.Structures import SQLStructure, LinkedColumn

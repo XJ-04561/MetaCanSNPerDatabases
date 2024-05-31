@@ -3,6 +3,7 @@ from threading import Thread, Lock
 import sqlite3, logging
 from queue import Queue, Empty as EmptyQueueException
 import SQLOOP.Globals as Globals
+import queue
 
 class CursorLike:
 	def __init__(self, data : list):

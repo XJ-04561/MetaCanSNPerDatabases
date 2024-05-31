@@ -171,7 +171,6 @@ class SQLOOP:
 	def params(self):
 		return []
 
-
 class SQLTuple(SQLOOP, tuple):
 	
 	@overload
@@ -239,7 +238,6 @@ class ClassProperty:
 	
 	def __repr__(self):
 		return f"{object.__repr__(self)[:-1]} name={self.name!r}>"
-
 
 class CachedClassProperty:
 
@@ -360,13 +358,11 @@ def alphabetize(n : int):
 		m //= 26
 	return "".join(out)
 
-
 def isRelated(cls1 : type|object, cls2 : type) -> bool:
 	"""Convenience function which returns True if cls1 is both a type and a subclass of cls2. This is useful because
 	attempting issubclass() on an object as first argument raises an exception,  so this can be used instead of
 	explicitly typing isinstance(cls1, type) and issubclass(cl1, cls2)"""
 	return isinstance(cls1, type) and issubclass(cls1, cls2)
-
 
 ASSERTIONS = (
 	SchemaNotEmpty,

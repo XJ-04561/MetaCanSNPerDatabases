@@ -64,7 +64,7 @@ class Fetcher:
 	# 		return ((self.query - LIMIT(rowNumber+1,rowNumber+1)) @ self._connection).fetchone()
 	
 	def __len__(self):
-		return sum(map(lambda x:1, self._cursor))
+		return (SelectStatement(SELECT(COUNT(ALL)), *self.query.words[1:]) @ self._connection).fetchone()[0]
 
 class DatabaseMeta(type):
 	
