@@ -25,8 +25,9 @@ class CursorLike:
 class ThreadConnection:
 
 	LOG : logging.Logger = logging.getLogger(f"{Globals.SOFTWARE_NAME}.ThreadConnection")
-
 	OPEN_DATABASES = {}
+	CLOSED : bool
+
 	queue : Queue[list[str,list,Lock, list]]
 	queueLock : Lock
 	running : bool
@@ -46,6 +47,7 @@ class ThreadConnection:
 
 	def __init__(self, filename : str, factory=sqlite3.Connection):
 		self.running = True
+		self.CLOSED = False
 		self.queue = Queue()
 		self.queueLock = Lock()
 		self.filename = filename
@@ -78,7 +80,11 @@ class ThreadConnection:
 					pass
 				except Exception as e:
 					self.LOG.exception(e)
+			self.running = False
+			_connection.close()
 		except Exception as e:
+			self.running = False
+			_connection.close()
 			self.LOG.exception(e)
 			try:
 				results.append(e)
@@ -87,8 +93,8 @@ class ThreadConnection:
 				pass
 			for _ in range(self.queue.unfinished_tasks):
 				string, params, lock, results = self.queue.get(timeout=15)
-				lock.release()
-		_connection.close()
+				if lock is not None:
+					lock.release()
 
 	def execute(self, string : str, params : list=[]):
 		lock = Lock()
@@ -129,6 +135,10 @@ class ThreadConnection:
 		return results
 
 	def close(self):
+		try:
+			raise Exception("Getting Traceback of .close() call.")
+		except Exception as e:
+			self.LOG.exception(e, stacklevel=logging.INFO)
 		self.running = False
 		self.queue.put([None, None, None, None])
 		self._thread.join()
@@ -137,4 +147,4 @@ class ThreadConnection:
 		self.execute("COMMIT;")
 
 	def __del__(self):
-		self.running = False
+		self.close()
