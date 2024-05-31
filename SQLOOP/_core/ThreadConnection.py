@@ -26,7 +26,7 @@ class ThreadConnection:
 
 	LOG : logging.Logger = logging.getLogger(f"{Globals.SOFTWARE_NAME}.ThreadConnection")
 	OPEN_DATABASES : dict[tuple[str, type],"ThreadConnection"]= {}
-	INSTANCES : list
+	INSTANCES : set
 	REFERENCE : "ThreadConnection"
 	CACHE_LOCK = Lock()
 	CLOSED : bool
@@ -41,19 +41,18 @@ class ThreadConnection:
 	def _connection(self) -> "ThreadConnection":
 		return self
 
-	def __init__(self, filename : str, factory=sqlite3.Connection):
+	def __init__(self, filename : str, factory=sqlite3.Connection, identifier=0):
 		with self.CACHE_LOCK:
-			if (filename, factory) in self.OPEN_DATABASES and self.OPEN_DATABASES[filename, factory].running:
-				ref = self.OPEN_DATABASES[filename, factory]
-				ref.INSTANCES.append(self)
+			if (filename, factory) in self.OPEN_DATABASES and self.OPEN_DATABASES[filename, factory][0].running:
+				ref = self.OPEN_DATABASES[filename, factory][0]
+				self.OPEN_DATABASES[filename, factory][1].add(identifier)
 				self.REFERENCE = ref
 				if ref.running:
 					return
 				else:
 					self.__dict__.pop("REFERENCE", None)
 			
-			self.OPEN_DATABASES[filename, factory] = self
-			self.INSTANCES = [self]
+			self.OPEN_DATABASES[filename, factory] = [self, {identifier}]
 			
 			self.running = True
 			self.CLOSED = False
@@ -150,15 +149,13 @@ class ThreadConnection:
 		
 		return results
 
-	def close(self):
+	def close(self, identifier=0):
 		import inspect
 		from pprint import pformat
 		self.LOG.info(f"Database thread at 0x{id(self):X} was closed in stack:\n{pformat(inspect.stack())}")
 		with self.CACHE_LOCK:
-			self.INSTANCES.remove(self)
-			try:
-				self.INSTANCES[0]
-			except:
+			self.INSTANCES.discard(identifier)
+			if not self.INSTANCES:
 				self.queue.put([None, None, None, None])
 				self._thread.join()
 	

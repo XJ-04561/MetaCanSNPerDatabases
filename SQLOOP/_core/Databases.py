@@ -165,7 +165,7 @@ class Database(metaclass=DatabaseMeta):
 			self.factory = factory
 		match mode:
 			case "w":
-				self._connection = ThreadConnection(filename, factory=self.factory)
+				self._connection = ThreadConnection(filename, factory=self.factory, identifier=id(self))
 			case "r":
 				if not os.path.exists(filename):
 					raise FileNotFoundError(f"Database file {filename} not found on the system.")
@@ -175,7 +175,7 @@ class Database(metaclass=DatabaseMeta):
 				if not cDatabase.startswith("/"): # Path has to be absolute already, and windows paths need a prepended '/'
 					cDatabase = "/"+cDatabase
 				
-				self._connection = ThreadConnection(filename, factory=self.factory)
+				self._connection = ThreadConnection(filename, factory=self.factory, identifier=id(self))
 			case _:
 				raise ValueError(f"{mode!r} is not a recognized file-stream mode. Only 'w'/'r' allowed.")
 	
@@ -210,7 +210,7 @@ class Database(metaclass=DatabaseMeta):
 	
 	def __del__(self):
 		try:
-			self._connection.close()
+			self.close()
 		except:
 			pass
 	
@@ -263,6 +263,8 @@ class Database(metaclass=DatabaseMeta):
 		from SQLOOP._core.Functions import getSmallestFootprint, createSubqueries
 		columns = tuple(filter(lambda x:isRelated(x, Column) or isinstance(x, Aggregate), items)) or (ALL)
 
+		comps = tuple(filter(lambda x:isinstance(x, Comparison), items))
+
 		realColumns = set()
 		for col in columns:
 			if isinstance(col, Aggregate):
@@ -272,7 +274,6 @@ class Database(metaclass=DatabaseMeta):
 				realColumns.add(col)
 		tables = tuple(filter(lambda x:isRelated(x, Table), items)) or getSmallestFootprint(self.tables, realColumns, secondaryColumns=set(map(*this.left, comps)))
 		
-		comps = tuple(filter(lambda x:isinstance(x, Comparison), items))
 		joinedColumns = {col for t in tables for col in t.columns}
 
 		distant, local = binner(lambda x:x.left in joinedColumns, comps, default=2)
@@ -372,7 +373,7 @@ class Database(metaclass=DatabaseMeta):
 
 	def close(self):
 		try:
-			self._connection.close()
+			self._connection.close(identifier=id(self))
 		except:
 			pass
 		
