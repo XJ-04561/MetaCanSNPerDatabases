@@ -286,7 +286,19 @@ class Database(metaclass=DatabaseMeta):
 		else:
 			tables = getSmallestFootprint(frozenset(self.tables), realColumns, secondaryColumns=frozenset(map(*this.left, comps)))
 			self.LOG.debug(f"Tables Determined: {', '.join(map(str, tables))}")
-		
+
+		# Disambiguate columns. I.e. Use 'table.column' instead of just 'column' when more than one table has a column named 'column'
+		_columns = []
+		for col in columns:
+			match sum(col in t for t in tables):
+				case 0:
+					raise NonContiguousQuery(f"Columns {', '.join(map(str,_columns))} could not be queried from a unified table. The tables they exist in have no direct or indirect connections.")
+				case 1:
+					_columns.append(col)
+				case _:
+					_columns.append(next(t.linkedColumns[col] for t in tables if col in t))
+		columns = tuple(_columns)
+
 		connections = tuple(table.linkedColumns[col] == otherTable.linkedColumns[col] for i, table in enumerate(tables) for col in table for otherTable in tables[i+1:] if col in otherTable)
 
 		joinedColumns = {col for t in tables for col in t.columns}

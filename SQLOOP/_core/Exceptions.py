@@ -1,20 +1,22 @@
 
 from sqlite3 import DatabaseError
 
-class DatabaseNotConnected(DatabaseError): pass
-class MissingArgument(DatabaseError): pass
-class MissingReferenceFile(DatabaseError): pass
-class UnableToDefineChromosomes(DatabaseError): pass
-class TableDefinitionMissmatch(DatabaseError): pass
-class ColumnNotFoundError(DatabaseError): pass
-class TablesNotRelated(DatabaseError): pass
-class ResultsShorterThanLookup(DatabaseError): pass
-class NoResultsFromQuery(DatabaseError): pass
+class SQLOOPError(DatabaseError): pass
+class DatabaseNotConnected(SQLOOPError): pass
+class MissingArgument(SQLOOPError): pass
+class MissingReferenceFile(SQLOOPError): pass
+class UnableToDefineChromosomes(SQLOOPError): pass
+class TableDefinitionMissmatch(SQLOOPError): pass
+class ColumnNotFoundError(SQLOOPError): pass
+class TablesNotRelated(SQLOOPError): pass
+class ResultsShorterThanLookup(SQLOOPError): pass
+class NoResultsFromQuery(SQLOOPError): pass
+class NonContiguousQuery(SQLOOPError): pass
 
-class DatabaseSchemaEmpty(DatabaseError): pass
-class SchemaTablesMismatch(DatabaseError): pass
-class SchemaIndexesMismatch(DatabaseError): pass
-class PRAGMAVersionMismatch(DatabaseError): pass
+class DatabaseSchemaEmpty(SQLOOPError): pass
+class SchemaTablesMismatch(SQLOOPError): pass
+class SchemaIndexesMismatch(SQLOOPError): pass
+class PRAGMAVersionMismatch(SQLOOPError): pass
 
 
 class Assertion:
