@@ -268,7 +268,7 @@ def disambiguateColumn(column, tables):
 def recursiveSubquery(startCol : "Column", tables : SQLDict["Table"], values : list[Union["Comparison", "Query"]]) -> "Comparison":
 	from SQLOOP._core.Words import IN, SELECT, FROM, WHERE
 	LOG = LOGGER.getChild("recursiveSubquery")
-	LOG.debug(f"Called with signature: ({startCol=}, {tables=}, {values=})")
+	if Globals.MAX_DEBUG: LOG.debug(f"Called with signature: ({startCol=}, {tables=}, {values=})")
 	if len(tables) == 0:
 		raise ValueError(f"SubQuerying ran out of tables to subquery! {values=}")
 	elif len(tables) == 1:
@@ -280,13 +280,13 @@ def recursiveSubquery(startCol : "Column", tables : SQLDict["Table"], values : l
 
 def subqueryPaths(startTables : SQLDict["Table"], columns : SQLDict["Column"], allTables : SQLDict["Table"]) -> list[list[list["Table"], SQLDict["Column"]]]:
 	LOG = LOGGER.getChild("subqueryPaths")
-	LOG.debug(f"Called with signature: ({startTables=}, {columns=}, {allTables=})")
+	if Globals.MAX_DEBUG: LOG.debug(f"Called with signature: ({startTables=}, {columns=}, {allTables=})")
 	if not columns:
 		return []
 	visited : set[Table] = set(startTables)
 	paths : list[list[Table]] = [(t,) for t in startTables]
 	while paths:
-		LOG.debug(f"Generation: {paths=}")
+		if Globals.MAX_DEBUG: LOG.debug(f"Generation: {paths=}")
 		nPaths = []
 		for p in paths:
 			for t in allTables:
@@ -298,7 +298,7 @@ def subqueryPaths(startTables : SQLDict["Table"], columns : SQLDict["Column"], a
 					continue
 				nPaths.append((*p, t))
 				visited.add(t)
-		LOG.debug(f"New Generation: {nPaths=}")
+		if Globals.MAX_DEBUG: LOG.debug(f"New Generation: {nPaths=}")
 		best, hits = max(map(lambda x:(x, columns.intersection(x[-1].columns)), nPaths), key=lambda x:len(x[1]))
 		if len(hits) == len(columns):
 			return ((best, hits),)
@@ -310,7 +310,7 @@ def subqueryPaths(startTables : SQLDict["Table"], columns : SQLDict["Column"], a
 
 def createSubqueries(startTables : SQLDict["Table"], allTables : SQLDict["Table"], values : tuple["Comparison"]):
 	LOG = LOGGER.getChild("createSubqueries")
-	LOG.debug(f"Called with signature: ({startTables=}, {allTables=}, {values=})")
+	if Globals.MAX_DEBUG: LOG.debug(f"Called with signature: ({startTables=}, {allTables=}, {values=})")
 	_allTables = allTables.difference(startTables)
 	paths = subqueryPaths(startTables, SQLDict(map(lambda x:x.left, values)), _allTables)
 	subqueries = {}

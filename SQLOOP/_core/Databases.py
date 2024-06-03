@@ -27,15 +27,15 @@ class Fetcher:
 			try:
 				res = query @ connection
 				ret = (res.fetchone() or [None])[0] if query.cols == 1 else res.fetchone()
-				cls.LOG.debug(f"Got {ret!r} from: {str(query)!r}, {query.params}")
+				if Globals.MAX_DEBUG: cls.LOG.debug(f"Got {ret!r} from: {str(query)!r}, {query.params}")
 				return ret
 			except sqlite3.Error as e:
-				cls.LOG.debug(f"Got [{type(e).__name__}: {e}] from: {str(query)!r}, {query.params}")
+				if Globals.MAX_DEBUG: cls.LOG.debug(f"Got [{type(e).__name__}: {e}] from: {str(query)!r}, {query.params}")
 				raise e
 			except StopIteration:
-				cls.LOG.debug(f"Got None from: {str(query)!r}, {query.params}")
+				if Globals.MAX_DEBUG: cls.LOG.debug(f"Got None from: {str(query)!r}, {query.params}")
 				return None
-		cls.LOG.debug(f"Created Fetcher from: {str(query)!r}, {query.params}")
+		if Globals.MAX_DEBUG: cls.LOG.debug(f"Created Fetcher from: {str(query)!r}, {query.params}")
 		return super().__new__(cls)
 
 	def __init__(self, connection : Connection, query : SelectStatement):
@@ -273,7 +273,7 @@ class Database(metaclass=DatabaseMeta):
 		if not type(items) is tuple:
 			items = (items, )
 		from SQLOOP._core.Functions import getSmallestFootprint, createSubqueries, recursiveWalk, disambiguateColumn
-		self.LOG.debug(f"Getting: {', '.join(map(str, items))}")
+		if Globals.MAX_DEBUG: self.LOG.debug(f"Getting: {', '.join(map(str, items))}")
 		columns = tuple(filter(lambda x:isRelated(x, Column) or isinstance(x, Aggregate) or isinstance(x, Operation), items)) or (ALL)
 
 		comps = tuple(filter(lambda x:isinstance(x, Comparison), items))
@@ -282,10 +282,10 @@ class Database(metaclass=DatabaseMeta):
 		
 		tables = tuple(filter(lambda x:isRelated(x, Table), items))
 		if tables:
-			self.LOG.debug(f"Tables given: {', '.join(map(str, tables))}")
+			if Globals.MAX_DEBUG: self.LOG.debug(f"Tables given: {', '.join(map(str, tables))}")
 		else:
 			tables = getSmallestFootprint(frozenset(self.tables), realColumns, secondaryColumns=frozenset(map(*this.left, comps)))
-			self.LOG.debug(f"Tables Determined: {', '.join(map(str, tables))}")
+			if Globals.MAX_DEBUG: self.LOG.debug(f"Tables Determined: {', '.join(map(str, tables))}")
 
 		# Disambiguate columns. I.e. Use 'table.column' instead of just 'column' when more than one table has a column named 'column'
 		try:

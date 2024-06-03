@@ -18,6 +18,7 @@ from SQLOOP._core.Exceptions import *
 from This import this
 
 LOGGER = logging.getLogger("SQLOOP")
+MAX_DEBUG = False
 
 class Connection(sqlite3.Connection):
 	filename : str | bytes | os.PathLike[str] | os.PathLike[bytes] = None
