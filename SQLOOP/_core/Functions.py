@@ -248,7 +248,7 @@ def subqueryPaths(startTables : SQLDict["Table"], columns : SQLDict["Column"], a
 				nPaths.append((*p, t))
 				visited.add(t)
 		LOG.debug(f"New Generation: {nPaths=}")
-		best, hits = max(map(lambda x:(x, columns.intersection(x[-1].columns)), nPaths), key=lambda x:len(x[0]))
+		best, hits = max(map(lambda x:(x, columns.intersection(x[-1].columns)), nPaths), key=lambda x:len(x[1]))
 		if len(hits) == len(columns):
 			return ((best, hits),)
 		elif len(hits) > 0:
