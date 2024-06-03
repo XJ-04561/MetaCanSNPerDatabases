@@ -24,7 +24,7 @@ class CursorLike:
 
 class ThreadConnection:
 
-	LOG : logging.Logger = logging.getLogger(f"{Globals.SOFTWARE_NAME}.ThreadConnection")
+	LOG : logging.Logger = Globals.LOGGER.getChild(f"ThreadConnection")
 	OPEN_DATABASES : dict[tuple[str, type],list["ThreadConnection",set[int]]]= {}
 	REFERENCE : "ThreadConnection"
 	CACHE_LOCK = Lock()
@@ -40,7 +40,9 @@ class ThreadConnection:
 	def _connection(self) -> "ThreadConnection":
 		return self
 
-	def __init__(self, filename : str, factory=sqlite3.Connection, identifier=0):
+	def __init__(self, filename : str, factory=sqlite3.Connection, identifier=0, *, logger : logging.Logger=None):
+		if logger:
+			self.LOG = logger
 		with self.CACHE_LOCK:
 			if (filename, factory) in self.OPEN_DATABASES and self.OPEN_DATABASES[filename, factory][0].running:
 				ref = self.OPEN_DATABASES[filename, factory][0]

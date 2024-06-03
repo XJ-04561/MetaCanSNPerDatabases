@@ -3,6 +3,7 @@ from SQLOOP.Globals import *
 import SQLOOP.Globals as Globals
 from threading import Lock
 
+LOGGER = Globals.LOGGER.getChild("Functions")
 
 class ImpossiblePathing(Error):
 	msg = "Unable to find path through which to conditionally select from {tables} based on columns {columns}."
@@ -225,13 +226,16 @@ def recursiveSubquery(startCol : "Column", tables : SQLDict["Table"], values : l
 		commonColumn = tables[0].columns.intersection(tables[1].columns)[0]
 		return startCol - IN (SELECT (startCol) - FROM (tables[0]) - WHERE (recursiveSubquery(commonColumn, tables[1:], values)))
 
+
 def subqueryPaths(startTables : SQLDict["Table"], columns : SQLDict["Column"], allTables : SQLDict["Table"]) -> list[list[list["Table"], SQLDict["Column"]]]:
-	
+	LOG = Globals.LOGGER.getChild("subqueryPaths")
+	LOG.debug(f"Called with signature: ({startTables=}, {columns=}, {allTables=})")
 	if not columns:
 		return []
 	visited : set[Table] = set(startTables)
 	paths : list[list[Table]] = [[t] for t in startTables]
 	while paths:
+		LOG.debug(f"Generation: {paths=}")
 		nPaths = []
 		for p in paths:
 			for t in allTables:
@@ -239,21 +243,24 @@ def subqueryPaths(startTables : SQLDict["Table"], columns : SQLDict["Column"], a
 					continue
 				if p[-1].columns.isdisjoint(t.columns):
 					continue
-				if not all(t2.columns.isdisjoint(t.columns) for t2 in p[:-1]):
+				if any(not t2.columns.isdisjoint(t.columns) for t2 in p[:-1]):
 					continue
-				nPaths.append([*p, t])
+				nPaths.append((*p, t))
 				visited.add(t)
+		LOG.debug(f"New Generation: {nPaths=}")
 		best, hits = max(map(lambda x:(x, columns.intersection(x[-1].columns)), nPaths), key=lambda x:len(x[0]))
 		if len(hits) == len(columns):
-			return [[best, hits]]
+			return ((best, hits),)
 		elif len(hits) > 0:
-			return [[best, hits]] + subqueryPaths(startTables | best, columns.without(hits), allTables.without(best))
+			return ((best, hits),) + subqueryPaths(startTables | best, columns.without(hits), allTables.without(best))
 		paths = nPaths
-	return None
+	return []
 
 def createSubqueries(startTables : SQLDict["Table"], allTables : SQLDict["Table"], values : tuple["Comparison"]):
+	LOG = Globals.LOGGER.getChild("createSubqueries")
+	LOG.debug(f"Called with signature: ({startTables=}, {allTables=}, {values=})")
 	_allTables = allTables.difference(startTables)
-	paths = subqueryPaths(startTables, SQLDict(map(*this.left, values)), _allTables)
+	paths = subqueryPaths(startTables, SQLDict(map(lambda x:x.left, values)), _allTables)
 	subqueries = {}
 	for path, targetColumns in reversed(paths):
 		subValues = []
