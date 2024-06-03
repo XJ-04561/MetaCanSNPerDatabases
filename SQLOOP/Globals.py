@@ -171,7 +171,6 @@ class SQLOOP:
 	def params(self):
 		return []
 
-
 class SQLTuple(SQLOOP, tuple):
 	
 	@overload
@@ -182,19 +181,17 @@ class SQLTuple(SQLOOP, tuple):
 	def __new__(cls, *args):
 		if len(args) == 1 and isinstance(args[0], Iterable):
 			args = tuple(args[0])
-		return tuple.__new__(cls, map(lambda x:SQLTuple(x) if type(x) is tuple else x, args))
+		from SQLOOP._core.Structures import SanitizedValue
+		return tuple.__new__(cls, map(lambda x:x if isinstance(x, SQLOOP) else SQLTuple(x) if isinstance(x, Iterable) else SanitizedValue(x), args))
 	
 	def __str__(self):
-		return f"({', '.join(map(lambda x:format(x) if isinstance(x, SQLOOP) else '?', self))})"
+		return f"({', '.join(map(format, self))})"
 	
 	@property
 	def params(self):
 		out = []
 		for item in self:
-			if not isinstance(item, SQLOOP):
-				out.append(item)
-			elif hasattr(item, "params"):
-				out.extend(item.params)
+			out.extend(getReadyAttr(item, "params", []))
 		return out
 
 class Nothing:
@@ -241,7 +238,6 @@ class ClassProperty:
 	
 	def __repr__(self):
 		return f"{object.__repr__(self)[:-1]} name={self.name!r}>"
-
 
 class CachedClassProperty:
 
@@ -291,19 +287,19 @@ class SQLDict(dict):
 			if all(map(lambda x:hasattr(x, "__len__"), data)) and all(map(lambda x:len(x) == 2, data)):
 				super().__init__(data, *args, **kwargs)
 			else:
-				super().__init__(list(map(lambda x:(str(x),x), data)), *args, **kwargs)
+				super().__init__(list(map(lambda x:(getattr(x, "__sql_name__", None) or str(x),x), data)), *args, **kwargs)
 		self.valueSet = set(self)
 	
 	def __iter__(self):
 		return iter(self.values())
 	
 	def __contains__(self, item):
-		from SQLOOP._core.Structures import ColumnAlias, LinkedColumn
+		from SQLOOP._core.Structures import ColumnAlias, Column
 		if isinstance(item, str):
 			return super().__contains__(item)
 		elif isRelated(item, ColumnAlias):
 			return super().__contains__(item.fullName)
-		elif isRelated(item, LinkedColumn):
+		elif isRelated(item, Column):
 			return super().__contains__(item.__sql_name__)
 		elif isinstance(item, SQLOOP):
 			return super().__contains__(str(item))
@@ -326,10 +322,15 @@ class SQLDict(dict):
 	
 	def __setitem__(self, key, value):
 		self.valueSet.add(value)
-		super().__setitem__(key, value)
+		if hasattr(key, "__sql_name__"):
+			super().__setitem__(key.__sql_name__, value)
+		else:
+			super().__setitem__(key, value)
 	
 	def __getitem__(self, key):
-		if isinstance(key, str):
+		if hasattr(key, "__sql_name__"):
+			return super().__getitem__(key.__sql_name__)
+		elif isinstance(key, str):
 			return super().__getitem__(key)
 		elif isinstance(key, int) and key < len(self):
 			for i,v in zip(range(key+1), self.values()): pass
@@ -362,13 +363,11 @@ def alphabetize(n : int):
 		m //= 26
 	return "".join(out)
 
-
 def isRelated(cls1 : type|object, cls2 : type) -> bool:
 	"""Convenience function which returns True if cls1 is both a type and a subclass of cls2. This is useful because
 	attempting issubclass() on an object as first argument raises an exception,  so this can be used instead of
 	explicitly typing isinstance(cls1, type) and issubclass(cl1, cls2)"""
 	return isinstance(cls1, type) and issubclass(cls1, cls2)
-
 
 ASSERTIONS = (
 	SchemaNotEmpty,

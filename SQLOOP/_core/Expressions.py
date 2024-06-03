@@ -30,6 +30,14 @@ class SelectStatement(Expression):
 
 	startWords = {SELECT}
 	startWord = SELECT
+
+	def __init__(self, startWord, *words: tuple[Word], sep: str = None):
+		super().__init__(startWord, *words, sep=sep)
+		if self.words and self.words[0] is SELECT:
+			for i, word in enumerate(self.words):
+				if isinstance(word, FROM) or word is FROM:
+					break
+			self.words = (SELECT (*self.words[1:i]), *self.words[i:])
 	
 	@property
 	def cols(self):
@@ -56,15 +64,10 @@ class SelectStatement(Expression):
 	def columns(self, values):
 		if not isinstance(values, tuple):
 			values = (values,)
-		for i, word in enumerate(self.words):
-			if word is SELECT:
-				self.words = (self.words[:i], SELECT(*values), self.words[i+2:])
-				break
-			elif isinstance(word, FROM):
-				self.words = (self.words[:i], SELECT(*values), self.words[i+1:])
-				break
+		if self.words and isinstance(self.words[0], SELECT):
+			self.words = (SELECT(*values), *self.words[1:])
 		else:
-			self.words = self.words + (SELECT(*values),)
+			self.words = (SELECT(*values), *self.words)
 
 	@property
 	def tables(self):
@@ -139,6 +142,12 @@ class SelectStatement(Expression):
 				return True
 		else:
 			return False
+
+	@property
+	def order(self):
+		for word in self.words:
+			if isinstance(word, BY):
+				return [order for order in word]
 
 	@property
 	def constraints(self) -> set["TableConstraint"]:
