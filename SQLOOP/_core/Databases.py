@@ -31,6 +31,7 @@ class Fetcher:
 				return ret
 			except sqlite3.Error as e:
 				cls.LOG.debug(f"Got [{type(e).__name__}: {e}] from: {str(query)!r}, {query.params}")
+				raise e
 			except StopIteration:
 				cls.LOG.debug(f"Got None from: {str(query)!r}, {query.params}")
 				return None
