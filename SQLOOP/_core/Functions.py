@@ -202,7 +202,7 @@ def correctDatabase(cls, filepath):
 def verifyDatabase(cls, filepath):
 	return cls(filepath, "r").valid
 
-@AnyCache
+@cache
 def getSmallestFootprint(tables : set["Table"], columns : set["Column"], secondaryColumns : set["Column"]=None) -> tuple["Table"]|None:
 	
 	LOG = LOGGER.getChild("getSmallestFootprint")

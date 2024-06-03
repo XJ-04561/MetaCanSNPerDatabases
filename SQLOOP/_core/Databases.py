@@ -278,15 +278,13 @@ class Database(metaclass=DatabaseMeta):
 
 		comps = tuple(filter(lambda x:isinstance(x, Comparison), items))
 
-		realColumns = set()
-		for col in recursiveWalk(columns):
-			if isRelated(col, Column) and col is not ALL:
-				realColumns.add(col)
+		realColumns = frozenset(col for col in recursiveWalk(columns) if isRelated(col, Column) and col is not ALL)
+		
 		tables = tuple(filter(lambda x:isRelated(x, Table), items))
 		if tables:
 			self.LOG.debug(f"Tables given: {', '.join(map(str, tables))}")
 		else:
-			tables = getSmallestFootprint(set(self.tables), realColumns, secondaryColumns=set(map(*this.left, comps)))
+			tables = getSmallestFootprint(frozenset(self.tables), realColumns, secondaryColumns=frozenset(map(*this.left, comps)))
 			self.LOG.debug(f"Tables Determined: {', '.join(map(str, tables))}")
 		
 		connections = tuple(table.linkedColumns[col] == otherTable.linkedColumns[col] for i, table in enumerate(tables) for col in table for otherTable in tables[i+1:] if col in otherTable)
