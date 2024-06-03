@@ -1,7 +1,7 @@
 
 
 from functools import cached_property, cache
-import sqlite3, hashlib, re, os, logging, shutil, sys, itertools, random
+import sqlite3, hashlib, re, os, logging, shutil, sys, itertools, random, copy
 from time import sleep
 
 

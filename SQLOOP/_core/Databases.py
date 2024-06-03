@@ -272,7 +272,7 @@ class Database(metaclass=DatabaseMeta):
 	def __getitem__(self, items : tuple[Column|Table|Comparison]):
 		if not type(items) is tuple:
 			items = (items, )
-		from SQLOOP._core.Functions import getSmallestFootprint, createSubqueries, recursiveWalk
+		from SQLOOP._core.Functions import getSmallestFootprint, createSubqueries, recursiveWalk, disambiguateColumn
 		self.LOG.debug(f"Getting: {', '.join(map(str, items))}")
 		columns = tuple(filter(lambda x:isRelated(x, Column) or isinstance(x, Aggregate) or isinstance(x, Operation), items)) or (ALL)
 
@@ -288,16 +288,10 @@ class Database(metaclass=DatabaseMeta):
 			self.LOG.debug(f"Tables Determined: {', '.join(map(str, tables))}")
 
 		# Disambiguate columns. I.e. Use 'table.column' instead of just 'column' when more than one table has a column named 'column'
-		_columns = []
-		for col in columns:
-			match sum(col in t for t in tables):
-				case 0:
-					raise NonContiguousQuery(f"Columns {', '.join(map(str,_columns))} could not be queried from a unified table. The tables they exist in have no direct or indirect connections.")
-				case 1:
-					_columns.append(col)
-				case _:
-					_columns.append(next(t.linkedColumns[col] for t in tables if col in t))
-		columns = tuple(_columns)
+		try:
+			columns = tuple(disambiguateColumn(col) for col in columns)
+		except ColumnNotFoundError:
+			raise NonContiguousQuery(f"Columns {', '.join(map(str, columns))} could not be queried from a unified table. The tables they exist in have no direct or indirect connections.")
 
 		connections = tuple(table.linkedColumns[col] == otherTable.linkedColumns[col] for i, table in enumerate(tables) for col in table for otherTable in tables[i+1:] if col in otherTable)
 

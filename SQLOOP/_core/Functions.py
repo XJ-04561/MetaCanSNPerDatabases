@@ -226,7 +226,41 @@ def getSmallestFootprint(tables : set["Table"], columns : set["Column"], seconda
 	
 	LOG.debug(f"Returned {ret}")
 	return ret
-	
+
+def disambiguateColumn(column, tables):
+	from SQLOOP._core.Aggregates import Aggregate, GROUP_CONCAT
+	from SQLOOP._core.Structures import Operation
+
+	if isRelated(column, Column):
+		match sum(column in t for t in tables):
+			case 0:
+				raise ColumnNotFoundError(f"Column {column} not found in any of tables: {tables}")
+			case 1:	
+				return column
+			case _:
+				return next(column in t for t in tables)
+	elif isinstance(column, Aggregate):
+		if isRelated(column.X, Column):
+			match sum(column.X in t for t in tables):
+				case 0:
+					raise ColumnNotFoundError(f"Column {column.X} not found in any of tables: {tables}")
+				case 1:
+					if isinstance(column, GROUP_CONCAT):
+						return type(column)(column.X, column.Y)
+					else:
+						return type(column)(column.X)
+				case _:
+					if isinstance(column, GROUP_CONCAT):
+						return type(column)(next(column.X in t for t in tables), column.Y)
+					else:
+						return type(column)(next(column.X in t for t in tables))
+		else:
+			return type(column)(disambiguateColumn(column.X))
+	elif isinstance(column, Operation):
+		return type(column)(disambiguateColumn(column.left), column.operator, disambiguateColumn(column.right))
+	else:
+		return column
+			
 
 def recursiveSubquery(startCol : "Column", tables : SQLDict["Table"], values : list[Union["Comparison", "Query"]]) -> "Comparison":
 	from SQLOOP._core.Words import IN, SELECT, FROM, WHERE
