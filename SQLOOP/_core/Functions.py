@@ -217,7 +217,7 @@ def getSmallestFootprint(tables : set["Table"], columns : set["Column"], seconda
 				candidates.append(subTables)
 		if candidates:
 			break
-	LOG.debug(f"Candidates: {ret}")
+	LOG.debug(f"Candidates: {candidates}")
 	if secondaryColumns is not None:
 		ret = max(candidates, key=lambda candTables:sum(any(c in t for t in candTables) for c in secondaryColumns))
 	else:
