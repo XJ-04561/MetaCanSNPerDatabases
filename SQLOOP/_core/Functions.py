@@ -164,10 +164,11 @@ def formatType(columns : tuple["Column"]):
 def recursiveWalk(iterable):
 	"""Generator that iterates in-order through an iterable and down through all their iterable elements. Going all the
 	way down through an element before progressing to the next element."""
+		
 	for item in iterable:
+		yield item
 		if isinstance(item, Iterable):
-			for innerItem in recursiveWalk(item):
-				yield innerItem
+			yield from recursiveWalk(item)
 		else:
 			yield item
 
