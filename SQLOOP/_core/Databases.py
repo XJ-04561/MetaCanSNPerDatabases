@@ -23,7 +23,7 @@ class Fetcher:
 		if query.singlet:
 			try:
 				res = query @ connection
-				return res.fetchone() if query.cols > 1 else (res.fetchone() or [None])[0]
+				return (res.fetchone() or [None])[0] if query.cols == 1 else res.fetchone()
 			except StopIteration:
 				return None
 		return super().__new__(cls)
