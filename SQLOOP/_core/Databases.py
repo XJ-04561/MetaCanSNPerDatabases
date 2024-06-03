@@ -142,6 +142,7 @@ class Database(metaclass=DatabaseMeta):
 	_connection : ThreadConnection
 	mode : str
 	filename : str
+
 	columns : SQLDict[Column] = SQLDict()
 	"""A hybrid between a tuple and a dict. Can be indexed using number in column order or by column
 	in-sql name (Column.__sql_name__). When iterated, returns dict.values() instead of the usual dict.keys()."""
@@ -153,6 +154,7 @@ class Database(metaclass=DatabaseMeta):
 	in-sql name (Index.__sql_name__). When iterated, returns dict.values() instead of the usual dict.keys()."""
 	assertions : list[Assertion] = Globals.ASSERTIONS
 	"""A look-up list of assertions and the exceptions to be raised should the assertion fail. Assertions are checked last to first."""
+	
 	@overload
 	def __init__(self, filename : str, mode : Mode, factory : type=Connection): ...
 	def __init__(self, filename : str, mode : Mode, factory : type=None):
@@ -277,7 +279,7 @@ class Database(metaclass=DatabaseMeta):
 
 		distant, local = binner(lambda x:x.left in joinedColumns, comps, default=2)
 		if distant:
-			wheres = connections + local + createSubqueries(tables, self.tables, distant)
+			wheres = connections + local + createSubqueries(SQLDict(tables), self.tables, distant)
 		else:
 			wheres = connections + local
 		
