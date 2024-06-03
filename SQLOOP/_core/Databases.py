@@ -29,6 +29,8 @@ class Fetcher:
 				ret = (res.fetchone() or [None])[0] if query.cols == 1 else res.fetchone()
 				cls.LOG.debug(f"Got {ret!r} from: {str(query)!r}, {query.params}")
 				return ret
+			except sqlite3.Error as e:
+				cls.LOG.debug(f"Got [{type(e).__name__}: {e}] from: {str(query)!r}, {query.params}")
 			except StopIteration:
 				cls.LOG.debug(f"Got None from: {str(query)!r}, {query.params}")
 				return None
