@@ -215,10 +215,16 @@ def getSmallestFootprint(tables : set["Table"], columns : set["Column"], seconda
 					break
 			else:
 				candidates.append(subTables)
+		if candidates:
+			break
+	LOG.debug(f"Candidates: {ret}")
 	if secondaryColumns is not None:
-		return max(candidates, key=lambda candTables:sum(any(c in t for t in candTables) for c in secondaryColumns))
+		ret = max(candidates, key=lambda candTables:sum(any(c in t for t in candTables) for c in secondaryColumns))
 	else:
-		return next(iter(candidates)) if candidates else ()
+		ret = next(iter(candidates)) if candidates else ()
+	
+	LOG.debug(f"Returned {ret}")
+	return ret
 	
 
 def recursiveSubquery(startCol : "Column", tables : SQLDict["Table"], values : list[Union["Comparison", "Query"]]) -> "Comparison":
