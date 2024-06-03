@@ -204,6 +204,8 @@ def verifyDatabase(cls, filepath):
 @AnyCache
 def getSmallestFootprint(tables : set["Table"], columns : set["Column"], secondaryColumns : set["Column"]=None) -> tuple["Table"]|None:
 	
+	LOG = LOGGER.getChild("getSmallestFootprint")
+	LOG.debug(f"Called with signature: ({tables=}, {columns=}, {secondaryColumns=})")
 	mustHaves = set(filter(None, map(*this.table, columns)))
 	candidates = []
 	for i in range(len(tables)):
@@ -218,6 +220,8 @@ def getSmallestFootprint(tables : set["Table"], columns : set["Column"], seconda
 
 def recursiveSubquery(startCol : "Column", tables : SQLDict["Table"], values : list[Union["Comparison", "Query"]]) -> "Comparison":
 	from SQLOOP._core.Words import IN, SELECT, FROM, WHERE
+	LOG = LOGGER.getChild("recursiveSubquery")
+	LOG.debug(f"Called with signature: ({startCol=}, {tables=}, {values=})")
 	if len(tables) == 0:
 		raise ValueError(f"SubQuerying ran out of tables to subquery! {values=}")
 	elif len(tables) == 1:
@@ -253,7 +257,8 @@ def subqueryPaths(startTables : SQLDict["Table"], columns : SQLDict["Column"], a
 			return ((best, hits),)
 		elif len(hits) > 0:
 			return ((best, hits),) + subqueryPaths(startTables | best, columns.without(hits), allTables.without(best))
-		paths = nPaths
+		else:
+			paths = nPaths
 	return []
 
 def createSubqueries(startTables : SQLDict["Table"], allTables : SQLDict["Table"], values : tuple["Comparison"]):
