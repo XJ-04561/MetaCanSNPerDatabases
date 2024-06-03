@@ -54,20 +54,13 @@ camelCase = re.compile("^[^_]+$")
 snakeKiller = re.compile(r"[_](\w)")
 
 def binner(key : Callable, iterable : Iterable, outType : type=list, default=None):
-	if issubclass(outType, dict):
-		if default is None:
-			return outType((i,tuple(data)) for i, data in itertools.groupby(sorted(iterable, key=key), key=key))
-		ret = {l:() for l in default}
-		for l, data in itertools.groupby(sorted(iterable, key=key), key=key):
-			ret[l] = tuple(data)
-		return outType(ret)
-	else:
-		if default is None:
-			return outType(tuple(data) for i, data in itertools.groupby(sorted(iterable, key=key), key=key))
-		ret = [() for _ in range(default)]
-		for i, data in itertools.groupby(sorted(iterable, key=key), key=key):
-			ret[int(i)] = tuple(data)
-		return outType(ret)
+	ret = {}
+	for i, data in itertools.groupby(tuple(iterable), key=key):
+		if i not in ret:
+			ret[i] = tuple(data)
+		else:
+			ret[i] = ret[i] + tuple(data)
+	return tuple(ret.get(i, ()) for i in range(default or max(ret)))
 
 def first(iterator : Iterable[_T]|Iterator[_T]) -> _T|None:
 	if hasattr(iterator, "__next__"):
