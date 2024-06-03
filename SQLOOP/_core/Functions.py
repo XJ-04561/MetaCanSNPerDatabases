@@ -85,6 +85,10 @@ class AnyCache(metaclass=CacheMeta):
 
 def isType(instance, cls):
 	
+	try:
+		from typing import GenericAlias
+	except:
+		from types import GenericAlias
 	if isinstance(instance, type):
 		if not isinstance(cls, Generic|GenericAlias):
 			return isRelated(instance, cls)
