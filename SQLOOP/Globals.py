@@ -6,7 +6,7 @@ from time import sleep
 
 
 from typing import (
-	Generator, Callable, Iterable, Self, Literal, LiteralString, Any, TextIO,
+	Generator, Callable, Iterable, Literal, LiteralString, Any, TextIO,
 	BinaryIO, Never, Iterator, TypeVar, Type, get_args, get_origin,
 	Union, Type, overload, final, Generic, Dict, GenericAlias)
 from types import FunctionType, MethodType
