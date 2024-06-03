@@ -230,8 +230,11 @@ def getSmallestFootprint(tables : set["Table"], columns : set["Column"], seconda
 def disambiguateColumn(column, tables):
 	from SQLOOP._core.Aggregates import Aggregate, GROUP_CONCAT
 	from SQLOOP._core.Structures import Operation
+	from SQLOOP._core.Schema import ALL
 
-	if isRelated(column, Column):
+	if column is ALL:
+		return ALL
+	elif isRelated(column, Column):
 		match sum(column in t for t in tables):
 			case 0:
 				raise ColumnNotFoundError(f"Column {column} not found in any of tables: {tables}")
