@@ -259,7 +259,7 @@ def subqueryPaths(startTables : SQLDict["Table"], columns : SQLDict["Column"], a
 			return ((best, hits),) + subqueryPaths(startTables.without(best), columns.without(hits), allTables.without(best))
 		else:
 			paths = nPaths
-	return []
+	return ()
 
 def createSubqueries(startTables : SQLDict["Table"], allTables : SQLDict["Table"], values : tuple["Comparison"]):
 	LOG = LOGGER.getChild("createSubqueries")
