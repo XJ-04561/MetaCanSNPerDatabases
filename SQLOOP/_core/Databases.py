@@ -11,6 +11,9 @@ from SQLOOP._core.ThreadConnection import ThreadConnection
 
 class Fetcher:
 	"""Fetches data from a cursor. Consumes the cursor object during iteration/indexation."""
+
+	LOG = Globals.LOGGER.getChild("Fetcher")
+
 	query : SelectStatement
 	_connection : Connection
 	cols : int
@@ -19,13 +22,17 @@ class Fetcher:
 	def __new__(cls, connection : Connection, query : SelectStatement, *args, **kwargs):
 		
 		assert isinstance(query, SelectStatement), "Fetcher must be given a SelectStatement."
-		
+
 		if query.singlet:
 			try:
 				res = query @ connection
-				return (res.fetchone() or [None])[0] if query.cols == 1 else res.fetchone()
+				ret = (res.fetchone() or [None])[0] if query.cols == 1 else res.fetchone()
+				cls.LOG.debug(f"Got {ret!r} from: {str(query)!r}, {query.params}")
+				return ret
 			except StopIteration:
+				cls.LOG.debug(f"Got None from: {str(query)!r}, {query.params}")
 				return None
+		cls.LOG.debug(f"Created Fetcher from: {str(query)!r}, {query.params}")
 		return super().__new__(cls)
 
 	def __init__(self, connection : Connection, query : SelectStatement):
