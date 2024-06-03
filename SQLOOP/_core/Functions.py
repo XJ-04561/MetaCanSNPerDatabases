@@ -256,7 +256,7 @@ def subqueryPaths(startTables : SQLDict["Table"], columns : SQLDict["Column"], a
 		if len(hits) == len(columns):
 			return ((best, hits),)
 		elif len(hits) > 0:
-			return ((best, hits),) + subqueryPaths(startTables | best, columns.without(hits), allTables.without(best))
+			return ((best, hits),) + subqueryPaths(startTables.without(best), columns.without(hits), allTables.without(best))
 		else:
 			paths = nPaths
 	return []
