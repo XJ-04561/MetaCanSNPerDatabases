@@ -237,7 +237,7 @@ def subqueryPaths(startTables : SQLDict["Table"], columns : SQLDict["Column"], a
 	if not columns:
 		return []
 	visited : set[Table] = set(startTables)
-	paths : list[list[Table]] = [[t] for t in startTables]
+	paths : list[list[Table]] = [(t,) for t in startTables]
 	while paths:
 		LOG.debug(f"Generation: {paths=}")
 		nPaths = []
