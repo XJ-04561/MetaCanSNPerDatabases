@@ -7,19 +7,6 @@ class SQLStructure(SQLOOP, type):
 
 	__name__ : str
 	__sql_name__ : str
-	
-	def __eq__(self, right):
-		return Comparison(self, "==", right)
-	def __ne__(self, right):
-		return Comparison(self, "!=", right)
-	def __lt__(self, right):
-		return Comparison(self, "<", right)
-	def __le__(self, right):
-		return Comparison(self, "<=", right)
-	def __gt__(self, right):
-		return Comparison(self, ">", right)
-	def __ge__(self, right):
-		return Comparison(self, ">=", right)
 
 	def __or__(self, other):
 		return Union[self, other]
@@ -49,12 +36,48 @@ class Hardcoded(SQLOOP):
 	
 	def __rsub__(self, left):
 		return Query(left, self)
-	
-	@property
-	def params(self):
-		return []
 
-class ColumnMeta(SQLStructure):
+class Operable(SQLOOP):
+	
+	"""Math-Operations"""
+
+	def __add__(self, other):			return Operation(self, "+", other)
+	def __radd__(self, other):			return Operation(other, "+", self)
+	def __sub__(self, other):			return Operation(self, "-", other) if not isinstance(other, (Prefix, Word)) else NotImplemented
+	def __rsub__(self, other):			return Operation(other, "-", self) if not isinstance(other, (Prefix, Word)) else NotImplemented
+	def __mul__(self, other):			return Operation(self, "*", other)
+	def __rmul__(self, other):			return Operation(other, "*", self)
+	def __matmul__(self, other):		return Operation(self, "@", other)
+	def __rmatmul__(self, other):		return Operation(other, "@", self)
+	def __truediv__(self, other):		return Operation(self, "/", other)
+	def __rtruediv__(self, other):		return Operation(other, "/", self)
+	def __floordiv__(self, other):		return Operation(self, "//", other)
+	def __rfloordiv__(self, other):		return Operation(other, "//", self)
+	def __mod__(self, other):			return Operation(self, "%", other)
+	def __rmod__(self, other):			return Operation(other, "%", self)
+	def __pow__(self, other):			return Operation(self, "**", other)
+	def __rpow__(self, other):			return Operation(other, "**", self)
+	def __lshift__(self, other):		return Operation(self, "<<", other)
+	def __rlshift__(self, other):		return Operation(other, "<<", self)
+	def __rshift__(self, other):		return Operation(self, ">>", other)
+	def __rrshift__(self, other):		return Operation(other, ">>", self)
+	def __and__(self, other):			return Operation(self, "&", other)
+	def __rand__(self, other):			return Operation(other, "&", self)
+	def __xor__(self, other):			return Operation(self, "^", other)
+	def __rxor__(self, other):			return Operation(other, "^", self)
+	def __or__(self, other):			return Operation(self, "|", other) if self is not Column and self is not Operation and self is not Comparison else super().__or__(other)
+	def __ror__(self, other):			return Operation(other, "|", self) if self is not Column and self is not Operation and self is not Comparison else super().__ror__(other)
+
+	"""Logic-Operations"""
+
+	def __eq__(self, right):			return Comparison(self, "==", right)
+	def __ne__(self, right):			return Comparison(self, "!=", right)
+	def __lt__(self, right):			return Comparison(self, "<", right)
+	def __le__(self, right):			return Comparison(self, "<=", right)
+	def __gt__(self, right):			return Comparison(self, ">", right)
+	def __ge__(self, right):			return Comparison(self, ">=", right)
+
+class ColumnMeta(SQLStructure, Operable):
 
 	type : "SQL_TYPE"
 	table : "Table"
@@ -71,6 +94,14 @@ class ColumnMeta(SQLStructure):
 			return f"{self} {self.type} {self.constraint}"
 		else:
 			return f"{self} {self.type}"
+	
+	def __pos__(self):
+		from SQLOOP._core.Words import ASC
+		return self - ASC
+	
+	def __neg__(self):
+		from SQLOOP._core.Words import DESC
+		return self - DESC
 
 class Column(SQLObject, metaclass=ColumnMeta):
 
@@ -161,11 +192,13 @@ class SanitizedValue(SQLObject, metaclass=SQLStructure):
 	@property
 	def params(self):
 		if self.value is not None:
-			return [self.value]# if type(self.value) is not str else [repr(self.value)]
+			return [self.value if not isinstance(self.value, list) else tuple(self.value)]# if type(self.value) is not str else [repr(self.value)]
 		else:
 			return []
 
-class Comparison(SQLOOP):
+class Comparison(Operable):
+	
+	OPERATORS = ["==", "!=", "<", "<=", ">", ">=", "=", "IN", "NOT", "IS"]
 	
 	left : Any
 	operator : str
@@ -179,7 +212,7 @@ class Comparison(SQLOOP):
 		else:
 			self.left = SanitizedValue(left)
 		
-		assert operator in ["==", "!=", "<", "<=", ">", ">=", "=", "IN", "NOT", "IS"], f"Not a valid operator for comparison: {operator=}"
+		assert not isRelated(operator, SQLOOP) and operator in self.OPERATORS, f"Not a valid operator for comparison: {operator=}"
 		self.operator = operator
 
 		if isinstance(right, SQLOOP):
@@ -195,6 +228,9 @@ class Comparison(SQLOOP):
 	def __str__(self):
 		return f"{self.left if not isinstance(self.left, SanitizedValue) else '?'} {self.operator} {self.right if not isinstance(self.right, SanitizedValue) else '?'}"
 	
+	def __format__(self, fs):
+		return f"({format(str(self), fs)})"
+
 	def __getitem__(self, key):
 		if isinstance(key, int):
 			if key == 0:
@@ -215,14 +251,40 @@ class Comparison(SQLOOP):
 
 		out = []
 
-		if isinstance(self.left, SanitizedValue):
-			out.append(self.left.value)
-		else:
-			out.extend(getReadyAttr(self.left, "params", []))
+		out.extend(getReadyAttr(self.left, "params", []))
 		
-		if isinstance(self.right, SanitizedValue):
-			out.append(self.right.value)
-		else:
+		out.extend(getReadyAttr(self.right, "params", []))
+		
+		return out
+
+class Operation(Comparison):
+
+	OPERATORS = {
+		"+" : "{left} + {right}",
+		"-" : "{left} - {right}",
+		"*" : "{left} * {right}",
+		"@" : "{left} @ {right}",
+		"/" : "{left} / {right}",
+		"//" : "floor({left} / {right})",
+		"%" : "{left} % {right}",
+		"**" : "power({left}, {right})",
+		"&" : "{left} & {right}",
+		"^" : "({left} | {right}) - ({left} & {right})",
+		"|" : "{left} | {right}"
+	}
+	
+	def __bool__(self):
+		return True
+
+	def __str__(self):
+		return self.OPERATORS[self.operator].format(left=self.left, right=self.right)
+	
+	@property
+	def params(self):
+		out = Comparison.params.fget(self)
+		if self.operator == "^":
+			out.extend(getReadyAttr(self.left, "params", []))
+			
 			out.extend(getReadyAttr(self.right, "params", []))
 		
 		return out
@@ -284,12 +346,7 @@ class Word(SQLOOP, metaclass=Prefix):
 	def params(self):
 		out = []
 		for item in self.content:
-			if isinstance(item, SQLOOP):
-				value = item.params
-				if not isinstance(value, (property, cached_property)):
-					out.extend(value)
-			else:
-				out.append(item)
+			out.extend(getReadyAttr(item, "params", []))
 		return out
 		
 class EnclosedWord(Word):
@@ -418,8 +475,7 @@ class Query(SQLOOP):
 	def params(self):
 		params = []
 		for word in self.words:
-			if isinstance(word, SQLOOP):
-				params.extend(getReadyAttr(word, "params", []))
+			params.extend(getReadyAttr(word, "params", []))
 		return params
 
 class TableMeta(SQLStructure):
@@ -482,7 +538,7 @@ class Table(SQLObject, HasColumns, metaclass=TableMeta):
 			cls.__doc__ += "\n".join(["```python", *(f"{cls.__name__}.{name} = {col.__name__} # {col}" for name, col in vars(cls).items() if isRelated(col, Column)), "```"])
 		else:
 			cls.__doc__ = "\n".join(["```python", *(f"{cls.__name__}.{name} = {col.__name__} # {col}" for name, col in vars(cls).items() if isRelated(col, Column)), "```"])
-		cls.linkedColumns = {str(col):SQLStructure(str(col), (LinkedColumn,), {}, type=col.type, table=cls) for col in cls.columns}
+		cls.linkedColumns = SQLDict(SQLStructure(str(col), (LinkedColumn,), {}, type=col.type, table=cls) for col in cls.columns)
 
 	def __init__(self, database):
 		self.database = database

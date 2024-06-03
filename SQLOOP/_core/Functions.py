@@ -3,6 +3,7 @@ from SQLOOP.Globals import *
 import SQLOOP.Globals as Globals
 from threading import Lock
 
+LOGGER = Globals.LOGGER.getChild("Functions")
 
 class ImpossiblePathing(Error):
 	msg = "Unable to find path through which to conditionally select from {tables} based on columns {columns}."
@@ -163,10 +164,11 @@ def formatType(columns : tuple["Column"]):
 def recursiveWalk(iterable):
 	"""Generator that iterates in-order through an iterable and down through all their iterable elements. Going all the
 	way down through an element before progressing to the next element."""
+		
 	for item in iterable:
+		yield item
 		if isinstance(item, Iterable):
-			for innerItem in recursiveWalk(item):
-				yield innerItem
+			yield from recursiveWalk(item)
 		else:
 			yield item
 
@@ -200,23 +202,73 @@ def correctDatabase(cls, filepath):
 def verifyDatabase(cls, filepath):
 	return cls(filepath, "r").valid
 
-@AnyCache
+@cache
 def getSmallestFootprint(tables : set["Table"], columns : set["Column"], secondaryColumns : set["Column"]=None) -> tuple["Table"]|None:
 	
+	LOG = LOGGER.getChild("getSmallestFootprint")
+	LOG.debug(f"Called with signature: ({tables=}, {columns=}, {secondaryColumns=})")
 	mustHaves = set(filter(None, map(*this.table, columns)))
 	candidates = []
 	for i in range(len(tables)):
-		for subTables in filter(mustHaves.issubset, itertools.combinations(tables, i+1)):
-			if all(map(lambda c:any(map(lambda t:c in t, subTables)), columns)):
+		for subTables in filter(mustHaves.issubset, itertools.combinations(tuple(tables), i+1)):
+			for col in columns:
+				if not any(col in t for t in subTables):
+					break
+			else:
 				candidates.append(subTables)
+		if candidates:
+			break
+	LOG.debug(f"Candidates: {candidates}")
 	if secondaryColumns is not None:
-		return max(candidates, key=lambda candTables:sum(any(c in t for t in candTables) for c in secondaryColumns))
+		ret = max(candidates, key=lambda candTables:sum(any(c in t for t in candTables) for c in secondaryColumns))
 	else:
-		return next(iter(candidates)) if candidates else ()
+		ret = next(iter(candidates)) if candidates else ()
 	
+	LOG.debug(f"Returned {ret}")
+	return ret
+
+def disambiguateColumn(column, tables):
+	from SQLOOP._core.Aggregates import Aggregate, GROUP_CONCAT
+	from SQLOOP._core.Structures import Operation
+	from SQLOOP._core.Schema import ALL
+
+	if column is ALL:
+		return ALL
+	elif isRelated(column, Column):
+		match sum(column in t for t in tables):
+			case 0:
+				raise ColumnNotFoundError(f"Column {column} not found in any of tables: {tables}")
+			case 1:	
+				return column
+			case _:
+				return next(column in t for t in tables)
+	elif isinstance(column, Aggregate):
+		if isRelated(column.X, Column):
+			match sum(column.X in t for t in tables):
+				case 0:
+					raise ColumnNotFoundError(f"Column {column.X} not found in any of tables: {tables}")
+				case 1:
+					if isinstance(column, GROUP_CONCAT):
+						return type(column)(column.X, column.Y)
+					else:
+						return type(column)(column.X)
+				case _:
+					if isinstance(column, GROUP_CONCAT):
+						return type(column)(next(column.X in t for t in tables), column.Y)
+					else:
+						return type(column)(next(column.X in t for t in tables))
+		else:
+			return type(column)(disambiguateColumn(column.X))
+	elif isinstance(column, Operation):
+		return type(column)(disambiguateColumn(column.left), column.operator, disambiguateColumn(column.right))
+	else:
+		return column
+			
 
 def recursiveSubquery(startCol : "Column", tables : SQLDict["Table"], values : list[Union["Comparison", "Query"]]) -> "Comparison":
 	from SQLOOP._core.Words import IN, SELECT, FROM, WHERE
+	LOG = LOGGER.getChild("recursiveSubquery")
+	if Globals.MAX_DEBUG: LOG.debug(f"Called with signature: ({startCol=}, {tables=}, {values=})")
 	if len(tables) == 0:
 		raise ValueError(f"SubQuerying ran out of tables to subquery! {values=}")
 	elif len(tables) == 1:
@@ -225,13 +277,16 @@ def recursiveSubquery(startCol : "Column", tables : SQLDict["Table"], values : l
 		commonColumn = tables[0].columns.intersection(tables[1].columns)[0]
 		return startCol - IN (SELECT (startCol) - FROM (tables[0]) - WHERE (recursiveSubquery(commonColumn, tables[1:], values)))
 
+
 def subqueryPaths(startTables : SQLDict["Table"], columns : SQLDict["Column"], allTables : SQLDict["Table"]) -> list[list[list["Table"], SQLDict["Column"]]]:
-	
+	LOG = LOGGER.getChild("subqueryPaths")
+	if Globals.MAX_DEBUG: LOG.debug(f"Called with signature: ({startTables=}, {columns=}, {allTables=})")
 	if not columns:
 		return []
 	visited : set[Table] = set(startTables)
-	paths : list[list[Table]] = [[t] for t in startTables]
+	paths : list[list[Table]] = [(t,) for t in startTables]
 	while paths:
+		if Globals.MAX_DEBUG: LOG.debug(f"Generation: {paths=}")
 		nPaths = []
 		for p in paths:
 			for t in allTables:
@@ -239,21 +294,25 @@ def subqueryPaths(startTables : SQLDict["Table"], columns : SQLDict["Column"], a
 					continue
 				if p[-1].columns.isdisjoint(t.columns):
 					continue
-				if not all(t2.columns.isdisjoint(t.columns) for t2 in p[:-1]):
+				if any(not t2.columns.isdisjoint(t.columns) for t2 in p[:-1]):
 					continue
-				nPaths.append([*p, t])
+				nPaths.append((*p, t))
 				visited.add(t)
-		best, hits = max(map(lambda x:(x, columns.intersection(x[-1].columns)), nPaths), key=lambda x:len(x[0]))
+		if Globals.MAX_DEBUG: LOG.debug(f"New Generation: {nPaths=}")
+		best, hits = max(map(lambda x:(x, columns.intersection(x[-1].columns)), nPaths), key=lambda x:len(x[1]))
 		if len(hits) == len(columns):
-			return [[best, hits]]
+			return ((best, hits),)
 		elif len(hits) > 0:
-			return [[best, hits]] + subqueryPaths(startTables | best, columns.without(hits), allTables.without(best))
-		paths = nPaths
-	return None
+			return ((best, hits),) + subqueryPaths(startTables.without(best), columns.without(hits), allTables.without(best))
+		else:
+			paths = nPaths
+	return ()
 
 def createSubqueries(startTables : SQLDict["Table"], allTables : SQLDict["Table"], values : tuple["Comparison"]):
+	LOG = LOGGER.getChild("createSubqueries")
+	if Globals.MAX_DEBUG: LOG.debug(f"Called with signature: ({startTables=}, {allTables=}, {values=})")
 	_allTables = allTables.difference(startTables)
-	paths = subqueryPaths(startTables, SQLDict(map(*this.left, values)), _allTables)
+	paths = subqueryPaths(startTables, SQLDict(map(lambda x:x.left, values)), _allTables)
 	subqueries = {}
 	for path, targetColumns in reversed(paths):
 		subValues = []

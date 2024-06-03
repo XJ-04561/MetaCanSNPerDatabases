@@ -1,20 +1,22 @@
 
 from sqlite3 import DatabaseError
 
-class DatabaseNotConnected(DatabaseError): pass
-class MissingArgument(DatabaseError): pass
-class MissingReferenceFile(DatabaseError): pass
-class UnableToDefineChromosomes(DatabaseError): pass
-class TableDefinitionMissmatch(DatabaseError): pass
-class ColumnNotFoundError(DatabaseError): pass
-class TablesNotRelated(DatabaseError): pass
-class ResultsShorterThanLookup(DatabaseError): pass
-class NoResultsFromQuery(DatabaseError): pass
+class SQLOOPError(DatabaseError): pass
+class DatabaseNotConnected(SQLOOPError): pass
+class MissingArgument(SQLOOPError): pass
+class MissingReferenceFile(SQLOOPError): pass
+class UnableToDefineChromosomes(SQLOOPError): pass
+class TableDefinitionMissmatch(SQLOOPError): pass
+class ColumnNotFoundError(SQLOOPError): pass
+class TablesNotRelated(SQLOOPError): pass
+class ResultsShorterThanLookup(SQLOOPError): pass
+class NoResultsFromQuery(SQLOOPError): pass
+class NonContiguousQuery(SQLOOPError): pass
 
-class DatabaseSchemaEmpty(DatabaseError): pass
-class SchemaTablesMismatch(DatabaseError): pass
-class SchemaIndexesMismatch(DatabaseError): pass
-class PRAGMAVersionMismatch(DatabaseError): pass
+class DatabaseSchemaEmpty(SQLOOPError): pass
+class SchemaTablesMismatch(SQLOOPError): pass
+class SchemaIndexesMismatch(SQLOOPError): pass
+class PRAGMAVersionMismatch(SQLOOPError): pass
 
 
 class Assertion:
@@ -52,13 +54,15 @@ class ValidTablesSchema(Assertion):
 	@classmethod
 	def rectify(cls, database : "Database") -> None:
 		from SQLOOP.core import (
-			createTempTable, Hardcoded, BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT,
-			INTO, SELECT, FROM, DROP, INDEX, ALL, WHERE, NAME, SQLITE_MASTER)
+			createTempTable, BEGIN, TRANSACTION, CREATE, TABLE, PRAGMA, COMMIT, ALTER, RENAME, TO, INSERT,
+			INTO, SELECT, FROM, DROP, INDEX, ALL, WHERE, SQLITE_MASTER)
 		from SQLOOP.Globals import sql
+		from SQLOOP._core.Structures import Hardcoded
+		
 		if not database.clearIndexes():
 			raise DatabaseError("Could not clear indexes!")
 		database(BEGIN - TRANSACTION)
-		preExistingTables = set(database(SELECT (NAME) - FROM (SQLITE_MASTER) - WHERE (type='table')))
+		preExistingTables = set(database(SELECT (SQLITE_MASTER.NAME) - FROM (SQLITE_MASTER) - WHERE (type='table')))
 		for table in database.tables:
 			if str(table) in preExistingTables:
 				TempTable = createTempTable(**vars(table))
@@ -72,7 +76,7 @@ class ValidTablesSchema(Assertion):
 			database(CREATE - INDEX - sql(index))
 		database(COMMIT)
 		database(BEGIN - TRANSACTION)
-		for table in database(SELECT (NAME) - FROM (SQLITE_MASTER) - WHERE (type='table')):
+		for table in database(SELECT (SQLITE_MASTER.NAME) - FROM (SQLITE_MASTER) - WHERE (type='table')):
 			if table not in database.tables:
 				database(DROP - TABLE - Hardcoded(table))
 		database(PRAGMA (user_version = database.CURRENT_VERSION))

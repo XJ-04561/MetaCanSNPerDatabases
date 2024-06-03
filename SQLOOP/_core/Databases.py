@@ -7,9 +7,13 @@ from SQLOOP._core.Types import *
 from SQLOOP._core.Expressions import *
 from SQLOOP._core.Words import *
 from SQLOOP._core.Aggregates import *
+from SQLOOP._core.ThreadConnection import ThreadConnection
 
 class Fetcher:
 	"""Fetches data from a cursor. Consumes the cursor object during iteration/indexation."""
+
+	LOG = Globals.LOGGER.getChild("Fetcher")
+
 	query : SelectStatement
 	_connection : Connection
 	cols : int
@@ -18,13 +22,20 @@ class Fetcher:
 	def __new__(cls, connection : Connection, query : SelectStatement, *args, **kwargs):
 		
 		assert isinstance(query, SelectStatement), "Fetcher must be given a SelectStatement."
-		
+
 		if query.singlet:
 			try:
 				res = query @ connection
-				return res.fetchone() if query.cols > 1 else res.fetchone()[0]
+				ret = (res.fetchone() or [None])[0] if query.cols == 1 else res.fetchone()
+				if Globals.MAX_DEBUG: cls.LOG.debug(f"Got {ret!r} from: {str(query)!r}, {query.params}")
+				return ret
+			except sqlite3.Error as e:
+				if Globals.MAX_DEBUG: cls.LOG.debug(f"Got [{type(e).__name__}: {e}] from: {str(query)!r}, {query.params}")
+				raise e
 			except StopIteration:
+				if Globals.MAX_DEBUG: cls.LOG.debug(f"Got None from: {str(query)!r}, {query.params}")
 				return None
+		if Globals.MAX_DEBUG: cls.LOG.debug(f"Created Fetcher from: {str(query)!r}, {query.params}")
 		return super().__new__(cls)
 
 	def __init__(self, connection : Connection, query : SelectStatement):
@@ -63,7 +74,7 @@ class Fetcher:
 	# 		return ((self.query - LIMIT(rowNumber+1,rowNumber+1)) @ self._connection).fetchone()
 	
 	def __len__(self):
-		return sum(map(lambda x:1, self._cursor))
+		return (SelectStatement(SELECT(COUNT(ALL)), *self.query.words[1:]) @ self._connection).fetchone()[0]
 
 class DatabaseMeta(type):
 	
@@ -136,9 +147,12 @@ class Database(metaclass=DatabaseMeta):
 
 	LOG = logging.Logger(SOFTWARE_NAME, level=logging.FATAL)
 
-	_connection : Connection
+	factory : type = Connection
+	factoryFunc : Callable = sqlite3.connect
+	_connection : ThreadConnection
 	mode : str
 	filename : str
+
 	columns : SQLDict[Column] = SQLDict()
 	"""A hybrid between a tuple and a dict. Can be indexed using number in column order or by column
 	in-sql name (Column.__sql_name__). When iterated, returns dict.values() instead of the usual dict.keys()."""
@@ -150,16 +164,20 @@ class Database(metaclass=DatabaseMeta):
 	in-sql name (Index.__sql_name__). When iterated, returns dict.values() instead of the usual dict.keys()."""
 	assertions : list[Assertion] = Globals.ASSERTIONS
 	"""A look-up list of assertions and the exceptions to be raised should the assertion fail. Assertions are checked last to first."""
-
-	def __init__(self, filename : str, mode : Mode, factory : type[sqlite3.Connection]=Connection, factoryFunc : Callable=sqlite3.connect):
+	
+	@overload
+	def __init__(self, filename : str, mode : Mode, factory : type=Connection): ...
+	def __init__(self, filename : str, mode : Mode, factory : type=None):
 
 		if type(self) is Database:
 			raise NotImplementedError("The base Database class is not to be used, please subclass `Database` with your own appropriate tables and indexes.")
 		self.mode = mode
 		self.filename = filename if os.path.isabs(filename) or filename == ":memory:" else os.path.realpath(os.path.expanduser(filename))
+		if factory:
+			self.factory = factory
 		match mode:
 			case "w":
-				self._connection = factoryFunc(filename, factory=factory)
+				self._connection = ThreadConnection(filename, factory=self.factory, identifier=id(self))
 			case "r":
 				if not os.path.exists(filename):
 					raise FileNotFoundError(f"Database file {filename} not found on the system.")
@@ -169,7 +187,7 @@ class Database(metaclass=DatabaseMeta):
 				if not cDatabase.startswith("/"): # Path has to be absolute already, and windows paths need a prepended '/'
 					cDatabase = "/"+cDatabase
 				
-				self._connection = factoryFunc(filename, factory=factory)
+				self._connection = ThreadConnection(filename, factory=self.factory, identifier=id(self))
 			case _:
 				raise ValueError(f"{mode!r} is not a recognized file-stream mode. Only 'w'/'r' allowed.")
 	
@@ -204,7 +222,7 @@ class Database(metaclass=DatabaseMeta):
 	
 	def __del__(self):
 		try:
-			self._connection.close()
+			self.close()
 		except:
 			pass
 	
@@ -252,26 +270,47 @@ class Database(metaclass=DatabaseMeta):
 		return False
 
 	def __getitem__(self, items : tuple[Column|Table|Comparison]):
-		if not isinstance(items, tuple):
+		if not type(items) is tuple:
 			items = (items, )
-		from SQLOOP._core.Functions import getSmallestFootprint, createSubqueries
-		columns = tuple(filter(lambda x:isRelated(x, Column), items)) or (ALL)
+		from SQLOOP._core.Functions import getSmallestFootprint, createSubqueries, recursiveWalk, disambiguateColumn
+		if Globals.MAX_DEBUG: self.LOG.debug(f"Getting: {', '.join(map(str, items))}")
+		columns = tuple(filter(lambda x:isRelated(x, Column) or isinstance(x, Aggregate) or isinstance(x, Operation), items)) or (ALL)
 
 		comps = tuple(filter(lambda x:isinstance(x, Comparison), items))
-		tables = tuple(filter(lambda x:isRelated(x, Table), items)) or getSmallestFootprint(self.tables, set(filter(lambda x:x is not ALL, itertools.chain(*map(lambda x:(x,) if not isinstance(x, Aggregate) else x.content, columns)))), secondaryColumns=tuple(map(*this.left, comps)))
+
+		realColumns = frozenset(col for col in recursiveWalk(columns) if isRelated(col, Column) and col is not ALL)
 		
+		tables = tuple(filter(lambda x:isRelated(x, Table), items))
+		if tables:
+			if Globals.MAX_DEBUG: self.LOG.debug(f"Tables given: {', '.join(map(str, tables))}")
+		else:
+			tables = getSmallestFootprint(frozenset(self.tables), realColumns, secondaryColumns=frozenset(map(*this.left, comps)))
+			if Globals.MAX_DEBUG: self.LOG.debug(f"Tables Determined: {', '.join(map(str, tables))}")
+
+		# Disambiguate columns. I.e. Use 'table.column' instead of just 'column' when more than one table has a column named 'column'
+		try:
+			columns = tuple(disambiguateColumn(col, tables) for col in columns)
+		except ColumnNotFoundError:
+			raise NonContiguousQuery(f"Columns {', '.join(map(str, columns))} could not be queried from a unified table. The tables they exist in have no direct or indirect connections.")
+
+		connections = tuple(table.linkedColumns[col] == otherTable.linkedColumns[col] for i, table in enumerate(tables) for col in table for otherTable in tables[i+1:] if col in otherTable)
+
 		joinedColumns = {col for t in tables for col in t.columns}
 
 		distant, local = binner(lambda x:x.left in joinedColumns, comps, default=2)
 		if distant:
-			wheres = local + createSubqueries(tables, self.tables, distant)
+			wheres = connections + local + createSubqueries(SQLDict(tables), self.tables, distant)
 		else:
-			wheres = local
+			wheres = connections + local
 		
+		order = tuple(filter(lambda x:isinstance(x, Query) and len(x.words) == 2 and isRelated(x.words[0], Column) and (x.words[1] is DESC or x.words[1] is ASC), items))
+
+		query = SELECT (*columns) - FROM (*tables)
 		if wheres:
-			return self(SELECT (*columns) - FROM (*tables) - WHERE (*wheres))
-		else:
-			return self(SELECT (*columns) - FROM (*tables))
+			query = query - WHERE (*wheres)
+		if order:
+			query = query - ORDER - BY (*order)
+		return self(query)
 
 	@property
 	def __version__(self):
@@ -359,6 +398,7 @@ class Database(metaclass=DatabaseMeta):
 
 	def close(self):
 		try:
-			self._connection.close()
+			self._connection.close(identifier=id(self))
 		except:
 			pass
+		

@@ -2,6 +2,11 @@
 from SQLOOP._core.Structures import *
 from typing import overload, final, Any
 
+__all__ = ("BEGIN", "ROLLBACK", "IN", "TRANSACTION", "COMMIT", "CONSTRAINT", "CHECK", "PRAGMA", "VALUES", "UPDATE",
+		   "SET", "UNIQUE", "SELECT", "FROM", "WHERE", "ASC", "DESC", "ORDER", "BY", "LIMIT", "CREATE", "ALTER",
+		   "DELETE", "AND", "RENAME", "DROP", "TO", "INDEX", "TABLE", "TRIGGER", "VIEW", "IF", "NOT", "IS", "PRIMARY",
+		   "FOREIGN", "EXISTS", "INSERT", "INTO", "NULL", "KEY", "OR", "REPLACE", "REFERENCES")
+
 class Comparators(Word):
 	@final
 	def __rsub__(self, left):
