@@ -289,7 +289,7 @@ class Database(metaclass=DatabaseMeta):
 
 		# Disambiguate columns. I.e. Use 'table.column' instead of just 'column' when more than one table has a column named 'column'
 		try:
-			columns = tuple(disambiguateColumn(col) for col in columns)
+			columns = tuple(disambiguateColumn(col, tables) for col in columns)
 		except ColumnNotFoundError:
 			raise NonContiguousQuery(f"Columns {', '.join(map(str, columns))} could not be queried from a unified table. The tables they exist in have no direct or indirect connections.")
 
