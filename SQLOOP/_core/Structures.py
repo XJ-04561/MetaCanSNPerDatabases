@@ -172,7 +172,7 @@ class SanitizedValue(SQLObject, metaclass=SQLStructure):
 	@overload
 	def __new__(cls, value : None|SQLOOP) -> SQLOOP: ...
 	@overload
-	def __new__(cls, value : Any) -> Self: ...
+	def __new__(cls, value : Any) -> "SanitizedValue": ...
 	def __new__(cls, value):
 		if value is None:
 			from SQLOOP._core.Words import NULL
@@ -426,10 +426,10 @@ class Query(SQLOOP):
 	def __format__(self, format_spec):
 		return f"({format(str(self), format_spec)})"
 
-	def __sub__(self, right : Self|Word):
+	def __sub__(self, right : "Query"|Word):
 		return type(self)(self.words, right)
 	
-	def __rsub__(self, left : Self|Word):
+	def __rsub__(self, left : "Query"|Word):
 		return type(self)(left, self.words)
 
 	def __mult__(self, right):

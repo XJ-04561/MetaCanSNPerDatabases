@@ -370,7 +370,7 @@ class Database(metaclass=DatabaseMeta):
 		self.close()
 		self.__init__(self.filename, mode=mode)
 
-	def createIndex(self : Self, index : Index) -> bool:
+	def createIndex(self : "Database", index : Index) -> bool:
 		"""Create a given Index-object inside the database. Returns True if succesfull, returns False otherwise."""
 		try:
 			self(CREATE - INDEX - sql(index))
