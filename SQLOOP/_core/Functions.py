@@ -209,8 +209,11 @@ def getSmallestFootprint(tables : set["Table"], columns : set["Column"], seconda
 	mustHaves = set(filter(None, map(*this.table, columns)))
 	candidates = []
 	for i in range(len(tables)):
-		for subTables in filter(mustHaves.issubset, itertools.combinations(tables, i+1)):
-			if all(map(lambda c:any(map(lambda t:c in t, subTables)), columns)):
+		for subTables in filter(mustHaves.issubset, itertools.combinations(tuple(tables), i+1)):
+			for col in columns:
+				if not any(col in t for t in subTables):
+					break
+			else:
 				candidates.append(subTables)
 	if secondaryColumns is not None:
 		return max(candidates, key=lambda candTables:sum(any(c in t for t in candTables) for c in secondaryColumns))

@@ -270,7 +270,7 @@ class Database(metaclass=DatabaseMeta):
 		return False
 
 	def __getitem__(self, items : tuple[Column|Table|Comparison]):
-		if not isinstance(items, tuple):
+		if not type(items) is tuple:
 			items = (items, )
 		from SQLOOP._core.Functions import getSmallestFootprint, createSubqueries, recursiveWalk
 		columns = tuple(filter(lambda x:isRelated(x, Column) or isinstance(x, Aggregate) or isinstance(x, Operation), items)) or (ALL)
