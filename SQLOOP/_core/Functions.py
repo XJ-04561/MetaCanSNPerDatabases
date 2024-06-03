@@ -228,7 +228,7 @@ def recursiveSubquery(startCol : "Column", tables : SQLDict["Table"], values : l
 
 
 def subqueryPaths(startTables : SQLDict["Table"], columns : SQLDict["Column"], allTables : SQLDict["Table"]) -> list[list[list["Table"], SQLDict["Column"]]]:
-	LOG = Globals.LOGGER.getChild("subqueryPaths")
+	LOG = LOGGER.getChild("subqueryPaths")
 	LOG.debug(f"Called with signature: ({startTables=}, {columns=}, {allTables=})")
 	if not columns:
 		return []
@@ -257,7 +257,7 @@ def subqueryPaths(startTables : SQLDict["Table"], columns : SQLDict["Column"], a
 	return []
 
 def createSubqueries(startTables : SQLDict["Table"], allTables : SQLDict["Table"], values : tuple["Comparison"]):
-	LOG = Globals.LOGGER.getChild("createSubqueries")
+	LOG = LOGGER.getChild("createSubqueries")
 	LOG.debug(f"Called with signature: ({startTables=}, {allTables=}, {values=})")
 	_allTables = allTables.difference(startTables)
 	paths = subqueryPaths(startTables, SQLDict(map(lambda x:x.left, values)), _allTables)
