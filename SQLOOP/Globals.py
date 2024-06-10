@@ -3,22 +3,57 @@
 from functools import cached_property, cache
 import sqlite3, hashlib, re, os, logging, shutil, sys, itertools, random, copy
 from time import sleep
-
-
-from typing import (
-	Generator, Callable, Iterable, Literal, Any, TextIO,
-	BinaryIO, Iterator, TypeVar, Type, get_args, get_origin,
-	Union, Type, overload, final, Generic)
-from types import FunctionType, MethodType
-
 from PseudoPathy import Path, DirectoryPath, FilePath, PathGroup, PathLibrary, PathList
 from PseudoPathy.PathShortHands import *
+from GeekyGadgets import *
+from GeekyGadgets.TypeHinting import *
 
 from SQLOOP._core.Exceptions import *
-from This import this
 
+_NOT_SET = object()
+_T = TypeVar("_T")
 LOGGER = logging.getLogger("SQLOOP")
 MAX_DEBUG = False
+SOFTWARE_NAME = "SQLOOP"
+ASSERTIONS = (
+	SchemaNotEmpty,
+	ValidTablesSchema,
+	ValidIndexesSchema
+)
+
+SQL_TYPES = {
+	"INTEGER" : int,
+	"TEXT" : str,
+	"VARCHAR" : str,
+	"CHAR" : str,
+	"DATE" : str,
+	"DATETIME" : str,
+	"DECIMAL" : float,
+	"NULL" : (lambda x : None)
+}
+SQL_TYPE_NAMES = {
+	int : "INTEGER",
+	str : "TEXT",
+	float : "DECIMAL",
+	None : "NULL"
+}
+OPERATOR_DUNDERS = {
+	"==" : "__eq__",
+	"!=" : "__ne__",
+	"<" : "__lt__",
+	"<=" : "__le__",
+	">" : "__gt__",
+	">=" : "__ge__",
+	"IN" : "__contains__"
+}
+
+whitespacePattern = re.compile(r"\s+")
+sqlite3TypePattern = re.compile(r"^(?P<integer>INTEGER)|(?P<decimal>DECIMAL)|(?P<char>(VAR)?CHAR[(](?P<number>[0-9]*)[)])|(?P<date>DATE)|(?P<datetime>DATETIME)|(?P<text>TEXT)$", re.IGNORECASE)
+namePattern = re.compile(r"^[a-zA-Z0-9_\-*]*$")
+formatPattern = re.compile(r"[{](.*?)[}]")
+fileNamePattern = re.compile(r"[a-zA-Z0-9_\-]*")
+antiFileNamePattern = re.compile(r"[^a-zA-Z0-9_\-]")
+tableCreationCommand = re.compile(r"^\W*CREATE\W+(TEMP|TEMPORARY\W)?\W*(TABLE|INDEX)(\W+IF\W+NOT\W+EXISTS)?\W+(\w[.])?", flags=re.ASCII|re.IGNORECASE)
 
 class Connection(sqlite3.Connection):
 	filename : str | bytes | os.PathLike[str] | os.PathLike[bytes] = None
@@ -32,85 +67,7 @@ class Connection(sqlite3.Connection):
 	def __repr__(self):
 		return f"{object.__repr__(self)[:-1]} '{self.filename}'>"
 
-tableCreationCommand = re.compile(r"^\W*CREATE\W+(TEMP|TEMPORARY\W)?\W*(TABLE|INDEX)(\W+IF\W+NOT\W+EXISTS)?\W+(\w[.])?", flags=re.ASCII|re.IGNORECASE)
-
-_NOT_SET = object()
-_T = TypeVar("_T")
-
-
-class Mode: pass
-class ReadMode: pass
-class WriteMode: pass
-Mode        = Literal["r", "w"]
-ReadMode    = Literal["r"]
-WriteMode   = Literal["w"]
-class Rest(Iterator): pass
-class All(Iterator): pass
-
-allCapsSnakecase = re.compile("^[A-Z_0-9]+$")
-snakeCase = re.compile("^[a-z_0-9]+$")
-camelKiller = re.compile(r"(?<=[^A-Z])(?=[A-Z])")
-
-camelCase = re.compile("^[^_]+$")
-snakeKiller = re.compile(r"[_](\w)")
-
-def binner(key : Callable, iterable : Iterable, outType : type=list, default=None):
-	ret = {}
-	for i, data in itertools.groupby(tuple(iterable), key=key):
-		if i not in ret:
-			ret[i] = tuple(data)
-		else:
-			ret[i] = ret[i] + tuple(data)
-	return tuple(ret.get(i, ()) for i in range(default or max(ret)))
-
-def first(iterator : Iterable[_T]|Iterator[_T]) -> _T|None:
-	if hasattr(iterator, "__next__"):
-		try:
-			return next(iterator)
-		except StopIteration:
-			return None
-	else:
-		try:
-			return next(iter(iterator))
-		except StopIteration:
-			return None
-
-def camel2snake(string : str):
-	if allCapsSnakecase.fullmatch(string) or snakeCase.fullmatch(string):
-		return string.lower()
-	else:
-		return camelKiller.sub("_", string).lower()
-
-def snake2camel(string):
-	if camelCase.fullmatch(string):
-		return string
-	else:
-		snakeKiller.sub(lambda m:m.group(1).upper(), string)
-
-@overload
-def getReadyAttr(obj, attrName) -> Any: ...
-@overload
-def getReadyAttr(obj, attrName, default : _T) -> Any|_T: ...
-def getReadyAttr(obj, attrName, default=_NOT_SET):
-	if default is _NOT_SET:
-		if isinstance((value := getattr(obj, attrName)), (property, cached_property)):
-			raise AttributeError(f"{type(obj)!r} object has a un-determined attribute {attrName!r} value ({value})")
-	elif isinstance((value := getattr(obj, attrName, default)), (property, cached_property)):
-		return default
-	return value
-
-def hasReadyAttr(obj, attrName) -> bool:
-	try:
-		if isinstance(getattr(obj, attrName), (property, cached_property)):
-			raise AttributeError()
-	except AttributeError:
-		return False
-	return True
-
-def isThing(thing, cls):
-	return isRelated(thing, cls) or isinstance(thing, cls)
-
-class Error(Exception):
+class SQLOOPError(Exception):
 	
 	msg : str
 	def __init__(self, *args, **kwargs):
@@ -133,7 +90,7 @@ class SQLOOP:
 		if name is not None:
 			cls.__sql_name__ = name.lower()
 		else:
-			cls.__sql_name__ = camel2snake(cls.__name__) if "_" not in cls.__name__.strip("_") else cls.__name__.lower()
+			cls.__sql_name__ = Case.toSnake(cls.__name__) if "_" not in cls.__name__.strip("_") else cls.__name__.lower()
 		super().__init_subclass__(*args, **kwargs)
 
 	def __repr__(self):
@@ -195,19 +152,12 @@ class SQLTuple(SQLOOP, tuple):
 			out.extend(getReadyAttr(item, "params", []))
 		return out
 
-class Nothing:
-	def __eq__(self, other):
-		return False
-
 class sql(str, SQLOOP):
 	def __new__(cls, obj):
 		if isinstance(obj, type):
 			return super().__new__(cls, type(obj).__sql__(obj))
 		else:
 			return super().__new__(cls, obj.__sql__())
-	
-class NoHash:
-	def __eq__(self, other): return True
 
 class ClassProperty:
 
@@ -318,7 +268,7 @@ class SQLDict(dict):
 			return all(x == y for x,y in zip(self, other))
 		if hasattr(other, "__next__"):
 			# The following will return False if one of the iterables/iterators outpaces the other.
-			return all(x == y for x,y in zip(itertools.chain(self, itertools.repeat(Nothing())), itertools.chain(other, itertools.repeat(Nothing()))))
+			return all(x == y for x,y in ZipLongest(self, other))
 		return False
 	
 	def __setitem__(self, key, value):
@@ -354,64 +304,3 @@ class SQLDict(dict):
 	def difference(self, *args, **kwargs): return SQLDict(self.valueSet.difference(*args, **kwargs))
 	def union(self, *args, **kwargs): return SQLDict(self.valueSet.union(*args, **kwargs))
 	def without(self, *iterables): return SQLDict(filter(lambda x:not any(x in it for it in iterables), self))
-
-@cache
-def alphabetize(n : int):
-	m = n
-	out = []
-	while m > 0:
-		out.append("ABCDEFGHIJKLMNOPQRSTUVWXYZ"[n%26])
-		m //= 26
-	return "".join(out)
-
-def isRelated(cls1 : type|object, cls2 : type) -> bool:
-	"""Convenience function which returns True if cls1 is both a type and a subclass of cls2. This is useful because
-	attempting issubclass() on an object as first argument raises an exception,  so this can be used instead of
-	explicitly typing isinstance(cls1, type) and issubclass(cl1, cls2)"""
-	return isinstance(cls1, type) and issubclass(cls1, cls2)
-
-ASSERTIONS = (
-	SchemaNotEmpty,
-	ValidTablesSchema,
-	ValidIndexesSchema
-)
-
-SQL_TYPES = {
-	"INTEGER" : int,
-	"TEXT" : str,
-	"VARCHAR" : str,
-	"CHAR" : str,
-	"DATE" : str,
-	"DATETIME" : str,
-	"DECIMAL" : float,
-	"NULL" : (lambda x : None)
-}
-
-SQL_TYPE_NAMES = {
-	int : "INTEGER",
-	str : "TEXT",
-	float : "DECIMAL",
-	None : "NULL"
-}
-
-OPERATOR_DUNDERS = {
-	"==" : "__eq__",
-	"!=" : "__ne__",
-	"<" : "__lt__",
-	"<=" : "__le__",
-	">" : "__gt__",
-	">=" : "__ge__",
-	"IN" : "__contains__"
-}
-
-whitespacePattern = re.compile(r"\s+")
-sqlite3TypePattern = re.compile(r"^(?P<integer>INTEGER)|(?P<decimal>DECIMAL)|(?P<char>(VAR)?CHAR[(](?P<number>[0-9]*)[)])|(?P<date>DATE)|(?P<datetime>DATETIME)|(?P<text>TEXT)$", re.IGNORECASE)
-namePattern = re.compile(r"^[a-zA-Z0-9_\-*]*$")
-formatPattern = re.compile(r"[{](.*?)[}]")
-fileNamePattern = re.compile(r"[a-zA-Z0-9_\-]*")
-antiFileNamePattern = re.compile(r"[^a-zA-Z0-9_\-]")
-
-SOFTWARE_NAME = "SQLOOP"
-
-SOURCES = []
-

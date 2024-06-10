@@ -7,7 +7,7 @@ from SQLOOP._core.Types import *
 from SQLOOP._core.Expressions import *
 from SQLOOP._core.Words import *
 from SQLOOP._core.Aggregates import *
-from SQLOOP._core.ThreadConnection import ThreadConnection
+from GeekyGadgets.Threads import ThreadConnection
 
 class Fetcher:
 	"""Fetches data from a cursor. Consumes the cursor object during iteration/indexation."""
@@ -272,13 +272,13 @@ class Database(metaclass=DatabaseMeta):
 	def __getitem__(self, items : tuple[Column|Table|Comparison]):
 		if not type(items) is tuple:
 			items = (items, )
-		from SQLOOP._core.Functions import getSmallestFootprint, createSubqueries, recursiveWalk, disambiguateColumn
+		from SQLOOP._core.Functions import getSmallestFootprint, createSubqueries, Walker, disambiguateColumn
 		if Globals.MAX_DEBUG: self.LOG.debug(f"Getting: {', '.join(map(str, items))}")
 		columns = tuple(filter(lambda x:isRelated(x, Column) or isinstance(x, Aggregate) or isinstance(x, Operation), items)) or (ALL)
 
 		comps = tuple(filter(lambda x:isinstance(x, Comparison), items))
 
-		realColumns = frozenset(col for col in recursiveWalk(columns) if isRelated(col, Column) and col is not ALL)
+		realColumns = frozenset(col for col in Walker(columns) if isRelated(col, Column) and col is not ALL)
 		
 		tables = tuple(filter(lambda x:isRelated(x, Table), items))
 		if tables:

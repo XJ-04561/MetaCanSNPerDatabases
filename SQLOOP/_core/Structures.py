@@ -365,14 +365,14 @@ class Query(SQLOOP):
 	def __new__(cls, *args, **kwargs):
 		
 		from SQLOOP._core.Expressions import Expression
-		from SQLOOP._core.Functions import recursiveWalk
+		from SQLOOP._core.Functions import Walker
 		
 		if cls is not Query:
 			return super().__new__(cls)
 		elif args and isinstance(args[0], Query) and type(args[0]) is not Query:
 			return super().__new__(type(args[0]))
 		else:
-			for item in recursiveWalk(args):
+			for item in Walker(args):
 				if isinstance(item, Word):
 					startWord = type(item)
 					break
@@ -403,8 +403,8 @@ class Query(SQLOOP):
 	
 	def __contains__(self, other):
 		
-		from SQLOOP._core.Functions import recursiveWalk
-		for item in recursiveWalk(self.words):
+		from SQLOOP._core.Functions import Walker
+		for item in Walker(self.words):
 			if item == other:
 				return True
 			elif isinstance(item, SQLOOP) and type(item) == other:
@@ -439,8 +439,8 @@ class Query(SQLOOP):
 	@cached_property
 	def startWord(self):
 		
-		from SQLOOP._core.Functions import recursiveWalk
-		for item in recursiveWalk(self.words):
+		from SQLOOP._core.Functions import Walker
+		for item in Walker(self.words):
 			if isinstance(item, Word):
 				return type(item)
 			elif isRelated(item, Word):
@@ -521,8 +521,8 @@ class Table(SQLObject, HasColumns, metaclass=TableMeta):
 		super().__init_subclass__(**kwargs)
 
 		numberOfColumns = sum(map(lambda x:1, filter(lambda x:isRelated(x, Column), vars(cls).values())))
-		for i in range(numberOfColumns):
-			if hasattr(cls, alphabetize(i)):
+		for c in AlphaRange(numberOfColumns):
+			if hasattr(cls, c):
 				break
 		else:
 			for i, value in enumerate(filter(lambda x:isRelated(x, Column), vars(cls).copy().values())):
